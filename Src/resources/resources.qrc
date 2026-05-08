@@ -1,0 +1,33 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>icons/tool-select.svg</file>
+        <file>icons/tool-rect.svg</file>
+        <file>icons/tool-ellipse.svg</file>
+        <file>icons/tool-line.svg</file>
+        <file>icons/tool-curve.svg</file>
+        <file>icons/tool-freehand.svg</file>
+        <file>icons/tool-text.svg</file>
+        <file>icons/tool-image.svg</file>
+        <file>icons/align-layout.svg</file>
+        <file>icons/rotate-cw.svg</file>
+        <file>icons/rotate-ccw.svg</file>
+        <file>icons/file-new.svg</file>
+        <file>icons/file-import.svg</file>
+        <file>icons/file-export.svg</file>
+        <file>icons/edit-undo.svg</file>
+        <file>icons/edit-redo.svg</file>
+        <file>icons/edit-cut.svg</file>
+        <file>icons/edit-copy.svg</file>
+        <file>icons/edit-paste.svg</file>
+        <file>icons/edit-delete.svg</file>
+        <file>icons/edit-select-all.svg</file>
+        <file>icons/bring-front.svg</file>
+        <file>icons/send-back.svg</file>
+        <file>icons/view-fit.svg</file>
+        <file>icons/view-zoom-reset.svg</file>
+        <file>icons/view-grid.svg</file>
+    </qresource>
+    <qresource prefix="/style">
+        <file>style.qss</file>
+    </qresource>
+</RCC>

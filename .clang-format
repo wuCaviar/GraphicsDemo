@@ -1,0 +1,98 @@
+# 合并后的 Qt C++ 风格 .clang-format
+# 基础：Qt 官方编码风格 (https://wiki.qt.io/Qt_Coding_Style)
+# 补充：来自另一份配置的实用选项 (SortUsingDeclarations 等)
+
+Language:        Cpp
+Standard:        c++17
+
+# 基础缩进与对齐
+AccessModifierOffset: -4           # public:/private: 与 class 关键字对齐
+IndentWidth:      4
+TabWidth:         4
+UseTab:           Never
+ContinuationIndentWidth: 4
+NamespaceIndentation: None         # 命名空间内容不缩进
+
+# 大括号风格 (控制流不换行，函数/类换行)
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass:      true
+  AfterStruct:     true
+  AfterEnum:       true
+  AfterFunction:   true
+  AfterNamespace:  false          # namespace 不换行
+  AfterControlStatement: false    # if/for/while 等不换行
+  BeforeCatch:     false
+  BeforeElse:      false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: true
+
+# 指针与引用
+DerivePointerAlignment: false
+PointerAlignment: Right           # * 和 & 贴近变量名
+
+# 操作符与空格
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: false
+SpaceAfterTemplateKeyword: false
+SpaceBeforeAssignmentOperators: true
+SpacesInAngles: false
+SpacesInParentheses: false
+SpacesInCStyleCastParentheses: false
+SpacesInContainerLiterals: false
+SpacesInSquareBrackets: false
+SpaceInEmptyParentheses: false
+
+# 换行与列宽
+ColumnLimit:     100              # Qt 常用 100 列
+AlwaysBreakTemplateDeclarations: Yes
+AlwaysBreakAfterReturnType: None
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+# 构造/继承列表 (逗号前置，与 Qt 一致)
+BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: BeforeComma
+ConstructorInitializerIndentWidth: 4
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+
+# 二元/三元运算符换行
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: true
+
+# 其他对齐选项
+AlignAfterOpenBracket: Align
+AlignOperands: true
+AlignTrailingComments: false
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+
+# 预处理与宏
+IndentPPDirectives: None
+ForEachMacros: ['foreach', 'Q_FOREACH', 'BOOST_FOREACH']
+
+# 空行
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# 包含文件排序 (自身头文件 -> Qt 头文件 -> 其他系统头文件)
+SortIncludes: true
+SortUsingDeclarations: true      # 同时也排序 using 声明
+IncludeBlocks: Preserve
+IncludeCategories:
+  - Regex: '^\"'
+    Priority: 1                  # 项目自己的头文件
+  - Regex: '^<Q.*>'
+    Priority: 2                  # Qt 头文件
+  - Regex: '^<.*>'
+    Priority: 3                  # 其他系统/第三方头文件
+
+# 其他
+FixNamespaceComments: true
+ReflowComments: true
+CompactNamespaces: false

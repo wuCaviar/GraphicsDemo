@@ -1,0 +1,45 @@
+#ifndef RECTITEM_H
+#define RECTITEM_H
+
+#include "IGraphicsItem.h"
+#include <QGraphicsRectItem>
+
+class RectItem : public QGraphicsRectItem, public IGraphicsItem
+{
+public:
+    enum { Type = UserType + RectItemType };
+
+    explicit RectItem(QGraphicsItem *parent = nullptr);
+    RectItem(const QRectF &rect, QGraphicsItem *parent = nullptr);
+
+    int type() const override { return Type; }
+
+    // IGraphicsItem
+    ItemType itemType() const override { return RectItemType; }
+    PropertyFlags propertyFlags() const override { return HasPen | HasBrush | HasRotation; }
+    QGraphicsItem *cloneItem() const override;
+
+    QPen itemPen() const override { return pen(); }
+    void setItemPen(const QPen &p) override { setPen(p); }
+    QBrush itemBrush() const override { return brush(); }
+    void setItemBrush(const QBrush &b) override { setBrush(b); }
+
+    // 精确几何矩形 — 返回不含画笔边距的 rect()
+    QRectF geometryRect() const override { return rect(); }
+    bool supportsGeometryRect() const override { return true; }
+
+    qreal cornerRadius() const;
+    void setCornerRadius(qreal r);
+
+    void serialize(QDataStream &out) const override;
+    void deserialize(QDataStream &in) override;
+
+protected:
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
+               QWidget *widget) override;
+
+private:
+    qreal m_cornerRadius = 0.0;
+};
+
+#endif // RECTITEM_H

@@ -1,0 +1,38 @@
+#ifndef ELLIPSEITEM_H
+#define ELLIPSEITEM_H
+
+#include "IGraphicsItem.h"
+#include <QGraphicsEllipseItem>
+
+class EllipseItem : public QGraphicsEllipseItem, public IGraphicsItem
+{
+public:
+    enum { Type = UserType + EllipseItemType };
+
+    explicit EllipseItem(QGraphicsItem *parent = nullptr);
+    EllipseItem(const QRectF &rect, QGraphicsItem *parent = nullptr);
+
+    int type() const override { return Type; }
+
+    ItemType itemType() const override { return EllipseItemType; }
+    PropertyFlags propertyFlags() const override { return HasPen | HasBrush | HasRotation; }
+    QGraphicsItem *cloneItem() const override;
+
+    QPen itemPen() const override { return pen(); }
+    void setItemPen(const QPen &p) override { setPen(p); }
+    QBrush itemBrush() const override { return brush(); }
+    void setItemBrush(const QBrush &b) override { setBrush(b); }
+
+    // 精确几何矩形 — 返回不含画笔边距的 rect()
+    QRectF geometryRect() const override { return rect(); }
+    bool supportsGeometryRect() const override { return true; }
+
+    void serialize(QDataStream &out) const override;
+    void deserialize(QDataStream &in) override;
+
+protected:
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
+               QWidget *widget) override;
+};
+
+#endif // ELLIPSEITEM_H
