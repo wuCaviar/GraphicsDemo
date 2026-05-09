@@ -1,4 +1,6 @@
 #include "RectItem.h"
+#include "ColorUtils.h"
+
 #include <QPainter>
 
 RectItem::RectItem(QGraphicsItem *parent) : QGraphicsRectItem(parent)
@@ -40,7 +42,7 @@ void RectItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidge
 {
     painter->setRenderHint(QPainter::Antialiasing);
     painter->setPen(pen());
-    painter->setBrush(brush());
+    painter->setBrush(ColorUtils::mapGradientBrushToRect(brush(), rect()));
 
     if (m_cornerRadius > 0)
         painter->drawRoundedRect(rect(), m_cornerRadius, m_cornerRadius);

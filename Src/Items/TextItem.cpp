@@ -1,4 +1,6 @@
 #include "TextItem.h"
+#include "ColorUtils.h"
+
 #include <QPainter>
 #include <QTextDocument>
 
@@ -133,8 +135,9 @@ void TextItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, 
     // 先绘制背景
     if (m_bgBrush != Qt::NoBrush) {
         painter->setPen(Qt::NoPen);
-        painter->setBrush(m_bgBrush);
-        painter->drawRect(boundingRect());
+        QRectF bgRect = boundingRect();
+        painter->setBrush(ColorUtils::mapGradientBrushToRect(m_bgBrush, bgRect));
+        painter->drawRect(bgRect);
     }
 
     // 绘制文本

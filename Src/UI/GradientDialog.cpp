@@ -6,13 +6,10 @@
 
 #include <QDrag>
 #include <QLinearGradient>
-#include <QRadialGradient>
-#include <QConicalGradient>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QStyleOptionFrame>
 #include <QStylePainter>
-#include <memory>
 
 class GradientPreview::Private
 {
@@ -101,55 +98,8 @@ void GradientPreview::paint(QPainter &painter, QRect rect) const
         return;
     }
 
-    // 根据渐变类型创建映射到预览区域的新渐变
-    std::unique_ptr<QGradient> drawGrad;
-
-    switch (grad->type()) {
-    case QGradient::LinearGradient: {
-        const QLinearGradient *lg = static_cast<const QLinearGradient *>(grad);
-        QPointF s = lg->start();
-        QPointF e = lg->finalStop();
-        // 计算原始渐变的边界框，然后等比映射到控件矩形
-        qreal gw = qMax(qAbs(e.x() - s.x()), 0.001);
-        qreal gh = qMax(qAbs(e.y() - s.y()), 0.001);
-        qreal minX = qMin(s.x(), e.x());
-        qreal minY = qMin(s.y(), e.y());
-        drawGrad.reset(new QLinearGradient(
-            (s.x() - minX) / gw * rect.width(),
-            (s.y() - minY) / gh * rect.height(),
-            (e.x() - minX) / gw * rect.width(),
-            (e.y() - minY) / gh * rect.height()));
-        break;
-    }
-    case QGradient::RadialGradient: {
-        const QRadialGradient *rg = static_cast<const QRadialGradient *>(grad);
-        qreal origR = qMax(rg->radius(), 0.001);
-        qreal scale = qMax(rect.width(), rect.height()) / 2.0;
-        // 保留焦点的相对偏移
-        qreal fx = rg->focalPoint().x() - rg->center().x();
-        qreal fy = rg->focalPoint().y() - rg->center().y();
-        drawGrad.reset(new QRadialGradient(
-            rect.width() / 2.0, rect.height() / 2.0, scale,
-            rect.width() / 2.0 + fx / origR * scale,
-            rect.height() / 2.0 + fy / origR * scale));
-        break;
-    }
-    case QGradient::ConicalGradient: {
-        const QConicalGradient *cg = static_cast<const QConicalGradient *>(grad);
-        drawGrad.reset(new QConicalGradient(
-            rect.width() / 2.0, rect.height() / 2.0, cg->angle()));
-        break;
-    }
-    default:
-        painter.fillRect(0, 0, rect.width(), rect.height(), p->brush);
-        return;
-    }
-
-    // 复制色标和扩展模式
-    drawGrad->setStops(grad->stops());
-    drawGrad->setSpread(grad->spread());
-    drawGrad->setCoordinateMode(QGradient::LogicalMode);
-    painter.fillRect(0, 0, rect.width(), rect.height(), QBrush(*drawGrad));
+    QRectF previewRect(0, 0, rect.width(), rect.height());
+    painter.fillRect(previewRect, ColorUtils::mapGradientBrushToRect(p->brush, previewRect));
 }
 
 void GradientPreview::setBrush(const QBrush &c)

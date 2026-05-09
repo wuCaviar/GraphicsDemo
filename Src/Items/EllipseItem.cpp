@@ -1,4 +1,6 @@
 #include "EllipseItem.h"
+#include "ColorUtils.h"
+
 #include <QPainter>
 
 EllipseItem::EllipseItem(QGraphicsItem *parent) : QGraphicsEllipseItem(parent)
@@ -29,7 +31,7 @@ void EllipseItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWi
 {
     painter->setRenderHint(QPainter::Antialiasing);
     painter->setPen(pen());
-    painter->setBrush(brush());
+    painter->setBrush(ColorUtils::mapGradientBrushToRect(brush(), rect()));
     painter->drawEllipse(rect());
 }
 
