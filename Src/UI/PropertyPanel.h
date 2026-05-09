@@ -55,7 +55,9 @@ private slots:
     void onPenStyleChanged(int idx);
     void onFillModeChanged(int idx);
     void onBrushColorClicked(const QColor& color);
-    void onBrushGradientClicked(const QBrush& brush);
+    void onBrushGradientPreviewed(const QBrush& brush);
+    void onBrushGradientSelected(const QBrush& brush);
+    void onBrushGradientCanceled(const QBrush& oldBrush);
     void onFontFamilyChanged(const QFont &f);
     void onFontSizeChanged(int s);
     void onBoldToggled(bool b);
@@ -68,8 +70,25 @@ private slots:
     void onRotationChanged(double r);
 
 private:
+    enum class ColorPreviewTarget {
+        None,
+        Border,
+        Fill,
+        Text,
+        TextBackground,
+        FillGradient,
+    };
+
     void setupUI();
     void updatePanel();
+    void beginColorPreview(ColorPreviewTarget target);
+    void previewColorChange(ColorPreviewTarget target, const QColor &color);
+    void commitColorChange(ColorPreviewTarget target, const QColor &color);
+    void cancelColorPreview(ColorPreviewTarget target);
+    void beginBrushPreview(ColorPreviewTarget target);
+    void previewBrushChange(ColorPreviewTarget target, const QBrush &brush);
+    void commitBrushChange(ColorPreviewTarget target, const QBrush &brush);
+    void clearColorPreview();
 
     QGraphicsItem *m_currentItem = nullptr;
     bool m_updating = false; // 防止信号循环
@@ -125,6 +144,11 @@ private:
     QRectF m_oldRect;
     qreal m_oldCornerRadius = 0;
     qreal m_oldRotation = 0;
+
+    ColorPreviewTarget m_previewTarget = ColorPreviewTarget::None;
+    QGraphicsItem *m_previewItem = nullptr;
+    QPen m_previewOldPen;
+    QBrush m_previewOldBrush;
 };
 
 #endif // PROPERTYPANEL_H

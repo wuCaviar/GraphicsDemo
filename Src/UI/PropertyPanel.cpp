@@ -65,6 +65,8 @@ void PropertyPanel::setupUI()
     auto *penLayout = new QFormLayout(m_penGroup);
     m_penColorSelector = new ColorSelector(this);
     m_penColorSelector->setFixedSize(60, 24);
+    m_penColorSelector->setUpdateMode(ColorSelector::Continuous);
+    m_penColorSelector->setDialogModality(Qt::ApplicationModal);
     m_penWidthSpin = new QSpinBox;
     m_penWidthSpin->setRange(0, 100);
     m_penStyleCombo = new QComboBox;
@@ -84,6 +86,8 @@ void PropertyPanel::setupUI()
 
     m_brushSolid = new ColorSelector(this);
     m_brushSolid->setFixedSize(60, 24);
+    m_brushSolid->setUpdateMode(ColorSelector::Continuous);
+    m_brushSolid->setDialogModality(Qt::ApplicationModal);
 
     m_brushGradient = new GradientPreview(this);
     m_brushGradient->setFixedSize(60, 24);
@@ -113,8 +117,12 @@ void PropertyPanel::setupUI()
     styleLayout->addWidget(m_italicBtn);
     m_textColorSelector = new ColorSelector(this);
     m_textColorSelector->setFixedSize(60, 24);
+    m_textColorSelector->setUpdateMode(ColorSelector::Continuous);
+    m_textColorSelector->setDialogModality(Qt::ApplicationModal);
     m_textBgColorSelector = new ColorSelector(this);
     m_textBgColorSelector->setFixedSize(60, 24);
+    m_textBgColorSelector->setUpdateMode(ColorSelector::Continuous);
+    m_textBgColorSelector->setDialogModality(Qt::ApplicationModal);
     m_textEdit = new QLineEdit;
     textLayout->addRow(tr("Font:"), m_fontCombo);
     textLayout->addRow(tr("Size:"), m_fontSizeSpin);
@@ -158,23 +166,59 @@ void PropertyPanel::setupUI()
     m_noSelectionLabel->setVisible(true);
 
     // ---- 信号连接 ----
+    connect(m_penColorSelector, &ColorSelector::colorEditingStarted, this,
+            [this](const QColor &) { beginColorPreview(ColorPreviewTarget::Border); });
+    connect(m_penColorSelector, &ColorSelector::colorChanged, this,
+            [this](const QColor &color) { previewColorChange(ColorPreviewTarget::Border, color); });
     connect(m_penColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onPenColorSelected);
+    connect(m_penColorSelector, &ColorSelector::colorSelectionCanceled, this,
+            [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::Border); });
+
     connect(m_penWidthSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
             &PropertyPanel::onPenWidthChanged);
     connect(m_penStyleCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &PropertyPanel::onPenStyleChanged);
+    connect(m_brushSolid, &ColorSelector::colorEditingStarted, this,
+            [this](const QColor &) { beginColorPreview(ColorPreviewTarget::Fill); });
+    connect(m_brushSolid, &ColorSelector::colorChanged, this,
+            [this](const QColor &color) { previewColorChange(ColorPreviewTarget::Fill, color); });
     connect(m_brushSolid, &ColorSelector::colorSelected, this, &PropertyPanel::onBrushColorClicked);
+    connect(m_brushSolid, &ColorSelector::colorSelectionCanceled, this,
+            [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::Fill); });
+
     connect(m_fillModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &PropertyPanel::onFillModeChanged);
-    connect(m_brushGradient, &GradientPreview::brushChanged, this, &PropertyPanel::onBrushGradientClicked);
+    connect(m_brushGradient, &GradientPreview::brushEditingStarted, this,
+            [this](const QBrush &) { beginBrushPreview(ColorPreviewTarget::FillGradient); });
+    connect(m_brushGradient, &GradientPreview::brushPreviewed, this,
+            &PropertyPanel::onBrushGradientPreviewed);
+    connect(m_brushGradient, &GradientPreview::brushSelected, this,
+            &PropertyPanel::onBrushGradientSelected);
+    connect(m_brushGradient, &GradientPreview::brushSelectionCanceled, this,
+            &PropertyPanel::onBrushGradientCanceled);
+
     connect(m_fontCombo, &QFontComboBox::currentFontChanged, this,
             &PropertyPanel::onFontFamilyChanged);
     connect(m_fontSizeSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
             &PropertyPanel::onFontSizeChanged);
     connect(m_boldBtn, &QPushButton::toggled, this, &PropertyPanel::onBoldToggled);
     connect(m_italicBtn, &QPushButton::toggled, this, &PropertyPanel::onItalicToggled);
+    connect(m_textColorSelector, &ColorSelector::colorEditingStarted, this,
+            [this](const QColor &) { beginColorPreview(ColorPreviewTarget::Text); });
+    connect(m_textColorSelector, &ColorSelector::colorChanged, this,
+            [this](const QColor &color) { previewColorChange(ColorPreviewTarget::Text, color); });
     connect(m_textColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onTextColorClicked);
+    connect(m_textColorSelector, &ColorSelector::colorSelectionCanceled, this,
+            [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::Text); });
+
+    connect(m_textBgColorSelector, &ColorSelector::colorEditingStarted, this,
+            [this](const QColor &) { beginColorPreview(ColorPreviewTarget::TextBackground); });
+    connect(m_textBgColorSelector, &ColorSelector::colorChanged, this,
+            [this](const QColor &color) { previewColorChange(ColorPreviewTarget::TextBackground, color); });
     connect(m_textBgColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onTextBgColorClicked);
+    connect(m_textBgColorSelector, &ColorSelector::colorSelectionCanceled, this,
+            [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::TextBackground); });
+
     connect(m_textEdit, &QLineEdit::editingFinished, this, &PropertyPanel::onTextChanged);
     connect(m_xSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &PropertyPanel::onGeometryChanged);
@@ -196,6 +240,165 @@ void PropertyPanel::setItem(QGraphicsItem *item)
     m_updating = true;
     updatePanel();
     m_updating = false;
+}
+
+void PropertyPanel::beginColorPreview(ColorPreviewTarget target)
+{
+    if (m_updating || !m_currentItem)
+        return;
+
+    auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
+    if (!gi)
+        return;
+    if (target == ColorPreviewTarget::Text && !qgraphicsitem_cast<TextItem *>(m_currentItem))
+        return;
+
+    m_previewTarget = target;
+    m_previewItem = m_currentItem;
+
+    if (target == ColorPreviewTarget::Border || target == ColorPreviewTarget::Text)
+        m_previewOldPen = gi->itemPen();
+    else
+        m_previewOldBrush = gi->itemBrush();
+}
+
+void PropertyPanel::previewColorChange(ColorPreviewTarget target, const QColor &color)
+{
+    if (m_updating || !color.isValid() || m_previewTarget != target || !m_previewItem)
+        return;
+
+    auto *gi = dynamic_cast<IGraphicsItem *>(m_previewItem);
+    if (!gi)
+        return;
+
+    switch (target) {
+    case ColorPreviewTarget::Border:
+    case ColorPreviewTarget::Text: {
+        QPen pen = gi->itemPen();
+        pen.setColor(color);
+        gi->setItemPen(pen);
+        break;
+    }
+    case ColorPreviewTarget::Fill:
+    case ColorPreviewTarget::TextBackground: {
+        QBrush brush(color);
+        brush.setStyle(Qt::SolidPattern);
+        gi->setItemBrush(brush);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+void PropertyPanel::commitColorChange(ColorPreviewTarget target, const QColor &color)
+{
+    if (m_updating || !color.isValid())
+        return;
+
+    if (m_previewTarget != target || !m_previewItem)
+        beginColorPreview(target);
+    if (m_previewTarget != target || !m_previewItem)
+        return;
+
+    previewColorChange(target, color);
+
+    auto *item = m_previewItem;
+    auto *gi = dynamic_cast<IGraphicsItem *>(item);
+    if (!gi) {
+        clearColorPreview();
+        return;
+    }
+
+    if (target == ColorPreviewTarget::Border || target == ColorPreviewTarget::Text) {
+        QPen newPen = gi->itemPen();
+        QPen oldPen = m_previewOldPen;
+        clearColorPreview();
+        if (newPen != oldPen)
+            Q_EMIT penChanged(item, oldPen, newPen);
+    } else {
+        QBrush newBrush = gi->itemBrush();
+        QBrush oldBrush = m_previewOldBrush;
+        clearColorPreview();
+        if (newBrush != oldBrush)
+            Q_EMIT brushChanged(item, oldBrush, newBrush);
+    }
+}
+
+void PropertyPanel::cancelColorPreview(ColorPreviewTarget target)
+{
+    if (m_previewTarget != target || !m_previewItem) {
+        clearColorPreview();
+        return;
+    }
+
+    auto *gi = dynamic_cast<IGraphicsItem *>(m_previewItem);
+    if (gi) {
+        if (target == ColorPreviewTarget::Border || target == ColorPreviewTarget::Text)
+            gi->setItemPen(m_previewOldPen);
+        else
+            gi->setItemBrush(m_previewOldBrush);
+    }
+
+    clearColorPreview();
+}
+
+void PropertyPanel::beginBrushPreview(ColorPreviewTarget target)
+{
+    if (m_updating || !m_currentItem)
+        return;
+
+    auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
+    if (!gi)
+        return;
+
+    m_previewTarget = target;
+    m_previewItem = m_currentItem;
+    m_previewOldBrush = gi->itemBrush();
+}
+
+void PropertyPanel::previewBrushChange(ColorPreviewTarget target, const QBrush &brush)
+{
+    if (m_updating || m_previewTarget != target || !m_previewItem)
+        return;
+
+    auto *gi = dynamic_cast<IGraphicsItem *>(m_previewItem);
+    if (gi)
+        gi->setItemBrush(brush);
+}
+
+void PropertyPanel::commitBrushChange(ColorPreviewTarget target, const QBrush &brush)
+{
+    if (m_updating)
+        return;
+
+    if (m_previewTarget != target || !m_previewItem)
+        beginBrushPreview(target);
+    if (m_previewTarget != target || !m_previewItem)
+        return;
+
+    previewBrushChange(target, brush);
+
+    auto *item = m_previewItem;
+    auto *gi = dynamic_cast<IGraphicsItem *>(item);
+    if (!gi) {
+        clearColorPreview();
+        return;
+    }
+
+    QBrush newBrush = gi->itemBrush();
+    QBrush oldBrush = m_previewOldBrush;
+    clearColorPreview();
+    if (newBrush != oldBrush)
+        Q_EMIT brushChanged(item, oldBrush, newBrush);
+}
+
+void PropertyPanel::clearColorPreview()
+{
+    m_previewTarget = ColorPreviewTarget::None;
+    m_previewItem = nullptr;
+    m_previewOldPen = QPen();
+    m_previewOldBrush = QBrush();
 }
 
 void PropertyPanel::updatePanel()
@@ -304,7 +507,7 @@ void PropertyPanel::updatePanel()
         m_textEdit->setText(m_oldText);
 
         // 文字颜色（仅 TextItem 有此概念）
-        if(auto *ti = qgraphicsitem_cast<TextItem *>(m_currentItem))
+        if (qgraphicsitem_cast<TextItem *>(m_currentItem))
         {
             m_textColorSelector->setVisible(true);
             m_textBgColorSelector->setVisible(true);
@@ -341,15 +544,8 @@ void PropertyPanel::updatePanel()
 // ---- 边框颜色 ----
 void PropertyPanel::onPenColorSelected(const QColor& color)
 {
-    if (m_updating || !m_currentItem) return;
-    auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
-
-    QPen oldPen = gi->itemPen();
     if (!color.isValid()) return;
-    QPen newPen = oldPen;
-    newPen.setColor(color);
-    emit penChanged(m_currentItem, oldPen, newPen);
+    commitColorChange(ColorPreviewTarget::Border, color);
 }
 
 void PropertyPanel::onPenWidthChanged(int w)
@@ -383,15 +579,8 @@ void PropertyPanel::onPenStyleChanged(int idx)
 // ---- 填充颜色 ----
 void PropertyPanel::onBrushColorClicked(const QColor& color)
 {
-    if (m_updating || !m_currentItem) return;
-    auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
-
-    QBrush oldBrush = gi->itemBrush();
     if (!color.isValid()) return;
-    QBrush newBrush(color);
-    newBrush.setStyle(Qt::SolidPattern);
-    emit brushChanged(m_currentItem, oldBrush, newBrush);
+    commitColorChange(ColorPreviewTarget::Fill, color);
 }
 
 void PropertyPanel::onFillModeChanged(int idx)
@@ -401,7 +590,6 @@ void PropertyPanel::onFillModeChanged(int idx)
     if (!gi) return;
 
     FillMode mode = static_cast<FillMode>(idx);
-    QBrush oldBrush = gi->itemBrush();
     QBrush newBrush;
     switch (mode) {
     case FillMode::NoFill:
@@ -420,18 +608,27 @@ void PropertyPanel::onFillModeChanged(int idx)
     m_brushSolid->setVisible(mode == FillMode::Solid);
     m_brushGradient->setVisible(mode == FillMode::Gradient);
 
+    if (m_updating)
+        return;
+
+    QBrush oldBrush = gi->itemBrush();
     if(newBrush != oldBrush)
         Q_EMIT brushChanged(m_currentItem, oldBrush, newBrush);
 }
 
-void PropertyPanel::onBrushGradientClicked(const QBrush& brush)
+void PropertyPanel::onBrushGradientPreviewed(const QBrush& brush)
 {
-    if (m_updating || !m_currentItem) return;
-    auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
+    previewBrushChange(ColorPreviewTarget::FillGradient, brush);
+}
 
-    QBrush oldBrush = gi->itemBrush();
-    Q_EMIT brushChanged(m_currentItem, oldBrush, brush);
+void PropertyPanel::onBrushGradientSelected(const QBrush& brush)
+{
+    commitBrushChange(ColorPreviewTarget::FillGradient, brush);
+}
+
+void PropertyPanel::onBrushGradientCanceled(const QBrush&)
+{
+    cancelColorPreview(ColorPreviewTarget::FillGradient);
 }
 
 // ---- 文字属性 ----
@@ -487,29 +684,14 @@ void PropertyPanel::onItalicToggled(bool b)
 
 void PropertyPanel::onTextColorClicked(const QColor& color)
 {
-    if (m_updating || !m_currentItem) return;
-    auto *ti = qgraphicsitem_cast<TextItem *>(m_currentItem);
-    if (!ti) return;
-
     if (!color.isValid()) return;
-
-    // 通过 penChanged 信号传递文字颜色变更（TextItem 的 setItemPen 会设置 defaultTextColor）
-    QPen oldPen = ti->itemPen();
-    QPen newPen = QPen(color);
-    Q_EMIT penChanged(m_currentItem, oldPen, newPen);
+    commitColorChange(ColorPreviewTarget::Text, color);
 }
 
 void PropertyPanel::onTextBgColorClicked(const QColor& color)
 {
-    if (m_updating || !m_currentItem) return;
-    auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
-
-    QBrush oldBrush = gi->itemBrush();
     if (!color.isValid()) return;
-
-    QBrush newBrush(color);
-    Q_EMIT brushChanged(m_currentItem, oldBrush, newBrush);
+    commitColorChange(ColorPreviewTarget::TextBackground, color);
 }
 
 void PropertyPanel::onTextChanged()

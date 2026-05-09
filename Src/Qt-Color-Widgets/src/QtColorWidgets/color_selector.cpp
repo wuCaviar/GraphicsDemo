@@ -103,6 +103,7 @@ bool ColorSelector::wheelRotating() const
 void ColorSelector::showDialog()
 {
     p->old_color = color();
+    Q_EMIT colorEditingStarted(p->old_color);
     p->dialog->setColor(color());
     connect_dialog();
 #ifdef Q_OS_ANDROID
@@ -136,6 +137,7 @@ void ColorSelector::accept_dialog()
 void ColorSelector::reject_dialog()
 {
     setColor(p->old_color);
+    Q_EMIT colorSelectionCanceled(p->old_color);
 }
 
 void ColorSelector::update_old_color(const QColor &c)

@@ -42,6 +42,11 @@ Q_SIGNALS:
            /// Emitted on setColor
     void brushChanged(QBrush);
 
+    void brushEditingStarted(QBrush oldBrush);
+    void brushPreviewed(QBrush brush);
+    void brushSelected(QBrush brush);
+    void brushSelectionCanceled(QBrush oldBrush);
+
     void backgroundChanged(const QBrush&);
     void drawFrameChanged(bool);
 

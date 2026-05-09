@@ -50,8 +50,12 @@ Q_SIGNALS:
     void wheelRotatingChanged(bool rotating);
     void updateModeChanged(UpdateMode);
     void dialogModalityChanged(Qt::WindowModality);
+    /// Emitted when the color dialog is opened for interactive editing
+    void colorEditingStarted(const QColor& oldColor);
     /// Emitted when a color is selected by the user
     void colorSelected(const QColor& c);
+    /// Emitted when an interactive color edit is canceled
+    void colorSelectionCanceled(const QColor& oldColor);
 
 public Q_SLOTS:
     void showDialog();

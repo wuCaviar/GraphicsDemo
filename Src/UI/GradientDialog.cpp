@@ -129,6 +129,9 @@ void GradientPreview::mouseReleaseEvent(QMouseEvent *ev)
 
     Q_EMIT clicked();
 
+    const QBrush oldBrush = p->brush;
+    Q_EMIT brushEditingStarted(oldBrush);
+
     // 创建渐变编辑对话框
     QtGradientDialog dialog(this);
     dialog.setWindowTitle(tr("Edit Gradient"));
@@ -144,12 +147,20 @@ void GradientPreview::mouseReleaseEvent(QMouseEvent *ev)
             [this](const QGradient &gradient) {
                 p->brush = QBrush(gradient);
                 update();
+                Q_EMIT brushPreviewed(p->brush);
                 Q_EMIT brushChanged(p->brush);
             });
 
-    dialog.exec();
-
-    Q_EMIT brushChanged(p->brush);
+    if (dialog.exec() == QDialog::Accepted) {
+        Q_EMIT brushSelected(p->brush);
+        Q_EMIT brushChanged(p->brush);
+    } else {
+        p->brush = oldBrush;
+        update();
+        Q_EMIT brushPreviewed(p->brush);
+        Q_EMIT brushSelectionCanceled(oldBrush);
+        Q_EMIT brushChanged(p->brush);
+    }
 }
 
 void GradientPreview::mouseMoveEvent(QMouseEvent *ev)
