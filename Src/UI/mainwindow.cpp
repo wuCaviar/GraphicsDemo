@@ -24,6 +24,7 @@
 #include <QDataStream>
 #include <QFile>
 #include <QFileDialog>
+#include <QFrame>
 #include <QImage>
 #include <QInputDialog>
 #include <QKeyEvent>
@@ -42,6 +43,19 @@
 #include <tiffio.h>
 
 static const char *kMimeFormat = "application/x-graphicsdemo-items";
+
+namespace {
+QFrame *createStatusSeparator(QWidget *parent)
+{
+    auto *line = new QFrame(parent);
+    line->setObjectName("StatusBarSeparator");
+    line->setFrameShape(QFrame::VLine);
+    line->setFrameShadow(QFrame::Plain);
+    line->setLineWidth(1);
+    line->setFixedHeight(16);
+    return line;
+}
+}
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
@@ -132,31 +146,31 @@ void MainWindow::_initMenuBar()
 
     // ---- 文件 ----
     QMenu *fileMenu = menu->addMenu(tr("&File"));
-    fileMenu->addAction(QIcon(":/icons/file-new.svg"), tr("&New..."), QKeySequence::New, this, &MainWindow::onNew);
+    fileMenu->addAction(QIcon(":/icons/icons/file-new.svg"), tr("&New..."), QKeySequence::New, this, &MainWindow::onNew);
     fileMenu->addSeparator();
-    fileMenu->addAction(QIcon(":/icons/file-import.svg"), tr("&Import Image..."), QKeySequence(Qt::CTRL | Qt::Key_I),
+    fileMenu->addAction(QIcon(":/icons/icons/file-import.svg"), tr("&Import Image..."), QKeySequence(Qt::CTRL | Qt::Key_I),
                         this, &MainWindow::onImportImage);
-    fileMenu->addAction(QIcon(":/icons/file-export.svg"), tr("&Export Image..."), QKeySequence(Qt::CTRL | Qt::Key_E),
+    fileMenu->addAction(QIcon(":/icons/icons/file-export.svg"), tr("&Export Image..."), QKeySequence(Qt::CTRL | Qt::Key_E),
                         this, &MainWindow::onExportImage);
     fileMenu->addSeparator();
     fileMenu->addAction(tr("E&xit"), QKeySequence::Quit, this, &QWidget::close);
 
     // ---- 编辑 ----
     QMenu *editMenu = menu->addMenu(tr("&Edit"));
-    m_undoAction = editMenu->addAction(QIcon(":/icons/edit-undo.svg"), tr("&Undo"), QKeySequence::Undo, this, &MainWindow::onUndo);
-    m_redoAction = editMenu->addAction(QIcon(":/icons/edit-redo.svg"), tr("&Redo"), QKeySequence::Redo, this, &MainWindow::onRedo);
+    m_undoAction = editMenu->addAction(QIcon(":/icons/icons/edit-undo.svg"), tr("&Undo"), QKeySequence::Undo, this, &MainWindow::onUndo);
+    m_redoAction = editMenu->addAction(QIcon(":/icons/icons/edit-redo.svg"), tr("&Redo"), QKeySequence::Redo, this, &MainWindow::onRedo);
     editMenu->addSeparator();
-    editMenu->addAction(QIcon(":/icons/edit-cut.svg"), tr("Cu&t"), QKeySequence::Cut, this, &MainWindow::onCut);
-    editMenu->addAction(QIcon(":/icons/edit-copy.svg"), tr("&Copy"), QKeySequence::Copy, this, &MainWindow::onCopy);
-    editMenu->addAction(QIcon(":/icons/edit-paste.svg"), tr("&Paste"), QKeySequence::Paste, this, &MainWindow::onPaste);
+    editMenu->addAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cu&t"), QKeySequence::Cut, this, &MainWindow::onCut);
+    editMenu->addAction(QIcon(":/icons/icons/edit-copy.svg"), tr("&Copy"), QKeySequence::Copy, this, &MainWindow::onCopy);
+    editMenu->addAction(QIcon(":/icons/icons/edit-paste.svg"), tr("&Paste"), QKeySequence::Paste, this, &MainWindow::onPaste);
     editMenu->addSeparator();
-    editMenu->addAction(QIcon(":/icons/edit-delete.svg"), tr("&Delete"), QKeySequence::Delete, this, &MainWindow::onDelete);
-    editMenu->addAction(QIcon(":/icons/edit-select-all.svg"), tr("Select &All"), QKeySequence::SelectAll, this, &MainWindow::onSelectAll);
+    editMenu->addAction(QIcon(":/icons/icons/edit-delete.svg"), tr("&Delete"), QKeySequence::Delete, this, &MainWindow::onDelete);
+    editMenu->addAction(QIcon(":/icons/icons/edit-select-all.svg"), tr("Select &All"), QKeySequence::SelectAll, this, &MainWindow::onSelectAll);
 
     // ---- 排列 ----
     QMenu *arrMenu = menu->addMenu(tr("&Arrange"));
-    arrMenu->addAction(QIcon(":/icons/bring-front.svg"), tr("Bring to Front"), this, &MainWindow::onBringToFront);
-    arrMenu->addAction(QIcon(":/icons/send-back.svg"), tr("Send to Back"), this, &MainWindow::onSendToBack);
+    arrMenu->addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring to Front"), this, &MainWindow::onBringToFront);
+    arrMenu->addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send to Back"), this, &MainWindow::onSendToBack);
     arrMenu->addSeparator();
     QMenu *alignMenu = arrMenu->addMenu(tr("Align"));
     alignMenu->addAction(tr("Left"), this, &MainWindow::onAlignLeft);
@@ -172,8 +186,8 @@ void MainWindow::_initMenuBar()
     distMenu->addAction(tr("Align && Layout..."), this, &MainWindow::onAlignLayoutDialog);
     arrMenu->addSeparator();
     QMenu *rotateMenu = arrMenu->addMenu(tr("Rotate"));
-    rotateMenu->addAction(QIcon(":/icons/rotate-cw.svg"), tr("90\u00b0 Clockwise"), this, [this]() { rotateSelectedItems(90.0); });
-    rotateMenu->addAction(QIcon(":/icons/rotate-ccw.svg"), tr("90\u00b0 Counter-clockwise"), this, [this]() { rotateSelectedItems(-90.0); });
+    rotateMenu->addAction(QIcon(":/icons/icons/rotate-cw.svg"), tr("90\u00b0 Clockwise"), this, [this]() { rotateSelectedItems(90.0); });
+    rotateMenu->addAction(QIcon(":/icons/icons/rotate-ccw.svg"), tr("90\u00b0 Counter-clockwise"), this, [this]() { rotateSelectedItems(-90.0); });
     rotateMenu->addAction(tr("180\u00b0"), this, [this]() { rotateSelectedItems(180.0); });
 
     // ---- 视图 ----
@@ -182,22 +196,32 @@ void MainWindow::_initMenuBar()
     viewMenu->addSeparator();
 
     // 网格显示/隐藏
-    m_gridAction = viewMenu->addAction(QIcon(":/icons/view-grid.svg"), tr("Show Grid"));
+    m_gridAction = viewMenu->addAction(QIcon(":/icons/icons/view-grid.svg"), tr("Show Grid"));
     m_gridAction->setCheckable(true);
     m_gridAction->setChecked(true);
     connect(m_gridAction, &QAction::toggled, this, [this](bool checked) {
         m_pView->setGridVisible(checked);
     });
 
+    // 刻度尺单位切换（px ↔ mm）
+    m_rulerUnitAction = viewMenu->addAction(tr("Ruler Unit: mm"));
+    m_rulerUnitAction->setCheckable(true);
+    connect(m_rulerUnitAction, &QAction::toggled, this, [this](bool checked) {
+        auto unit = checked ? RulerBar::Millimeter : RulerBar::Pixel;
+        m_hRuler->setUnit(unit);
+        m_vRuler->setUnit(unit);
+        m_rulerUnitAction->setText(checked ? tr("Ruler Unit: mm") : tr("Ruler Unit: px"));
+        // 同步更新状态栏坐标和画布尺寸的单位显示
+        _updateCanvasLabel();
+        _updatePosLabel(m_lastScenePos);
+    });
+
     viewMenu->addSeparator();
     // 缩放适配
-    viewMenu->addAction(QIcon(":/icons/view-fit.svg"), tr("Fit to Canvas"), this, [this]() {
-        if (m_pView->canvasItem()) {
-            m_pView->fitInView(m_pView->canvasItem()->rect(), Qt::KeepAspectRatio);
-            m_pView->scale(0.9, 0.9); // 稍微缩小一点留边
-        }
+    viewMenu->addAction(QIcon(":/icons/icons/view-fit.svg"), tr("Fit to Canvas"), this, [this]() {
+        m_pView->fitToCanvas();
     });
-    viewMenu->addAction(QIcon(":/icons/view-zoom-reset.svg"), tr("Reset Zoom (Ctrl+0)"), QKeySequence(Qt::CTRL | Qt::Key_0),
+    viewMenu->addAction(QIcon(":/icons/icons/view-zoom-reset.svg"), tr("Reset Zoom (Ctrl+0)"), QKeySequence(Qt::CTRL | Qt::Key_0),
                         this, [this]() { m_pView->setZoomLevel(1.0); });
 
     _updateUndoRedoActions();
@@ -205,9 +229,31 @@ void MainWindow::_initMenuBar()
 
 void MainWindow::_initToolBar()
 {
+    // 文件 & 编辑工具栏
+    QToolBar *fileEditBar = addToolBar(tr("File & Edit"));
+    fileEditBar->setMovable(true);
+    fileEditBar->setObjectName("FileEditToolBar");
+    fileEditBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    fileEditBar->setIconSize(QSize(20, 20));
+
+    fileEditBar->addAction(QIcon(":/icons/icons/file-new.svg"), tr("New"), this, &MainWindow::onNew);
+    fileEditBar->addAction(QIcon(":/icons/icons/file-import.svg"), tr("Import Image"), this, &MainWindow::onImportImage);
+    fileEditBar->addAction(QIcon(":/icons/icons/file-export.svg"), tr("Export Image"), this, &MainWindow::onExportImage);
+
+    fileEditBar->addSeparator();
+
+    fileEditBar->addAction(m_undoAction);
+    fileEditBar->addAction(m_redoAction);
+
+    fileEditBar->addSeparator();
+
+    fileEditBar->addAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cut"), QKeySequence::Cut, this, &MainWindow::onCut);
+    fileEditBar->addAction(QIcon(":/icons/icons/edit-copy.svg"), tr("Copy"), QKeySequence::Copy, this, &MainWindow::onCopy);
+    fileEditBar->addAction(QIcon(":/icons/icons/edit-paste.svg"), tr("Paste"), QKeySequence::Paste, this, &MainWindow::onPaste);
+
     // 绘图工具栏
     QToolBar *drawBar = addToolBar(tr("Drawing Tools"));
-    drawBar->setMovable(false);
+    drawBar->setMovable(true);
     drawBar->setObjectName("DrawingToolBar");
     drawBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     drawBar->setIconSize(QSize(20, 20));
@@ -227,15 +273,15 @@ void MainWindow::_initToolBar()
         return act;
     };
 
-    auto *selectAct = addToolAction(":/icons/tool-select.svg", tr("Select (V)"), Tool::Select, "V");
+    auto *selectAct = addToolAction(":/icons/icons/tool-select.svg", tr("Select (V)"), Tool::Select, "V");
     selectAct->setChecked(true);
-    addToolAction(":/icons/tool-rect.svg", tr("Rectangle (R)"), Tool::Rect, "R");
-    addToolAction(":/icons/tool-ellipse.svg", tr("Ellipse (E)"), Tool::Ellipse, "E");
-    addToolAction(":/icons/tool-line.svg", tr("Line (L)"), Tool::Line, "L");
-    addToolAction(":/icons/tool-curve.svg", tr("Curve (C)"), Tool::BezierCurve, "C");
-    addToolAction(":/icons/tool-freehand.svg", tr("Freehand (F)"), Tool::Freehand, "F");
-    addToolAction(":/icons/tool-text.svg", tr("Text (T)"), Tool::Text, "T");
-    addToolAction(":/icons/tool-image.svg", tr("Image (I)"), Tool::Image, "I");
+    addToolAction(":/icons/icons/tool-rect.svg", tr("Rectangle (R)"), Tool::Rect, "R");
+    addToolAction(":/icons/icons/tool-ellipse.svg", tr("Ellipse (E)"), Tool::Ellipse, "E");
+    addToolAction(":/icons/icons/tool-line.svg", tr("Line (L)"), Tool::Line, "L");
+    addToolAction(":/icons/icons/tool-curve.svg", tr("Curve (C)"), Tool::BezierCurve, "C");
+    addToolAction(":/icons/icons/tool-freehand.svg", tr("Freehand (F)"), Tool::Freehand, "F");
+    addToolAction(":/icons/icons/tool-text.svg", tr("Text (T)"), Tool::Text, "T");
+    addToolAction(":/icons/icons/tool-image.svg", tr("Image (I)"), Tool::Image, "I");
 
     // 对齐工具栏
     m_alignToolBar = addToolBar(tr("Align"));
@@ -244,19 +290,19 @@ void MainWindow::_initToolBar()
     m_alignToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     m_alignToolBar->setIconSize(QSize(20, 20));
 
-    QAction *alignLayoutAct = m_alignToolBar->addAction(QIcon(":/icons/align-layout.svg"), tr("Align && Layout..."));
+    QAction *alignLayoutAct = m_alignToolBar->addAction(QIcon(":/icons/icons/align-layout.svg"), tr("Align && Layout..."));
     alignLayoutAct->setToolTip(tr("Open Align & Layout dialog"));
     connect(alignLayoutAct, &QAction::triggered, this, &MainWindow::onAlignLayoutDialog);
 
     m_alignToolBar->addSeparator();
 
     // 顺时针旋转 90°
-    QAction *rotateCWAct = m_alignToolBar->addAction(QIcon(":/icons/rotate-cw.svg"), tr("Rotate 90\u00b0 CW"));
+    QAction *rotateCWAct = m_alignToolBar->addAction(QIcon(":/icons/icons/rotate-cw.svg"), tr("Rotate 90\u00b0 CW"));
     rotateCWAct->setToolTip(tr("Rotate 90\u00b0 clockwise"));
     connect(rotateCWAct, &QAction::triggered, this, [this]() { rotateSelectedItems(90.0); });
 
     // 逆时针旋转 90°
-    QAction *rotateCCWAct = m_alignToolBar->addAction(QIcon(":/icons/rotate-ccw.svg"), tr("Rotate 90\u00b0 CCW"));
+    QAction *rotateCCWAct = m_alignToolBar->addAction(QIcon(":/icons/icons/rotate-ccw.svg"), tr("Rotate 90\u00b0 CCW"));
     rotateCCWAct->setToolTip(tr("Rotate 90\u00b0 counter-clockwise"));
     connect(rotateCCWAct, &QAction::triggered, this, [this]() { rotateSelectedItems(-90.0); });
 }
@@ -306,7 +352,7 @@ void MainWindow::_initConnections()
 
     // 状态栏：鼠标位置 & 缩放变化 & 刻度尺鼠标位置同步
     connect(m_pView, &QAtGraphicsView::mousePositionChanged, this, [this](const QPointF &pos) {
-        m_posLabel->setText(tr("X: %1  Y: %2").arg(pos.x(), 0, 'f', 1).arg(pos.y(), 0, 'f', 1));
+        _updatePosLabel(pos);
         // 同步鼠标位置到刻度尺
         m_hRuler->setMousePosition(pos);
         m_vRuler->setMousePosition(pos);
@@ -318,6 +364,10 @@ void MainWindow::_initConnections()
         m_zoomSlider->blockSignals(true);
         m_zoomSlider->setValue(pct);
         m_zoomSlider->blockSignals(false);
+
+        // 同步刻度尺缩放
+        m_hRuler->updateRuler();
+        m_vRuler->updateRuler();
     });
 
     // TextItem 编辑完成时更新属性面板
@@ -339,12 +389,13 @@ void MainWindow::_initStatusBar()
     auto *bar = statusBar();
 
     // 鼠标坐标
-    m_posLabel = new QLabel(tr("X: 0.0  Y: 0.0"));
-    m_posLabel->setMinimumWidth(180);
+    m_posLabel = new QLabel(tr("X: 0.0 px  Y: 0.0 px"));
+    m_posLabel->setMinimumWidth(220);
 
     // 缩放标签
     m_zoomLabel = new QLabel(tr("100%"));
     m_zoomLabel->setMinimumWidth(60);
+    m_zoomLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
     // 缩放滑块
     m_zoomSlider = new QSlider(Qt::Horizontal);
@@ -360,22 +411,19 @@ void MainWindow::_initStatusBar()
 
     // 画布尺寸
     m_canvasLabel = new QLabel;
-    if (m_pView->canvasItem()) {
-        QSizeF sz = m_pView->canvasItem()->canvasSize();
-        // 像素转 mm (96dpi: 1px ≈ 0.2646mm)
-        static constexpr qreal kPxToMM = 0.2645833333;
-        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm")
-                                       .arg(sz.width() * kPxToMM, 0, 'f', 1)
-                                       .arg(sz.height() * kPxToMM, 0, 'f', 1));
-    }
+    m_canvasLabel->setMinimumWidth(230);
+    _updateCanvasLabel();
 
     // 当前工具
-    m_toolLabel = new QLabel(tr("Tool: Select"));
-    m_toolLabel->setMinimumWidth(100);
+    m_toolLabel = new QLabel;
+    m_toolLabel->setMinimumWidth(120);
+    _updateToolLabel();
 
     bar->addWidget(m_posLabel);
+    bar->addPermanentWidget(createStatusSeparator(bar));
     bar->addPermanentWidget(m_zoomLabel);
     bar->addPermanentWidget(m_zoomSlider);
+    bar->addPermanentWidget(createStatusSeparator(bar));
     bar->addPermanentWidget(m_canvasLabel);
     bar->addPermanentWidget(m_toolLabel);
 }
@@ -386,6 +434,92 @@ void MainWindow::_updateUndoRedoActions()
         m_undoAction->setEnabled(m_undoStack->canUndo());
     if (m_redoAction)
         m_redoAction->setEnabled(m_undoStack->canRedo());
+}
+
+void MainWindow::_updatePosLabel(const QPointF &scenePos)
+{
+    m_lastScenePos = scenePos;
+    bool isMm = m_hRuler->unit() == RulerBar::Millimeter;
+    if (isMm) {
+        qreal ppi = m_pView->canvasItem() ? m_pView->canvasItem()->ppi() : 96.0;
+        qreal kPxToMm = 25.4 / ppi;
+        qreal xmm = scenePos.x() * kPxToMm;
+        qreal ymm = scenePos.y() * kPxToMm;
+        m_posLabel->setText(tr("X: %1 mm  Y: %2 mm")
+                                    .arg(xmm, 0, 'f', 1)
+                                    .arg(ymm, 0, 'f', 1));
+    } else {
+        m_posLabel->setText(tr("X: %1 px  Y: %2 px")
+                                    .arg(scenePos.x(), 0, 'f', 1)
+                                    .arg(scenePos.y(), 0, 'f', 1));
+    }
+}
+
+void MainWindow::_updateCanvasLabel()
+{
+    if (!m_canvasLabel)
+        return;
+
+    auto *canvas = m_pView->canvasItem();
+    if (!canvas) {
+        m_canvasLabel->clear();
+        return;
+    }
+
+    QSizeF sz = canvas->canvasSize();
+    qreal ppi = canvas->ppi();
+    bool isMm = m_hRuler->unit() == RulerBar::Millimeter;
+    if (isMm) {
+        qreal kPxToMm = 25.4 / ppi;
+        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm \u00b7 %3 PPI")
+                                       .arg(sz.width() * kPxToMm, 0, 'f', 1)
+                                       .arg(sz.height() * kPxToMm, 0, 'f', 1)
+                                       .arg(ppi, 0, 'f', 0));
+    } else {
+        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 px \u00b7 %3 PPI")
+                                       .arg(sz.width(), 0, 'f', 1)
+                                       .arg(sz.height(), 0, 'f', 1)
+                                       .arg(ppi, 0, 'f', 0));
+    }
+}
+
+void MainWindow::_updateToolLabel()
+{
+    if (!m_toolLabel)
+        return;
+
+    QString toolName;
+    switch (m_currentTool) {
+    case Tool::Select:
+        toolName = tr("Select");
+        break;
+    case Tool::Rect:
+        toolName = tr("Rectangle");
+        break;
+    case Tool::Ellipse:
+        toolName = tr("Ellipse");
+        break;
+    case Tool::Line:
+        toolName = tr("Line");
+        break;
+    case Tool::BezierCurve:
+        toolName = tr("B\u00e9zier Curve");
+        break;
+    case Tool::Freehand:
+        toolName = tr("Freehand");
+        break;
+    case Tool::Text:
+        toolName = tr("Text");
+        break;
+    case Tool::Image:
+        toolName = tr("Image");
+        break;
+    }
+
+    if (toolName.isEmpty())
+        toolName = tr("Unknown");
+
+    m_toolLabel->setText(tr("Tool: %1").arg(toolName));
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event)
@@ -406,6 +540,7 @@ void MainWindow::onNew()
         return;
 
     QSizeF canvasSize = dlg.selectedSize();
+    qreal ppi = dlg.selectedPpi();
 
     // 先清空 undo 栈，避免命令引用即将被删除的图元
     m_undoStack->clear();
@@ -415,6 +550,20 @@ void MainWindow::onNew()
 
     // 安全清空场景并重建画布
     m_pView->resetCanvas(canvasSize);
+
+    // 设置画布 PPI
+    if (m_pView->canvasItem())
+        m_pView->canvasItem()->setPpi(ppi);
+
+    // 同步刻度尺 PPI
+    m_hRuler->setPpi(ppi);
+    m_vRuler->setPpi(ppi);
+
+    // PPI 变化后刷新刻度尺和状态栏
+    m_hRuler->updateRuler();
+    m_vRuler->updateRuler();
+    _updateCanvasLabel();
+    _updatePosLabel(m_lastScenePos);
 }
 
 void MainWindow::onImportImage()
@@ -718,18 +867,7 @@ void MainWindow::onToolTriggered(Tool tool)
     for (auto it = m_toolActions.begin(); it != m_toolActions.end(); ++it)
         it.value()->setChecked(it.key() == tool);
 
-    // 更新状态栏工具名
-    static const QMap<Tool, QString> toolNames = {
-        { Tool::Select, tr("Select") },
-        { Tool::Rect, tr("Rectangle") },
-        { Tool::Ellipse, tr("Ellipse") },
-        { Tool::Line, tr("Line") },
-        { Tool::BezierCurve, tr("B\u00e9zier Curve") },
-        { Tool::Text, tr("Text") },
-        { Tool::Image, tr("Image") },
-    };
-    if (m_toolLabel)
-        m_toolLabel->setText(tr("Tool: %1").arg(toolNames.value(tool, tr("Unknown"))));
+    _updateToolLabel();
 }
 
 // ============================================================

@@ -18,9 +18,18 @@ public:
     void setCanvasSize(const QSizeF &size);
     QSizeF canvasSize() const;
 
+    void setPpi(qreal ppi);
+    qreal ppi() const { return m_ppi; }
+
+    // 1mm 对应的场景像素数（基于当前 PPI）
+    qreal pixelsPerMm() const { return m_ppi / 25.4; }
+
 protected:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget) override;
+
+private:
+    qreal m_ppi = 96.0; // 默认 96 DPI
 };
 
 #endif // CANVASITEM_H

@@ -7,7 +7,7 @@ CanvasItem::CanvasItem(QGraphicsItem *parent)
     setFlag(ItemIsSelectable, false);
     setFlag(ItemIsMovable, false);
     setFlag(ItemIsFocusable, false);
-    setBrush(QBrush(Qt::white));
+    setBrush(QBrush(Qt::transparent)); // 透明，白色填充由 drawBackground 绘制
     setPen(QPen(Qt::NoPen));
     setZValue(-9999); // 始终在最底层
 }
@@ -18,7 +18,7 @@ CanvasItem::CanvasItem(const QSizeF &size, QGraphicsItem *parent)
     setFlag(ItemIsSelectable, false);
     setFlag(ItemIsMovable, false);
     setFlag(ItemIsFocusable, false);
-    setBrush(QBrush(Qt::white));
+    setBrush(QBrush(Qt::transparent)); // 透明，白色填充由 drawBackground 绘制
     setPen(QPen(Qt::NoPen));
     setZValue(-9999);
 }
@@ -26,6 +26,11 @@ CanvasItem::CanvasItem(const QSizeF &size, QGraphicsItem *parent)
 void CanvasItem::setCanvasSize(const QSizeF &size)
 {
     setRect(QRectF(0, 0, size.width(), size.height()));
+}
+
+void CanvasItem::setPpi(qreal ppi)
+{
+    m_ppi = qBound(1.0, ppi, 9999.0);
 }
 
 QSizeF CanvasItem::canvasSize() const

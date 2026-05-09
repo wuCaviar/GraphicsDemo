@@ -1,9 +1,14 @@
 #ifndef PROPERTYPANEL_H
 #define PROPERTYPANEL_H
 
+#include "GradientDialog.h"
 #include "IGraphicsItem.h"
 #include <QDockWidget>
 #include <QGraphicsItem>
+
+#include <QtColorWidgets/ColorSelector>
+
+using namespace color_widgets;
 
 class QDoubleSpinBox;
 class QSpinBox;
@@ -45,18 +50,18 @@ signals:
     void rotationChanged(QGraphicsItem *item, qreal oldRotation, qreal newRotation);
 
 private slots:
-    void onPenColorClicked();
+    void onPenColorSelected(const QColor& color);
     void onPenWidthChanged(int w);
     void onPenStyleChanged(int idx);
     void onFillModeChanged(int idx);
-    void onBrushColorClicked();
-    void onBrushGradientClicked();
+    void onBrushColorClicked(const QColor& color);
+    void onBrushGradientClicked(const QBrush& brush);
     void onFontFamilyChanged(const QFont &f);
     void onFontSizeChanged(int s);
     void onBoldToggled(bool b);
     void onItalicToggled(bool b);
-    void onTextColorClicked();
-    void onTextBgColorClicked();
+    void onTextColorClicked(const QColor& color);
+    void onTextBgColorClicked(const QColor& color);
     void onTextChanged();
     void onGeometryChanged();
     void onCornerRadiusChanged(double r);
@@ -87,22 +92,23 @@ private:
     QDoubleSpinBox *m_hSpin = nullptr;
 
     // 边框
-    QPushButton *m_penColorBtn = nullptr;
+    ColorSelector *m_penColorSelector = nullptr;
     QSpinBox *m_penWidthSpin = nullptr;
     QComboBox *m_penStyleCombo = nullptr;
 
     // 填充
     QComboBox *m_fillModeCombo = nullptr; // NoFill / Solid / Gradient
-    QPushButton *m_brushColorBtn = nullptr;
-    QPushButton *m_brushGradientBtn = nullptr;
+    ColorSelector* m_brushSolid = nullptr;
+    GradientPreview* m_brushGradient = nullptr;
 
     // 文字
     QFontComboBox *m_fontCombo = nullptr;
     QSpinBox *m_fontSizeSpin = nullptr;
     QPushButton *m_boldBtn = nullptr;
     QPushButton *m_italicBtn = nullptr;
-    QPushButton *m_textColorBtn = nullptr;
-    QPushButton *m_textBgColorBtn = nullptr;
+    ColorSelector* m_textColorSelector = nullptr;
+    ColorSelector* m_textBgColorSelector = nullptr;
+
     QLineEdit *m_textEdit = nullptr;
 
     // 圆角

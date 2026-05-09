@@ -9,7 +9,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-// 打印行业常用尺寸 (单位: mm, @96dpi 换算: 1mm ≈ 3.7795px)
+// 打印行业常用尺寸 (单位: mm)
 struct PrintSizePreset
 {
     QString name;
@@ -37,7 +37,20 @@ static const PrintSizePreset kPresets[] = {
     { "Custom",                  0,      0 },
 };
 
-static constexpr qreal kMMToPx = 3.7795275591; // 96dpi: 1 inch = 25.4mm, 96/25.4
+// 常用 PPI 预设
+struct PpiPreset
+{
+    QString name;
+    qreal ppi;
+};
+
+static const PpiPreset kPpiPresets[] = {
+    { "72 PPI (Screen/Web)",     72 },
+    { "96 PPI (Windows)",        96 },
+    { "150 PPI (Draft Print)",   150 },
+    { "300 PPI (Quality Print)", 300 },
+    { "600 PPI (High Quality)",  600 },
+};
 
 NewFileDialog::NewFileDialog(QWidget *parent) : QDialog(parent)
 {
@@ -71,6 +84,15 @@ void NewFileDialog::setupUI()
     m_heightSpin->setDecimals(1);
     m_heightSpin->setSuffix(tr(" mm"));
     formLayout->addRow(tr("Height:"), m_heightSpin);
+
+    // PPI 设置
+    m_ppiSpin = new QDoubleSpinBox;
+    m_ppiSpin->setRange(1, 9999);
+    m_ppiSpin->setDecimals(0);
+    m_ppiSpin->setSuffix(tr(" PPI"));
+    m_ppiSpin->setValue(96);
+    m_ppiSpin->setToolTip(tr("Pixels Per Inch — affects mm↔px conversion"));
+    formLayout->addRow(tr("Resolution:"), m_ppiSpin);
 
     mainLayout->addWidget(group);
 
@@ -113,8 +135,14 @@ void NewFileDialog::onPresetChanged(int index)
 
 QSizeF NewFileDialog::selectedSize() const
 {
-    // 将 mm 转为 px（96dpi）
-    return QSizeF(m_widthSpin->value() * kMMToPx, m_heightSpin->value() * kMMToPx);
+    // 将 mm 转为 px（基于用户设定的 PPI）
+    qreal mmToPx = m_ppiSpin->value() / 25.4;
+    return QSizeF(m_widthSpin->value() * mmToPx, m_heightSpin->value() * mmToPx);
+}
+
+qreal NewFileDialog::selectedPpi() const
+{
+    return m_ppiSpin->value();
 }
 
 QString NewFileDialog::selectedPresetName() const

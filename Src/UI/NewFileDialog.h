@@ -16,6 +16,7 @@ public:
     explicit NewFileDialog(QWidget *parent = nullptr);
 
     QSizeF selectedSize() const;
+    qreal selectedPpi() const;
     QString selectedPresetName() const;
 
 private slots:
@@ -27,6 +28,7 @@ private:
     QComboBox *m_presetCombo = nullptr;
     QDoubleSpinBox *m_widthSpin = nullptr;
     QDoubleSpinBox *m_heightSpin = nullptr;
+    QDoubleSpinBox *m_ppiSpin = nullptr;
 };
 
 #endif // NEWFILEDIALOG_H

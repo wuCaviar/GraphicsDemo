@@ -1,41 +1,59 @@
 #ifndef GRADIENTDIALOG_H
 #define GRADIENTDIALOG_H
 
-#include <QDialog>
-#include <QLinearGradient>
+#include <QWidget>
 
-class QComboBox;
-class QPushButton;
-class QDoubleSpinBox;
-
-// 渐变编辑对话框 — 编辑线性渐变的起止颜色和方向
-class GradientDialog : public QDialog
+class GradientPreview : public QWidget
 {
     Q_OBJECT
+    Q_PROPERTY(QBrush brush READ brush WRITE setBrush NOTIFY brushChanged DESIGNABLE true)
+    Q_PROPERTY(QBrush background READ background WRITE setBackground NOTIFY backgroundChanged DESIGNABLE true)
+    Q_PROPERTY(bool drawFrame READ drawFrame WRITE setDrawFrame NOTIFY drawFrameChanged DESIGNABLE true)
 
 public:
-    explicit GradientDialog(const QLinearGradient &gradient = QLinearGradient(),
-                            QWidget *parent = nullptr);
+    explicit GradientPreview(QWidget *parent = nullptr);
+    ~GradientPreview();
 
-    QLinearGradient gradient() const;
+           /// Get the background visible under transparent colors
+    QBrush background() const;
 
-private slots:
-    void onStartColorClicked();
-    void onEndColorClicked();
-    void onDirectionChanged(int index);
+           /// Change the background visible under transparent colors
+    void setBackground(const QBrush &bk);
+
+           /// Get current brush
+    QBrush brush() const;
+
+    QSize sizeHint () const Q_DECL_OVERRIDE;
+
+    void paint(QPainter &painter, QRect rect) const;
+
+           /// Whether to draw a frame around the color
+    bool drawFrame() const;
+    void setDrawFrame(bool);
+
+public Q_SLOTS:
+    /// Set current color
+    void setBrush(const QBrush &b);
+
+Q_SIGNALS:
+    /// Emitted when the user clicks on the widget
+    void clicked();
+
+           /// Emitted on setColor
+    void brushChanged(QBrush);
+
+    void backgroundChanged(const QBrush&);
+    void drawFrameChanged(bool);
+
+protected:
+    void paintEvent(QPaintEvent *) Q_DECL_OVERRIDE;
+    void resizeEvent(QResizeEvent *) Q_DECL_OVERRIDE;
+    void mouseReleaseEvent(QMouseEvent *ev) Q_DECL_OVERRIDE;
+    void mouseMoveEvent(QMouseEvent *ev) Q_DECL_OVERRIDE;
 
 private:
-    void setupUI();
-    void updatePreview();
-
-    QLinearGradient m_gradient;
-    QColor m_startColor;
-    QColor m_endColor;
-
-    QPushButton *m_startColorBtn = nullptr;
-    QPushButton *m_endColorBtn = nullptr;
-    QComboBox *m_directionCombo = nullptr;
-    QWidget *m_previewWidget = nullptr;
+    class Private;
+    Private * const p;
 };
 
 #endif // GRADIENTDIALOG_H

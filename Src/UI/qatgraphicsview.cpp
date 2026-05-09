@@ -140,6 +140,28 @@ void QAtGraphicsView::setZoomLevel(qreal level)
     emit zoomChanged(m_zoomLevel);
 }
 
+void QAtGraphicsView::fitToCanvas()
+{
+    if (!m_pCanvas)
+        return;
+
+    // 先重置变换矩阵，避免 fitInView 在已有缩放基础上叠加
+    resetTransform();
+    m_zoomLevel = 1.0;
+
+    // fitInView 会自动计算并设置缩放+平移，使画布完整显示
+    fitInView(m_pCanvas->rect(), Qt::KeepAspectRatio);
+
+    // 稍微缩小一点留边
+    scale(0.9, 0.9);
+
+    // 从变换矩阵反算实际缩放比
+    qreal actualScale = transform().m11();
+    m_zoomLevel = qBound(0.1, actualScale, 5.0);
+
+    emit zoomChanged(m_zoomLevel);
+}
+
 void QAtGraphicsView::scrollToCanvasOrigin()
 {
     // 确保画布左上角 (0,0) 在视图的合适位置
@@ -506,26 +528,27 @@ void QAtGraphicsView::setGridVisible(bool visible)
 
 void QAtGraphicsView::drawBackground(QPainter *painter, const QRectF &rect)
 {
-    // 先绘制默认背景
+    // 1. 绘制灰色工作区背景
     painter->fillRect(rect, m_pMainScene->backgroundBrush().color());
 
-    // 绘制画布阴影效果
-    if (m_pCanvas) {
-        QRectF canvasRect = m_pCanvas->rect();
-        // 右侧阴影
-        QRectF rightShadow(canvasRect.right(), canvasRect.top() + 3,
-                           6, canvasRect.height());
-        // 底部阴影
-        QRectF bottomShadow(canvasRect.left() + 3, canvasRect.bottom(),
-                            canvasRect.width(), 6);
+    if (!m_pCanvas)
+        return;
 
-        painter->fillRect(rightShadow, QColor(60, 60, 60, 80));
-        painter->fillRect(bottomShadow, QColor(60, 60, 60, 80));
-    }
+    QRectF canvasRect = m_pCanvas->rect();
 
-    // 绘制网格（仅在画布区域内）
-    if (m_gridVisible && m_pCanvas) {
-        QRectF canvasRect = m_pCanvas->rect();
+    // 2. 绘制画布白色填充（从 CanvasItem 移到这里，确保网格不被遮挡）
+    painter->fillRect(canvasRect, Qt::white);
+
+    // 3. 绘制画布阴影效果
+    QRectF rightShadow(canvasRect.right(), canvasRect.top() + 3,
+                       6, canvasRect.height());
+    QRectF bottomShadow(canvasRect.left() + 3, canvasRect.bottom(),
+                        canvasRect.width(), 6);
+    painter->fillRect(rightShadow, QColor(60, 60, 60, 80));
+    painter->fillRect(bottomShadow, QColor(60, 60, 60, 80));
+
+    // 4. 绘制网格（仅在画布区域内，位于白色填充之上、图元之下）
+    if (m_gridVisible) {
         QRectF gridRect = rect.intersected(canvasRect);
         if (!gridRect.isValid())
             return;

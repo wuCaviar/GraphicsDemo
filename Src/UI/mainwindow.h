@@ -116,12 +116,21 @@ private:
     // 网格显示切换
     QAction *m_gridAction = nullptr;
 
+    // 刻度尺单位切换
+    QAction *m_rulerUnitAction = nullptr;
+
     // 状态栏控件
     QLabel *m_posLabel = nullptr;
     QLabel *m_zoomLabel = nullptr;
     QLabel *m_canvasLabel = nullptr;
     QLabel *m_toolLabel = nullptr;
     QSlider *m_zoomSlider = nullptr;
+
+    // 状态栏辅助
+    QPointF m_lastScenePos;                           // 最近一次鼠标场景坐标
+    void _updatePosLabel(const QPointF &scenePos);    // 根据单位模式更新坐标标签
+    void _updateCanvasLabel();                        // 根据单位模式更新画布尺寸标签
+    void _updateToolLabel();                          // 根据当前工具更新工具标签
 };
 
 #endif // MAINWINDOW_H

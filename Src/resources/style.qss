@@ -111,14 +111,27 @@ QToolBar QToolButton::menu-indicator {
 QStatusBar {
     background-color: #ffffff;
     border-top: 1px solid #e0e0e0;
-    padding: 2px 8px;
+    padding: 2px 10px;
     color: #666666;
     font-size: 12px;
 }
 
+QStatusBar::item {
+    border: none;
+}
+
 QStatusBar QLabel {
     color: #555555;
-    padding: 0px 6px;
+    padding: 0px 4px;
+}
+
+QStatusBar QSlider {
+    margin: 0px 4px;
+}
+
+QStatusBar QFrame#StatusBarSeparator {
+    color: #d6d6d6;
+    margin: 0px 8px;
 }
 
 /* ---- Dock Widget (Property Panel) ---- */

@@ -5,7 +5,10 @@ QT += core gui widgets
 
 TARGET = GraphicsDemo
 
-DEFINES +=
+DEFINES += QTCOLORWIDGETS_STATICALLY_LINKED
+
+include(Qt-Color-Widgets/color_widgets.pri)
+include(QtGradientEditor/qtgradienteditor.pri)
 
 # 启用 RTTI（AlignmentUtils 使用 dynamic_cast<IGraphicsItem*>）
 CONFIG += rtti
@@ -32,6 +35,7 @@ HEADERS += \
     Utils/ImageUtils.h \
     Utils/ColorUtils.h \
     Utils/AlignmentUtils.h
+
 
 SOURCES += \
     App/main.cpp \

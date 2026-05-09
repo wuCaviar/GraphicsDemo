@@ -63,29 +63,35 @@ void PropertyPanel::setupUI()
     // ---- 边框 ----
     m_penGroup = new QGroupBox(tr("Border"));
     auto *penLayout = new QFormLayout(m_penGroup);
-    m_penColorBtn = new QPushButton;
-    m_penColorBtn->setFixedSize(60, 24);
+    m_penColorSelector = new ColorSelector(this);
+    m_penColorSelector->setFixedSize(60, 24);
     m_penWidthSpin = new QSpinBox;
     m_penWidthSpin->setRange(0, 100);
     m_penStyleCombo = new QComboBox;
     m_penStyleCombo->addItems({tr("Solid"), tr("Dash"), tr("Dot"), tr("DashDot"), tr("DashDotDot"), tr("None")});
-    penLayout->addRow(tr("Color:"), m_penColorBtn);
+    penLayout->addRow(tr("Color:"), m_penColorSelector);
     penLayout->addRow(tr("Width:"), m_penWidthSpin);
     penLayout->addRow(tr("Style:"), m_penStyleCombo);
     mainLayout->addWidget(m_penGroup);
 
     // ---- 填充 ----
     m_brushGroup = new QGroupBox(tr("Fill"));
+
     auto *brushLayout = new QFormLayout(m_brushGroup);
+
     m_fillModeCombo = new QComboBox;
     m_fillModeCombo->addItems({tr("No Fill"), tr("Solid Color"), tr("Gradient")});
-    m_brushColorBtn = new QPushButton;
-    m_brushColorBtn->setFixedSize(60, 24);
-    m_brushGradientBtn = new QPushButton(tr("Edit..."));
-    m_brushGradientBtn->setFixedSize(60, 24);
+
+    m_brushSolid = new ColorSelector(this);
+    m_brushSolid->setFixedSize(60, 24);
+
+    m_brushGradient = new GradientPreview(this);
+    m_brushGradient->setFixedSize(60, 24);
+
     auto *brushBtnLayout = new QHBoxLayout;
-    brushBtnLayout->addWidget(m_brushColorBtn);
-    brushBtnLayout->addWidget(m_brushGradientBtn);
+    brushBtnLayout->addWidget(m_brushSolid);
+    brushBtnLayout->addWidget(m_brushGradient);
+
     brushLayout->addRow(tr("Mode:"), m_fillModeCombo);
     brushLayout->addRow(tr("Color:"), brushBtnLayout);
     mainLayout->addWidget(m_brushGroup);
@@ -105,16 +111,16 @@ void PropertyPanel::setupUI()
     auto *styleLayout = new QHBoxLayout;
     styleLayout->addWidget(m_boldBtn);
     styleLayout->addWidget(m_italicBtn);
-    m_textColorBtn = new QPushButton;
-    m_textColorBtn->setFixedSize(60, 24);
-    m_textBgColorBtn = new QPushButton;
-    m_textBgColorBtn->setFixedSize(60, 24);
+    m_textColorSelector = new ColorSelector(this);
+    m_textColorSelector->setFixedSize(60, 24);
+    m_textBgColorSelector = new ColorSelector(this);
+    m_textBgColorSelector->setFixedSize(60, 24);
     m_textEdit = new QLineEdit;
     textLayout->addRow(tr("Font:"), m_fontCombo);
     textLayout->addRow(tr("Size:"), m_fontSizeSpin);
     textLayout->addRow(tr("Style:"), styleLayout);
-    textLayout->addRow(tr("Color:"), m_textColorBtn);
-    textLayout->addRow(tr("Background:"), m_textBgColorBtn);
+    textLayout->addRow(tr("Color:"), m_textColorSelector);
+    textLayout->addRow(tr("Background:"), m_textBgColorSelector);
     textLayout->addRow(tr("Text:"), m_textEdit);
     mainLayout->addWidget(m_textGroup);
 
@@ -152,23 +158,23 @@ void PropertyPanel::setupUI()
     m_noSelectionLabel->setVisible(true);
 
     // ---- 信号连接 ----
-    connect(m_penColorBtn, &QPushButton::clicked, this, &PropertyPanel::onPenColorClicked);
+    connect(m_penColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onPenColorSelected);
     connect(m_penWidthSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
             &PropertyPanel::onPenWidthChanged);
     connect(m_penStyleCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &PropertyPanel::onPenStyleChanged);
-    connect(m_brushColorBtn, &QPushButton::clicked, this, &PropertyPanel::onBrushColorClicked);
+    connect(m_brushSolid, &ColorSelector::colorSelected, this, &PropertyPanel::onBrushColorClicked);
     connect(m_fillModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &PropertyPanel::onFillModeChanged);
-    connect(m_brushGradientBtn, &QPushButton::clicked, this, &PropertyPanel::onBrushGradientClicked);
+    connect(m_brushGradient, &GradientPreview::brushChanged, this, &PropertyPanel::onBrushGradientClicked);
     connect(m_fontCombo, &QFontComboBox::currentFontChanged, this,
             &PropertyPanel::onFontFamilyChanged);
     connect(m_fontSizeSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
             &PropertyPanel::onFontSizeChanged);
     connect(m_boldBtn, &QPushButton::toggled, this, &PropertyPanel::onBoldToggled);
     connect(m_italicBtn, &QPushButton::toggled, this, &PropertyPanel::onItalicToggled);
-    connect(m_textColorBtn, &QPushButton::clicked, this, &PropertyPanel::onTextColorClicked);
-    connect(m_textBgColorBtn, &QPushButton::clicked, this, &PropertyPanel::onTextBgColorClicked);
+    connect(m_textColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onTextColorClicked);
+    connect(m_textBgColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onTextBgColorClicked);
     connect(m_textEdit, &QLineEdit::editingFinished, this, &PropertyPanel::onTextChanged);
     connect(m_xSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &PropertyPanel::onGeometryChanged);
@@ -246,7 +252,7 @@ void PropertyPanel::updatePanel()
     if (flags & IGraphicsItem::HasPen) {
         QPen p = gi->itemPen();
         m_oldPen = p;
-        ColorUtils::updateColorButton(m_penColorBtn, p.color());
+        m_penColorSelector->setColor(p.color());
         m_penWidthSpin->setValue(p.width());
         int styleIdx = 0;
         switch (p.style()) {
@@ -267,22 +273,23 @@ void PropertyPanel::updatePanel()
         QBrush b = gi->itemBrush();
         m_oldBrush = b;
 
-        if (b.style() == Qt::LinearGradientPattern || b.style() == Qt::RadialGradientPattern
-            || b.style() == Qt::ConicalGradientPattern) {
-            m_fillModeCombo->setCurrentIndex(static_cast<int>(FillMode::Gradient));
-            m_brushColorBtn->setEnabled(false);
-            m_brushGradientBtn->setEnabled(true);
-        } else if (b.style() == Qt::SolidPattern) {
-            m_fillModeCombo->setCurrentIndex(static_cast<int>(FillMode::Solid));
-            m_brushColorBtn->setEnabled(true);
-            m_brushGradientBtn->setEnabled(false);
-            QColor c = b.color();
-            ColorUtils::updateColorButton(m_brushColorBtn, c);
-        } else {
-            m_fillModeCombo->setCurrentIndex(static_cast<int>(FillMode::NoFill));
-            m_brushColorBtn->setEnabled(false);
-            m_brushGradientBtn->setEnabled(false);
+        Qt::BrushStyle style = b.style();
+        int nIndex = static_cast<int>(FillMode::NoFill);
+        if (style == Qt::LinearGradientPattern ||
+            style == Qt::RadialGradientPattern ||
+            style == Qt::ConicalGradientPattern) {
+            // 渐变
+            nIndex = static_cast<int>(FillMode::Gradient);
+            m_brushGradient->setBrush(b);
+
+        } else if (style == Qt::SolidPattern) {
+            // 纯色
+            nIndex = static_cast<int>(FillMode::Solid);
+            m_brushSolid->setColor(b.color());
         }
+
+        m_fillModeCombo->setCurrentIndex(nIndex);
+        emit m_fillModeCombo->currentIndexChanged(nIndex);
     }
 
     // ---- 文字 ----
@@ -297,20 +304,18 @@ void PropertyPanel::updatePanel()
         m_textEdit->setText(m_oldText);
 
         // 文字颜色（仅 TextItem 有此概念）
-        if (auto *ti = qgraphicsitem_cast<TextItem *>(m_currentItem)) {
-            QColor textColor = ti->defaultTextColor();
-            ColorUtils::updateColorButton(m_textColorBtn, textColor);
-            QBrush bg = gi->itemBrush();
-            if (bg.style() == Qt::NoBrush) {
-                ColorUtils::updateColorButton(m_textBgColorBtn, QColor(), true);
-            } else {
-                ColorUtils::updateColorButton(m_textBgColorBtn, bg.color());
-            }
-            m_textColorBtn->setVisible(true);
-            m_textBgColorBtn->setVisible(true);
-        } else {
-            m_textColorBtn->setVisible(false);
-            m_textBgColorBtn->setVisible(false);
+        if(auto *ti = qgraphicsitem_cast<TextItem *>(m_currentItem))
+        {
+            m_textColorSelector->setVisible(true);
+            m_textBgColorSelector->setVisible(true);
+
+            m_textColorSelector->setColor(gi->itemPen().color());
+            m_textBgColorSelector->setColor(gi->itemBrush().color());
+        }
+        else
+        {
+            m_textColorSelector->setVisible(false);
+            m_textBgColorSelector->setVisible(false);
         }
     }
 
@@ -334,19 +339,17 @@ void PropertyPanel::updatePanel()
 }
 
 // ---- 边框颜色 ----
-void PropertyPanel::onPenColorClicked()
+void PropertyPanel::onPenColorSelected(const QColor& color)
 {
     if (m_updating || !m_currentItem) return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
     if (!gi) return;
 
     QPen oldPen = gi->itemPen();
-    QColor c = ColorUtils::pickColor(this, oldPen.color(), tr("Border Color"));
-    if (!c.isValid()) return;
+    if (!color.isValid()) return;
     QPen newPen = oldPen;
-    newPen.setColor(c);
+    newPen.setColor(color);
     emit penChanged(m_currentItem, oldPen, newPen);
-    ColorUtils::updateColorButton(m_penColorBtn, c);
 }
 
 void PropertyPanel::onPenWidthChanged(int w)
@@ -378,86 +381,57 @@ void PropertyPanel::onPenStyleChanged(int idx)
 }
 
 // ---- 填充颜色 ----
-void PropertyPanel::onBrushColorClicked()
+void PropertyPanel::onBrushColorClicked(const QColor& color)
 {
     if (m_updating || !m_currentItem) return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
     if (!gi) return;
 
     QBrush oldBrush = gi->itemBrush();
-    QColor c = ColorUtils::pickColor(this, oldBrush.color(), tr("Fill Color"));
-    if (!c.isValid()) return;
-    QBrush newBrush(c);
+    if (!color.isValid()) return;
+    QBrush newBrush(color);
+    newBrush.setStyle(Qt::SolidPattern);
     emit brushChanged(m_currentItem, oldBrush, newBrush);
-    ColorUtils::updateColorButton(m_brushColorBtn, c);
 }
 
 void PropertyPanel::onFillModeChanged(int idx)
 {
-    if (m_updating || !m_currentItem) return;
+    if (!m_currentItem) return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
     if (!gi) return;
 
     FillMode mode = static_cast<FillMode>(idx);
     QBrush oldBrush = gi->itemBrush();
-
-    // 根据模式切换按钮可见性
-    m_brushColorBtn->setEnabled(mode == FillMode::Solid);
-    m_brushGradientBtn->setEnabled(mode == FillMode::Gradient);
-
     QBrush newBrush;
     switch (mode) {
     case FillMode::NoFill:
         newBrush = QBrush(Qt::NoBrush);
         break;
     case FillMode::Solid:
-        // 使用旧颜色或默认白色
-        newBrush = QBrush(oldBrush.color().isValid() ? oldBrush.color() : Qt::white);
-        ColorUtils::updateColorButton(m_brushColorBtn, newBrush.color());
+        newBrush = QBrush(m_brushSolid->color());
         break;
-    case FillMode::Gradient: {
-        // 默认渐变：白到黑
-        QLinearGradient g(0, 0, 1, 0);
-        g.setCoordinateMode(QGradient::ObjectBoundingMode);
-        g.setColorAt(0.0, Qt::white);
-        g.setColorAt(1.0, Qt::black);
-        newBrush = QBrush(g);
+    case FillMode::Gradient:
+        newBrush = m_brushGradient->brush();
+    default:
         break;
-    }
     }
 
-    if (oldBrush != newBrush)
-        emit brushChanged(m_currentItem, oldBrush, newBrush);
+    // 根据模式切换按钮可见性或可用性
+    m_brushSolid->setVisible(mode == FillMode::Solid);
+    m_brushGradient->setVisible(mode == FillMode::Gradient);
+
+    if(newBrush != oldBrush)
+        Q_EMIT brushChanged(m_currentItem, oldBrush, newBrush);
 }
 
-void PropertyPanel::onBrushGradientClicked()
+void PropertyPanel::onBrushGradientClicked(const QBrush& brush)
 {
     if (m_updating || !m_currentItem) return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
     if (!gi) return;
 
     QBrush oldBrush = gi->itemBrush();
-
-    // 提取现有渐变或创建默认渐变
-    QLinearGradient currentGradient;
-    if (oldBrush.style() == Qt::LinearGradientPattern) {
-        const QGradient *g = oldBrush.gradient();
-        QGradientStops stops = g->stops();
-        currentGradient = QLinearGradient(0, 0, 1, 0);
-        currentGradient.setCoordinateMode(QGradient::ObjectBoundingMode);
-        currentGradient.setStops(stops);
-    } else {
-        currentGradient = QLinearGradient(0, 0, 1, 0);
-        currentGradient.setCoordinateMode(QGradient::ObjectBoundingMode);
-        currentGradient.setColorAt(0.0, Qt::white);
-        currentGradient.setColorAt(1.0, Qt::black);
-    }
-
-    GradientDialog dlg(currentGradient, this);
-    if (dlg.exec() == QDialog::Accepted) {
-        QBrush newBrush(dlg.gradient());
-        emit brushChanged(m_currentItem, oldBrush, newBrush);
-    }
+    Q_EMIT brushChanged(m_currentItem, oldBrush, brush);
 }
 
 // ---- 文字属性 ----
@@ -511,38 +485,31 @@ void PropertyPanel::onItalicToggled(bool b)
     emit fontChanged(m_currentItem, oldFont, newFont);
 }
 
-void PropertyPanel::onTextColorClicked()
+void PropertyPanel::onTextColorClicked(const QColor& color)
 {
     if (m_updating || !m_currentItem) return;
     auto *ti = qgraphicsitem_cast<TextItem *>(m_currentItem);
     if (!ti) return;
 
-    QColor oldColor = ti->defaultTextColor();
-    QColor c = ColorUtils::pickColor(this, oldColor, tr("Text Color"));
-    if (!c.isValid()) return;
+    if (!color.isValid()) return;
 
     // 通过 penChanged 信号传递文字颜色变更（TextItem 的 setItemPen 会设置 defaultTextColor）
     QPen oldPen = ti->itemPen();
-    QPen newPen = oldPen;
-    newPen.setColor(c);
-    emit penChanged(m_currentItem, oldPen, newPen);
-    ColorUtils::updateColorButton(m_textColorBtn, c);
+    QPen newPen = QPen(color);
+    Q_EMIT penChanged(m_currentItem, oldPen, newPen);
 }
 
-void PropertyPanel::onTextBgColorClicked()
+void PropertyPanel::onTextBgColorClicked(const QColor& color)
 {
     if (m_updating || !m_currentItem) return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
     if (!gi) return;
 
     QBrush oldBrush = gi->itemBrush();
-    QColor oldColor = (oldBrush.style() == Qt::SolidPattern) ? oldBrush.color() : Qt::white;
-    QColor c = ColorUtils::pickColor(this, oldColor, tr("Background Color"));
-    if (!c.isValid()) return;
+    if (!color.isValid()) return;
 
-    QBrush newBrush(c);
-    emit brushChanged(m_currentItem, oldBrush, newBrush);
-    ColorUtils::updateColorButton(m_textBgColorBtn, c);
+    QBrush newBrush(color);
+    Q_EMIT brushChanged(m_currentItem, oldBrush, newBrush);
 }
 
 void PropertyPanel::onTextChanged()
