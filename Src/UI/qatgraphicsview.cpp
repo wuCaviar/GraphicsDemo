@@ -1,16 +1,16 @@
 #include "qatgraphicsview.h"
 
-#include "RectItem.h"
-#include "EllipseItem.h"
-#include "LineItem.h"
 #include "BezierCurveItem.h"
-#include "FreehandItem.h"
-#include "TextItem.h"
-#include "ImageItem.h"
 #include "CanvasItem.h"
-#include "ResizeHandleItem.h"
 #include "Commands.h"
+#include "EllipseItem.h"
+#include "FreehandItem.h"
+#include "ImageItem.h"
 #include "ImageUtils.h"
+#include "LineItem.h"
+#include "RectItem.h"
+#include "ResizeHandleItem.h"
+#include "TextItem.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -20,12 +20,14 @@
 #include <QImage>
 #include <QImageReader>
 #include <QKeyEvent>
-#include <QMouseEvent>
+#include <QMenu>
 #include <QMimeData>
+#include <QMouseEvent>
 #include <QScrollBar>
 #include <QShortcut>
 #include <QUndoStack>
 #include <QWheelEvent>
+#include <QtMath>
 
 #include <tiff.h>
 #include <tiffio.h>
@@ -165,9 +167,9 @@ void QAtGraphicsView::fitToCanvas()
 void QAtGraphicsView::scrollToCanvasOrigin()
 {
     // 确保画布左上角 (0,0) 在视图的合适位置
-    QMetaObject::invokeMethod(this, [this]() {
-        centerOn(m_pCanvas ? m_pCanvas->rect().center() : QPointF(400, 560));
-    }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(
+        this, [this]() { centerOn(m_pCanvas ? m_pCanvas->rect().center() : QPointF(400, 560)); },
+        Qt::QueuedConnection);
 }
 
 void QAtGraphicsView::setTool(Tool tool)
@@ -178,14 +180,28 @@ void QAtGraphicsView::setTool(Tool tool)
 
     m_tool = tool;
 
-    // 根据工具设置拖拽模式
-    if (tool == Tool::Select) {
+    // 根据工具设置拖拽模式和光标
+    switch (tool) {
+    case Tool::Select:
         setDragMode(RubberBandDrag);
         setCursor(Qt::ArrowCursor);
-    } else {
+        break;
+    case Tool::Hand:
+        setDragMode(NoDrag);  // 不用 ScrollHandDrag，手动实现平移
+        setCursor(Qt::OpenHandCursor);
+        break;
+    case Tool::Text:        // 点击即插入文字
+    case Tool::Image:       // 点击弹出文件对话框
+        setDragMode(NoDrag);
+        setCursor(Qt::ArrowCursor);
+        break;
+    default:                // Rect / Ellipse / Line / BezierCurve / Freehand
         setDragMode(NoDrag);
         setCursor(Qt::CrossCursor);
+        break;
     }
+
+    emit toolChanged(tool);  // 通知工具变更
 }
 
 // ============================================================
@@ -254,10 +270,13 @@ void QAtGraphicsView::scheduleResizeHandleUpdate()
     if (m_resizeHandleUpdatePending)
         return;
     m_resizeHandleUpdatePending = true;
-    QMetaObject::invokeMethod(this, [this]() {
-        m_resizeHandleUpdatePending = false;
-        updateResizeHandle();
-    }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(
+        this,
+        [this]() {
+            m_resizeHandleUpdatePending = false;
+            updateResizeHandle();
+        },
+        Qt::QueuedConnection);
 }
 
 void QAtGraphicsView::removeResizeHandle()
@@ -266,6 +285,15 @@ void QAtGraphicsView::removeResizeHandle()
         m_pMainScene->removeItem(m_resizeHandle);
         delete m_resizeHandle;
         m_resizeHandle = nullptr;
+    }
+}
+
+// 原地刷新选中框位置（不删除重建），适用于 Z 序/旋转等几何不变的操作
+void QAtGraphicsView::refreshResizeHandle()
+{
+    if (m_resizeHandle) {
+        m_resizeHandle->updateHandlePositions();
+        m_resizeHandle->update();
     }
 }
 
@@ -294,6 +322,15 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
 
     QPointF scenePos = mapToScene(event->pos());
     emit mousePositionChanged(scenePos);
+
+    // 手型工具：开始平移（只移动视图，不碰元素）
+    if (m_tool == Tool::Hand) {
+        m_handPanning = true;
+        m_handLastPos = event->pos();
+        setCursor(Qt::ClosedHandCursor);
+        event->accept();
+        return;
+    }
 
     if (m_tool == Tool::Select) {
         // 记录移动起始位置（用于 MoveItemsCommand）
@@ -374,7 +411,8 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
         m_tempItem = item;
         break;
     }
-    default: break;
+    default:
+        break;
     }
 
     if (m_tempItem)
@@ -385,6 +423,21 @@ void QAtGraphicsView::mouseMoveEvent(QMouseEvent *event)
 {
     QPointF scenePos = mapToScene(event->pos());
     emit mousePositionChanged(scenePos);
+
+    // 手型工具：只平移视图，不碰任何图元
+    if (m_handPanning) {
+        QPoint delta = event->pos() - m_handLastPos;
+        m_handLastPos = event->pos();
+        horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
+        verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
+        return;
+    }
+
+    // ★ 非 Select 工具在未活跃绘制时，跳过 QGraphicsView::mouseMoveEvent
+    //   防止父类根据图元 hover 状态覆写光标（Hand=OpenHand, Text=Arrow, 绘图=Cross等）
+    if (m_tool != Tool::Select && !m_drawing) {
+        return;
+    }
 
     if (!m_drawing || !m_tempItem) {
         QGraphicsView::mouseMoveEvent(event);
@@ -442,7 +495,8 @@ void QAtGraphicsView::mouseMoveEvent(QMouseEvent *event)
             fi->appendPoint(scenePos);
         break;
     }
-    default: break;
+    default:
+        break;
     }
 }
 
@@ -450,6 +504,14 @@ void QAtGraphicsView::mouseReleaseEvent(QMouseEvent *event)
 {
     if (event->button() != Qt::LeftButton) {
         QGraphicsView::mouseReleaseEvent(event);
+        return;
+    }
+
+    // 手型工具：结束平移（独立于 m_tool，因为空格松手后 m_tool 可能已恢复）
+    if (m_handPanning) {
+        m_handPanning = false;
+        setCursor(m_tool == Tool::Hand ? Qt::OpenHandCursor : Qt::ArrowCursor);
+        event->accept();
         return;
     }
 
@@ -472,8 +534,8 @@ void QAtGraphicsView::mouseReleaseEvent(QMouseEvent *event)
         }
 
         if (!movedItems.isEmpty() && m_undoStack) {
-            m_undoStack->push(new MoveItemsCommand(movedItems, oldPositions, newPositions,
-                                                    m_pMainScene));
+            m_undoStack->push(
+                new MoveItemsCommand(movedItems, oldPositions, newPositions, m_pMainScene));
         }
         m_moveStartPositions.clear();
 
@@ -495,8 +557,54 @@ void QAtGraphicsView::mouseDoubleClickEvent(QMouseEvent *event)
     QGraphicsView::mouseDoubleClickEvent(event);
 }
 
+// ============================================================
+// 右键菜单 — 通过信号复用 MainWindow 的 onBringToFront / onSendToBack
+// ============================================================
+void QAtGraphicsView::contextMenuEvent(QContextMenuEvent *event)
+{
+    // 遍历点击位置的所有图元（按 z 序从高到低），
+    // 找到第一个可交互的图元（跳过 CanvasItem 和 ResizeHandleItem）
+    QGraphicsItem *hitItem = nullptr;
+    const auto allItems = items(event->pos());
+    for (auto *item : allItems) {
+        if (item->type() != CanvasItem::Type && item->type() != ResizeHandleItem::Type) {
+            hitItem = item;
+            break;
+        }
+    }
+    if (!hitItem)
+        return;
+
+    // 若该图元未被选中，先清除选择再选中它（右键点击即选中）
+    if (!hitItem->isSelected()) {
+        m_pMainScene->clearSelection();
+        hitItem->setSelected(true);
+    }
+
+    auto selectedItems = m_pMainScene->selectedItems();
+    if (selectedItems.isEmpty())
+        return;
+
+    QMenu menu;
+    menu.addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring to Front"),
+                   this, &QAtGraphicsView::bringToFrontRequested);
+    menu.addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send to Back"),
+                   this, &QAtGraphicsView::sendToBackRequested);
+
+    menu.exec(event->globalPos());
+}
+
 void QAtGraphicsView::keyPressEvent(QKeyEvent *event)
 {
+    // 空格键：临时切换到手型工具
+    if (event->key() == Qt::Key_Space && !m_drawing && !m_spaceHandMode) {
+        m_previousTool = m_tool;
+        m_spaceHandMode = true;
+        setTool(Tool::Hand);
+        event->accept();
+        return;
+    }
+
     // Escape 键取消当前绘制
     if (event->key() == Qt::Key_Escape && m_drawing) {
         cancelDrawing();
@@ -504,6 +612,24 @@ void QAtGraphicsView::keyPressEvent(QKeyEvent *event)
         return;
     }
     QGraphicsView::keyPressEvent(event);
+}
+
+void QAtGraphicsView::keyReleaseEvent(QKeyEvent *event)
+{
+    // 空格键释放：恢复之前的工具
+    if (event->key() == Qt::Key_Space && m_spaceHandMode) {
+        m_spaceHandMode = false;
+        if (!m_handPanning) {
+            // 未拖拽中：正常恢复工具光标
+            setTool(m_previousTool);
+        } else {
+            // 正在拖拽中：仅更新工具类型，保持 ClosedHandCursor 直至松手
+            m_tool = m_previousTool;
+        }
+        event->accept();
+        return;
+    }
+    QGraphicsView::keyReleaseEvent(event);
 }
 
 void QAtGraphicsView::wheelEvent(QWheelEvent *event)
@@ -539,13 +665,16 @@ void QAtGraphicsView::drawBackground(QPainter *painter, const QRectF &rect)
     // 2. 绘制画布白色填充（从 CanvasItem 移到这里，确保网格不被遮挡）
     painter->fillRect(canvasRect, Qt::white);
 
-    // 3. 绘制画布阴影效果
+    // 3. 绘制画布阴影效果（光源来自左上角，右侧/底部/角落无空隙/重叠）
     QRectF rightShadow(canvasRect.right(), canvasRect.top() + 3,
-                       6, canvasRect.height());
+                       6, canvasRect.height() - 3);
     QRectF bottomShadow(canvasRect.left() + 3, canvasRect.bottom(),
-                        canvasRect.width(), 6);
-    painter->fillRect(rightShadow, QColor(60, 60, 60, 80));
-    painter->fillRect(bottomShadow, QColor(60, 60, 60, 80));
+                        canvasRect.width() - 3, 6);
+    QRectF cornerShadow(canvasRect.right(), canvasRect.bottom(), 6, 6);
+    QColor shadowColor(60, 60, 60, 80);
+    painter->fillRect(rightShadow, shadowColor);
+    painter->fillRect(bottomShadow, shadowColor);
+    painter->fillRect(cornerShadow, shadowColor);
 
     // 4. 绘制网格（仅在画布区域内，位于白色填充之上、图元之下）
     if (m_gridVisible) {

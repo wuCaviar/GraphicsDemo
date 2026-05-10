@@ -19,7 +19,7 @@ public:
     bool draw_frame = true; ///< 是否绘制边框
 
     Private()
-        : brush(QGradient(QGradient::WarmFlame)),
+        : brush(QGradient()),
           back(Qt::darkGray, Qt::DiagCrossPattern)
     {}
 };

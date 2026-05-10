@@ -55,7 +55,7 @@ void RectItem::serialize(QDataStream &out) const
     out << rect() << pen() << brush() << m_cornerRadius << pos() << rotation();
 }
 
-void RectItem::deserialize(QDataStream &in)
+bool RectItem::deserialize(QDataStream &in)
 {
     QRectF r;
     QPen p;
@@ -63,10 +63,13 @@ void RectItem::deserialize(QDataStream &in)
     qreal cr, rot;
     QPointF pos_;
     in >> r >> p >> b >> cr >> pos_ >> rot;
+    if (in.status() != QDataStream::Ok)
+        return false;
     setRect(r);
     setPen(p);
     setBrush(b);
     m_cornerRadius = cr;
     setPos(pos_);
     setRotation(rot);
+    return true;
 }

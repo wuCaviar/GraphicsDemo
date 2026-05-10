@@ -93,3 +93,6 @@ compile_commands.json
 Build*
 
 libtiffpic
+
+.agents
+.claude

@@ -21,8 +21,8 @@ AddItemCommand::~AddItemCommand()
     // 场景已销毁时，item 也必然已被 Qt 对象树销毁，无需再 delete
     if (!m_scene)
         return;
-    // 仅当 item 不在场景中且仍由 command 持有时才删除
-    if (m_item && !m_item->scene())
+    // 仅当 command 仍持有 item 所有权且 item 不在场景中时才删除
+    if (m_owned && m_item && !m_item->scene())
         delete m_item;
 }
 
@@ -58,10 +58,12 @@ RemoveItemsCommand::~RemoveItemsCommand()
     // 场景已销毁时，items 也必然已被销毁
     if (!m_scene)
         return;
-    // 仅当 items 不在场景中时（undo 状态）才删除
-    for (auto *item : m_items) {
-        if (item && !item->scene())
-            delete item;
+    // 仅当 command 仍持有 items 所有权（redo 状态，item 已从场景移除）时才删除
+    if (m_owned) {
+        for (auto *item : m_items) {
+            if (item && !item->scene())
+                delete item;
+        }
     }
 }
 
@@ -73,6 +75,7 @@ void RemoveItemsCommand::undo()
         if (item)
             m_scene->addItem(item);
     }
+    m_owned = false; // items 回到场景，command 不再持有
 }
 
 void RemoveItemsCommand::redo()
@@ -83,6 +86,7 @@ void RemoveItemsCommand::redo()
         if (item)
             m_scene->removeItem(item);
     }
+    m_owned = true; // items 从场景移除，command 持有
 }
 
 // ============================================================
@@ -230,9 +234,12 @@ PasteItemsCommand::~PasteItemsCommand()
     // 场景已销毁时，items 也必然已被销毁
     if (!m_scene)
         return;
-    for (auto *item : m_items) {
-        if (item && !item->scene())
-            delete item;
+    // 仅当 command 仍持有 items 所有权（undo 状态，item 已从场景移除）时才删除
+    if (m_owned) {
+        for (auto *item : m_items) {
+            if (item && !item->scene())
+                delete item;
+        }
     }
 }
 
@@ -244,6 +251,7 @@ void PasteItemsCommand::undo()
         if (item)
             m_scene->removeItem(item);
     }
+    m_owned = true; // items 从场景移除，command 持有
 }
 
 void PasteItemsCommand::redo()
@@ -254,6 +262,7 @@ void PasteItemsCommand::redo()
         if (item)
             m_scene->addItem(item);
     }
+    m_owned = false; // items 添加到场景，command 不再持有
 }
 
 // ============================================================

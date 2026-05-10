@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include "PropertyPanel.h"
+#include "ImageUtils.h"
 #include "qatgraphicsview.h"
 #include "AlignmentUtils.h"
 #include <QMainWindow>
@@ -29,6 +30,7 @@ public:
 protected:
     void keyPressEvent(QKeyEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void onNew();
@@ -77,6 +79,10 @@ private:
     void _updateUndoRedoActions();
     void loadStyleSheet();
 
+    // 窗口状态持久化
+    void loadWindowState();
+    void saveWindowState();
+
     void copyItemsToClipboard(const QList<QGraphicsItem *> &items);
     QList<QGraphicsItem *> pasteItemsFromClipboard();
     QList<QGraphicsItem *> filterSelectableItems() const;
@@ -88,7 +94,12 @@ private:
                          const AlignmentUtils::DistributeParams &params = AlignmentUtils::DistributeParams());
 
     // 无损 TIFF 导出
-    bool exportTiffLossless(const QString &path, const QImage &image);
+    bool exportTiffLossless(const QString &path, const QImage &image,
+                             const ImageUtils::ExportParameters &params = ImageUtils::ExportParameters());
+
+    // 使用参数导出图像（PNG/JPEG 等格式）
+    bool exportImageWithParams(const QString &path, const QImage &image,
+                              const ImageUtils::ExportParameters &params);
 
     Ui::MainWindow *ui;
 

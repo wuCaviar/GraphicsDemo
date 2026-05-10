@@ -14,6 +14,7 @@ class ResizeHandleItem;
 // 绘图工具类型
 enum class Tool {
     Select,         // 选择/移动
+    Hand,           // 抓手/平移
     Rect,           // 矩形
     Ellipse,        // 椭圆
     Line,           // 直线
@@ -56,19 +57,27 @@ public:
 
     // 手动触发 ResizeHandle 更新（旋转等操作后调用）
     void scheduleResizeHandleUpdate();
+    // 原地刷新选中框位置（不移除重建），适用于 Z 序等几何不变的操作
+    void refreshResizeHandle();
 
 signals:
     void itemAdded(QGraphicsItem *item);
     void selectionChanged();
     void mousePositionChanged(const QPointF &scenePos);
     void zoomChanged(qreal level);
+    void toolChanged(Tool tool);  // 通知工具变更（含空格临时切换）
+    // 右键菜单请求（复用 MainWindow 已有功能）
+    void bringToFrontRequested();
+    void sendToBackRequested();
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
     void drawBackground(QPainter *painter, const QRectF &rect) override;
 
@@ -108,6 +117,14 @@ private:
 
     // 缩放
     qreal m_zoomLevel = 1.0;
+
+    // 空格键临时手型工具
+    Tool m_previousTool = Tool::Select;
+    bool m_spaceHandMode = false;
+
+    // 手型工具平移状态
+    bool m_handPanning = false;
+    QPoint m_handLastPos;
 
     // 网格
     bool m_gridVisible = true;

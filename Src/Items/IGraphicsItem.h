@@ -67,7 +67,7 @@ public:
 
     // 序列化（剪贴板）
     virtual void serialize(QDataStream &out) const = 0;
-    virtual void deserialize(QDataStream &in) = 0;
+    virtual bool deserialize(QDataStream &in) = 0;
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(IGraphicsItem::PropertyFlags)

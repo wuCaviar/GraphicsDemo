@@ -36,15 +36,18 @@ void LineItem::serialize(QDataStream &out) const
     out << line() << pen() << pos() << rotation();
 }
 
-void LineItem::deserialize(QDataStream &in)
+bool LineItem::deserialize(QDataStream &in)
 {
     QLineF l;
     QPen p;
     qreal rot;
     QPointF pos_;
     in >> l >> p >> pos_ >> rot;
+    if (in.status() != QDataStream::Ok)
+        return false;
     setLine(l);
     setPen(p);
     setPos(pos_);
     setRotation(rot);
+    return true;
 }

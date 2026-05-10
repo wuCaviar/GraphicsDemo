@@ -40,7 +40,7 @@ void EllipseItem::serialize(QDataStream &out) const
     out << rect() << pen() << brush() << pos() << rotation();
 }
 
-void EllipseItem::deserialize(QDataStream &in)
+bool EllipseItem::deserialize(QDataStream &in)
 {
     QRectF r;
     QPen p;
@@ -48,9 +48,12 @@ void EllipseItem::deserialize(QDataStream &in)
     qreal rot;
     QPointF pos_;
     in >> r >> p >> b >> pos_ >> rot;
+    if (in.status() != QDataStream::Ok)
+        return false;
     setRect(r);
     setPen(p);
     setBrush(b);
     setPos(pos_);
     setRotation(rot);
+    return true;
 }

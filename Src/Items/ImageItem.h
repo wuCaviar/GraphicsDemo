@@ -44,7 +44,7 @@ public:
     void setRawTiffData(const QByteArray &data) { m_rawTiffData = data; }
 
     void serialize(QDataStream &out) const override;
-    void deserialize(QDataStream &in) override;
+    bool deserialize(QDataStream &in) override;
 
 protected:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,

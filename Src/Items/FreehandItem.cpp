@@ -42,15 +42,18 @@ void FreehandItem::serialize(QDataStream &out) const
     out << path() << pen() << pos() << rotation();
 }
 
-void FreehandItem::deserialize(QDataStream &in)
+bool FreehandItem::deserialize(QDataStream &in)
 {
     QPainterPath p;
     QPen pen_;
     qreal rot;
     QPointF pos_;
     in >> p >> pen_ >> pos_ >> rot;
+    if (in.status() != QDataStream::Ok)
+        return false;
     setPath(p);
     setPen(pen_);
     setPos(pos_);
     setRotation(rot);
+    return true;
 }

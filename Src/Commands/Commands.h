@@ -43,6 +43,7 @@ public:
 private:
     QPointer<QGraphicsScene> m_scene;
     QList<QGraphicsItem *> m_items;
+    bool m_owned = false; // redo 后（item 从场景移除）为 true
 };
 
 // ============================================================
@@ -107,6 +108,7 @@ public:
 private:
     QPointer<QGraphicsScene> m_scene;
     QList<QGraphicsItem *> m_items;
+    bool m_owned = false; // undo 后（item 从场景移除）为 true
 };
 
 // ============================================================

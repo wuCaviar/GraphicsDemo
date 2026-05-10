@@ -34,6 +34,7 @@ QImage ImageItem::itemImage() const { return pixmap().toImage(); }
 
 void ImageItem::setItemImage(const QImage &img)
 {
+    prepareGeometryChange();
     setPixmap(QPixmap::fromImage(img));
     // 更新 m_rect
     if (!img.isNull())
@@ -82,13 +83,16 @@ void ImageItem::serialize(QDataStream &out) const
     out << img << m_pen << pos() << rotation() << m_filePath << m_rawTiffData << m_rect;
 }
 
-void ImageItem::deserialize(QDataStream &in)
+bool ImageItem::deserialize(QDataStream &in)
 {
     QImage img;
     qreal rot;
     QPointF pos_;
     in >> img >> m_pen >> pos_ >> rot >> m_filePath >> m_rawTiffData >> m_rect;
+    if (in.status() != QDataStream::Ok)
+        return false;
     setPixmap(QPixmap::fromImage(img));
     setPos(pos_);
     setRotation(rot);
+    return true;
 }

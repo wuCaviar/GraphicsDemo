@@ -42,7 +42,7 @@ public:
     bool supportsGeometryRect() const override { return true; }
 
     void serialize(QDataStream &out) const override;
-    void deserialize(QDataStream &in) override;
+    bool deserialize(QDataStream &in) override;
 
     // 禁用默认文本交互，改由属性面板编辑
     void enableEditing(bool on);

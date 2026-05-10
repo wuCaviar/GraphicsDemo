@@ -165,7 +165,7 @@ void TextItem::serialize(QDataStream &out) const
         << m_rect;
 }
 
-void TextItem::deserialize(QDataStream &in)
+bool TextItem::deserialize(QDataStream &in)
 {
     QString txt;
     QColor color;
@@ -175,6 +175,8 @@ void TextItem::deserialize(QDataStream &in)
     QPointF pos_;
     QRectF r;
     in >> txt >> color >> f >> bg >> pos_ >> rot >> r;
+    if (in.status() != QDataStream::Ok)
+        return false;
     setPlainText(txt);
     setDefaultTextColor(color);
     setFont(f);
@@ -183,4 +185,5 @@ void TextItem::deserialize(QDataStream &in)
     setRotation(rot);
     if (r.isValid())
         setRect(r);
+    return true;
 }

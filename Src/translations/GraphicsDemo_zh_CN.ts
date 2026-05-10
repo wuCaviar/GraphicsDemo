@@ -6,47 +6,47 @@
     <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="33"/>
         <source>Align &amp; Layout</source>
-        <translation type="unfinished"></translation>
+        <translation>对齐&amp;布局</translation>
     </message>
     <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="56"/>
         <source>Align</source>
-        <translation type="unfinished"></translation>
+        <translation>对齐</translation>
     </message>
     <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="60"/>
         <source>Left</source>
-        <translation type="unfinished"></translation>
+        <translation>左</translation>
     </message>
     <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="61"/>
         <source>HCenter</source>
-        <translation type="unfinished"></translation>
+        <translation>水平居中</translation>
     </message>
     <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="62"/>
         <source>Right</source>
-        <translation type="unfinished"></translation>
+        <translation>右</translation>
     </message>
     <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="63"/>
         <source>Top</source>
-        <translation type="unfinished"></translation>
+        <translation>顶部</translation>
     </message>
     <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="64"/>
         <source>VCenter</source>
-        <translation type="unfinished"></translation>
+        <translation>垂直居中</translation>
     </message>
     <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="65"/>
         <source>Bottom</source>
-        <translation type="unfinished"></translation>
+        <translation>底部</translation>
     </message>
     <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="72"/>
         <source>Click to align selected items</source>
-        <translation type="unfinished"></translation>
+        <translation>点击对齐选中项</translation>
     </message>
     <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="85"/>
@@ -77,7 +77,8 @@
         <location filename="../UI/AlignLayoutDialog.cpp" line="110"/>
         <location filename="../UI/AlignLayoutDialog.cpp" line="130"/>
         <source> px</source>
-        <translation type="unfinished"></translation>
+        <translation>px
+</translation>
     </message>
     <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="120"/>

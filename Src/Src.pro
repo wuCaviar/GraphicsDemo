@@ -21,6 +21,8 @@ HEADERS += \
     UI/RulerBar.h \
     UI/GradientDialog.h \
     UI/AlignLayoutDialog.h \
+    UI/ImportImageDialog.h \
+    UI/ExportImageDialog.h \
     Items/IGraphicsItem.h \
     Items/RectItem.h \
     Items/EllipseItem.h \
@@ -46,6 +48,8 @@ SOURCES += \
     UI/RulerBar.cpp \
     UI/GradientDialog.cpp \
     UI/AlignLayoutDialog.cpp \
+    UI/ImportImageDialog.cpp \
+    UI/ExportImageDialog.cpp \
     Items/IGraphicsItem.cpp \
     Items/RectItem.cpp \
     Items/EllipseItem.cpp \

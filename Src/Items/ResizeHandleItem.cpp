@@ -478,41 +478,36 @@ void ResizeHandleItem::applyGroupResize(HandleRole role, const QPointF &scenePos
         // 缩放图元尺寸
         QSizeF scaledSize(origRect.width() * sx, origRect.height() * sy);
 
-        // 新位置 = 新中心 - 缩放后尺寸的中心偏移
-        QPointF newPos(newCenterX - scaledSize.width() / 2.0,
-                       newCenterY - scaledSize.height() / 2.0);
-
-        // 考虑原始 rect 可能不从 (0,0) 开始的情况
-        qreal rectOffsetX = origRect.center().x() - origRect.width() / 2.0;
-        qreal rectOffsetY = origRect.center().y() - origRect.height() / 2.0;
-        newPos.setX(newCenterX - (rectOffsetX * sx + scaledSize.width() / 2.0));
-        newPos.setY(newCenterY - (rectOffsetY * sy + scaledSize.height() / 2.0));
-
         if (auto *ri = qgraphicsitem_cast<RectItem *>(item)) {
             QRectF scaledRect(ri->rect().topLeft(), scaledSize);
             ri->setRect(scaledRect);
+            // 新位置 = 新中心 - 缩放后 rect 的本地中心偏移
+            QPointF newPos(newCenterX - scaledRect.center().x(),
+                           newCenterY - scaledRect.center().y());
             item->setPos(newPos);
         } else if (auto *ei = qgraphicsitem_cast<EllipseItem *>(item)) {
             QRectF scaledRect(ei->rect().topLeft(), scaledSize);
             ei->setRect(scaledRect);
+            QPointF newPos(newCenterX - scaledRect.center().x(),
+                           newCenterY - scaledRect.center().y());
             item->setPos(newPos);
         } else if (auto *ti = qgraphicsitem_cast<TextItem *>(item)) {
-            // TextItem 通过 setRect() 缩放
-            QSizeF origItemSize = origRect.size();
-            if (origItemSize.width() > 0 && origItemSize.height() > 0) {
-                ti->setRect(QRectF(origRect.topLeft(), scaledSize));
-            }
+            QRectF scaledRect(origRect.topLeft(), scaledSize);
+            ti->setRect(scaledRect);
+            QPointF newPos(newCenterX - scaledRect.center().x(),
+                           newCenterY - scaledRect.center().y());
             item->setPos(newPos);
         } else if (auto *ii = qgraphicsitem_cast<ImageItem *>(item)) {
-            // ImageItem 通过 setRect() 缩放
-            QSizeF origItemSize = origRect.size();
-            if (origItemSize.width() > 0 && origItemSize.height() > 0) {
-                ii->setRect(QRectF(origRect.topLeft(), scaledSize));
-            }
+            QRectF scaledRect(origRect.topLeft(), scaledSize);
+            ii->setRect(scaledRect);
+            QPointF newPos(newCenterX - scaledRect.center().x(),
+                           newCenterY - scaledRect.center().y());
             item->setPos(newPos);
         } else {
             // 其他图元通过 transform 缩放
             QSizeF origSize = origRect.size();
+            QPointF newPos(newCenterX - scaledSize.width() / 2.0,
+                           newCenterY - scaledSize.height() / 2.0);
             if (origSize.width() > 0 && origSize.height() > 0) {
                 qreal itemSx = scaledSize.width() / origSize.width();
                 qreal itemSy = scaledSize.height() / origSize.height();

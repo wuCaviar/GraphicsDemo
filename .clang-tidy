@@ -1,0 +1,68 @@
+# Clang-Tidy 配置文件 - Qt Graphics Demo 项目
+# 
+# 使用方法:
+# 1. 安装 clang-tidy: brew install llvm (macOS) 或 apt install clang-tidy (Ubuntu)
+# 2. 生成 compile_commands.json: cd build && qmake CONFIG+=ccache .. && compiledb make
+# 3. 运行: clang-tidy Src/UI/mainwindow.cpp -p build/
+
+---
+Checks: >
+  *,
+  -llvm-header-guard,
+  -llvmlibc-*,
+  -cert-err58-cpp,
+  -cert-msc32-c,
+  -cert-msc51-cpp,
+  -cppcoreguidelines-*,
+  -hicpp-*,
+  -modernize-use-trailing-return-type,
+  -modernize-pass-by-value,
+  -readability-implicit-bool-conversion,
+  -google-build-using-namespace,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -clang-analyzer-cplusplus.NewDeleteLeaks,
+
+  # 启用的检查类别
+  bugprone-*,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  modernize-*,
+
+  # Qt 项目特定
+  -readability-isolate-declaration,
+  -modernize-deprecated-headers,
+
+CheckOptions:
+  # 命名约定（Qt风格）
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key: readability-identifier-naming.VariableCase
+    value: camelBack
+  - key: readability-identifier-naming.MemberPrefix
+    value: m_
+  - key: readability-identifier-naming.ParameterPrefix
+    value: ""
+  - key: readability-identifier-naming.LocalPrefix
+    value: ""
+  - key: readability-identifier-naming.ConstexprVariableCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+
+  # 其他检查选项
+  - key: readability-function-cognitive-complexity.IgnoreMacros
+    value: "true"
+  - key: modernize-use-nullptr.NullMacros
+    value: "NULL"
+
+HeaderFilterRegex: '.*\.(h|hpp|inl)'
+FormatStyle: file
+...
+

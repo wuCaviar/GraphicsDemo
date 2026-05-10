@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/icons">
         <file>icons/tool-select.svg</file>
+        <file>icons/tool-hand.svg</file>
         <file>icons/tool-rect.svg</file>
         <file>icons/tool-ellipse.svg</file>
         <file>icons/tool-line.svg</file>

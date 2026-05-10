@@ -26,7 +26,7 @@ public:
     void setBezierCurve(const QPointF &start, const QPointF &cp1, const QPointF &cp2, const QPointF &end);
 
     void serialize(QDataStream &out) const override;
-    void deserialize(QDataStream &in) override;
+    bool deserialize(QDataStream &in) override;
 
 protected:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,

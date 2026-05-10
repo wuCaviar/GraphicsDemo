@@ -426,9 +426,11 @@ void PropertyPanel::updatePanel()
     m_xSpin->setValue(m_currentItem->pos().x());
     m_ySpin->setValue(m_currentItem->pos().y());
 
-    // 判断 W/H 是否可编辑：仅 RectItem 和 EllipseItem 支持 setRect()
+    // 判断 W/H 是否可编辑：支持 setRect() 的图元
     bool canResizeRect = (qgraphicsitem_cast<RectItem *>(m_currentItem)
-                          || qgraphicsitem_cast<EllipseItem *>(m_currentItem));
+                          || qgraphicsitem_cast<EllipseItem *>(m_currentItem)
+                          || qgraphicsitem_cast<TextItem *>(m_currentItem)
+                          || qgraphicsitem_cast<ImageItem *>(m_currentItem));
     m_wSpin->setReadOnly(!canResizeRect);
     m_hSpin->setReadOnly(!canResizeRect);
 
@@ -490,9 +492,16 @@ void PropertyPanel::updatePanel()
             nIndex = static_cast<int>(FillMode::Solid);
             m_brushSolid->setColor(b.color());
         }
+        else
+        {
+            // 隐藏控件
+            m_brushGradient->setVisible(false);
+            m_brushSolid->setVisible(false);
+        }
 
+        m_fillModeCombo->blockSignals(true);
         m_fillModeCombo->setCurrentIndex(nIndex);
-        emit m_fillModeCombo->currentIndexChanged(nIndex);
+        m_fillModeCombo->blockSignals(false);
     }
 
     // ---- 文字 ----
@@ -600,6 +609,7 @@ void PropertyPanel::onFillModeChanged(int idx)
         break;
     case FillMode::Gradient:
         newBrush = m_brushGradient->brush();
+        break;
     default:
         break;
     }
@@ -730,6 +740,10 @@ void PropertyPanel::onGeometryChanged()
         oldRect = ri->rect();
     else if (auto *ei = qgraphicsitem_cast<EllipseItem *>(m_currentItem))
         oldRect = ei->rect();
+    else if (auto *ti = qgraphicsitem_cast<TextItem *>(m_currentItem))
+        oldRect = ti->rect();
+    else if (auto *ii = qgraphicsitem_cast<ImageItem *>(m_currentItem))
+        oldRect = ii->rect();
 
     QRectF newRect(0, 0, w, h);
 
