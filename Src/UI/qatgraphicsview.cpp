@@ -230,12 +230,7 @@ void QAtGraphicsView::updateResizeHandle()
 {
     removeResizeHandle();
 
-    auto items = m_pMainScene->selectedItems();
-    QList<QGraphicsItem *> selectableItems;
-    for (auto *item : items) {
-        if (item->type() != CanvasItem::Type && item->type() != ResizeHandleItem::Type)
-            selectableItems << item;
-    }
+    auto selectableItems = ::filterSelectableItems(m_pMainScene->selectedItems());
 
     if (selectableItems.isEmpty())
         return;

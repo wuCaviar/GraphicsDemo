@@ -1,50 +1,13 @@
-/****************************************************************************
-**
-** Copyright (C) 2009 Nokia Corporation and/or its subsidiary(-ies).
-** All rights reserved.
-** Contact: Nokia Corporation (qt-info@nokia.com)
-**
-** This file is part of the tools applications of the Qt Toolkit.
-**
-** $QT_BEGIN_LICENSE:LGPL$
-** No Commercial Usage
-** This file contains pre-release code and may not be distributed.
-** You may use this file in accordance with the terms and conditions
-** contained in the Technology Preview License Agreement accompanying
-** this package.
-**
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 as published by the Free Software
-** Foundation and appearing in the file LICENSE.LGPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** In addition, as a special exception, Nokia gives you certain additional
-** rights.  These rights are described in the Nokia Qt LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
-**
-** If you have questions regarding the use of this file, please contact
-** Nokia at qt-info@nokia.com.
-**
-**
-**
-**
-**
-**
-**
-**
-** $QT_END_LICENSE$
-**
-****************************************************************************/
+// Copyright (C) 2016 The Qt Company Ltd.
+// SPDX-License-Identifier: LicenseRef-Qt-Commercial OR LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
 
 #include "qtcolorline.h"
 #include "qdrawutil.h"
 
-#include <QPainter>
-#include <QPaintEvent>
-#include <QStyleOption>
+#include <QtGui/QPainter>
+#include <QtGui/QPaintEvent>
+#include <QtWidgets/QStyleOption>
+#include <QtGui/QRegion>
 
 QT_BEGIN_NAMESPACE
 
@@ -95,7 +58,7 @@ private:
     QPixmap hueGradientPixmap(Qt::Orientation orientation, bool flipped = false,
                 int saturation = 0xFF, int value = 0xFF, int alpha = 0xFF) const;
 
-    QVector<QRect> rects(const QPointF &point) const;
+    QList<QRect> rects(const QPointF &point) const;
 
     QColor colorFromPoint(const QPointF &point) const;
     QPointF pointFromColor(const QColor &color) const;
@@ -148,7 +111,6 @@ void QtColorLinePrivate::setColor(const QColor &color)
         return;
     m_color = color;
     checkColor();
-    QColor c = colorFromPoint(m_point);
     m_point = pointFromColor(m_color);
     q_ptr->update();
 }
@@ -433,7 +395,7 @@ QPixmap QtColorLinePrivate::hueGradientPixmap(int size, Qt::Orientation orientat
     colorList << QColor::fromHsv(0, saturation, value, alpha);
     QLinearGradient lg(0, 0, gradW, gradH);
     for (int i = 0; i <= 6; i++)
-        lg.setColorAt((double)i / 6.0, flipped ? colorList.at(6 - i) : colorList.at(i));
+        lg.setColorAt(double(i) / 6.0, flipped ? colorList.at(6 - i) : colorList.at(i));
     QImage img(w, h, QImage::Format_ARGB32);
     QPainter p(&img);
     p.setCompositionMode(QPainter::CompositionMode_Source);
@@ -622,7 +584,7 @@ QPointF QtColorLinePrivate::pointFromColor(const QColor &color) const
     return p;
 }
 
-QVector<QRect> QtColorLinePrivate::rects(const QPointF &point) const
+QList<QRect> QtColorLinePrivate::rects(const QPointF &point) const
 {
     QRect r = q_ptr->geometry();
     r.moveTo(0, 0);
@@ -632,7 +594,7 @@ QVector<QRect> QtColorLinePrivate::rects(const QPointF &point) const
     int y1 = (int)((r.height() - m_indicatorSize - 2 * m_indicatorSpace) * point.y() + 0.5);
     int y2 = y1 + m_indicatorSize + 2 * m_indicatorSpace;
 
-    QVector<QRect> rects;
+    QList<QRect> rects;
     if (m_orientation == Qt::Horizontal) {
         // r0 r1 r2
         QRect r0(0, 0, x1, r.height());
@@ -662,9 +624,8 @@ void QtColorLinePrivate::paintEvent(QPaintEvent *)
 {
     QRect rect = q_ptr->rect();
 
-    QVector<QRect> r = rects(m_point);
+    QList<QRect> r = rects(m_point);
 
-    QColor cBack = q_ptr->palette().color(QPalette::Active, QPalette::Window);
     QColor c = colorFromPoint(m_point);
     if (!m_combiningAlpha && m_component != QtColorLine::Alpha)
         c.setAlpha(0xFF);
@@ -682,18 +643,13 @@ void QtColorLinePrivate::paintEvent(QPaintEvent *)
             pmp.end();
 
             p.setBrushOrigin((rect.width() % pixSize + pixSize) / 2, (rect.height() % pixSize + pixSize) / 2);
-            p.setClipRect(r[1].adjusted(4, 4, -4, -4));
-            p.setClipRect(QRect(rect.topLeft(), QPoint(r[1].left() + 0, rect.bottom())), Qt::ClipOperation::ReplaceClip);
-            p.setClipRect(QRect(QPoint(r[1].right() - 0, rect.top()), rect.bottomRight()), Qt::ClipOperation::ReplaceClip);
-            p.setClipRect(QRect(rect.topLeft(), QPoint(rect.right(), r[1].top() + 0)), Qt::ClipOperation::ReplaceClip);
-            p.setClipRect(QRect(QPoint(rect.left(), r[1].bottom() - 0), rect.bottomRight()), Qt::ClipOperation::ReplaceClip);
-            /*
-            p.setClipRect(r[1].adjusted(3, 3, -3, -3));
-            p.setClipRect(QRect(rect.topLeft(), QPoint(r[1].left() + 1, rect.bottom())), Qt::ClipOperation::ReplaceClip);
-            p.setClipRect(QRect(QPoint(r[1].right() - 1, rect.top()), rect.bottomRight()), Qt::ClipOperation::ReplaceClip);
-            p.setClipRect(QRect(rect.topLeft(), QPoint(rect.right(), r[1].top() + 1)), Qt::ClipOperation::ReplaceClip);
-            p.setClipRect(QRect(QPoint(rect.left(), r[1].bottom() - 1), rect.bottomRight()), Qt::ClipOperation::ReplaceClip);
-            */
+
+            QRegion region(r[1].adjusted(4, 4, -4, -4));
+            region += QRect(rect.topLeft(), QPoint(r[1].left() + 0, rect.bottom()));
+            region += QRect(QPoint(r[1].right() - 0, rect.top()), rect.bottomRight());
+            region += QRect(rect.topLeft(), QPoint(rect.right(), r[1].top() + 0));
+            region += QRect(QPoint(rect.left(), r[1].bottom() - 0), rect.bottomRight());
+            p.setClipRegion(region);
             p.fillRect(rect, pm);
             p.setBrushOrigin(0, 0);
             p.setClipping(false);
@@ -841,13 +797,17 @@ void QtColorLinePrivate::paintEvent(QPaintEvent *)
                 //p.drawRect(thinRect);
             }
             p.setBrush(m_alphalessPixmap);
+            QRegion region;
             if (m_orientation == Qt::Horizontal) {
-                p.setClipRect(r[1].adjusted(0, qRound(r[1].height() * coef), 0, 0));
-                p.setClipRect(r[1].adjusted(0, 0, 0, -qRound(r[1].height() * coef)), Qt::ClipOperation::ReplaceClip);
+                region += r[1].adjusted(0, qRound(r[1].height() * coef), 0, 0);
+                region += r[1].adjusted(0, 0, 0, -qRound(r[1].height() * coef));
+                p.setClipRegion(region);
             } else {
-                p.setClipRect(r[1].adjusted(qRound(r[1].width() * coef), 0, 0, 0));
-                p.setClipRect(r[1].adjusted(0, 0, -qRound(r[1].width() * coef), 0), Qt::ClipOperation::ReplaceClip);
+                region += r[1].adjusted(qRound(r[1].width() * coef), 0, 0, 0);
+                region += r[1].adjusted(0, 0, -qRound(r[1].width() * coef), 0);
+                p.setClipRegion(region);
             }
+            p.setClipRegion(region);
             p.setBrush(Qt::NoBrush);
             p.setPen(QPen(QColor(c.rgb())));
 
@@ -861,7 +821,7 @@ void QtColorLinePrivate::paintEvent(QPaintEvent *)
                 QRect bottom = r[1].adjusted(0, qRound(r[1].height() * coef) - 1, 0, 0);
                 top.setBottom(bottom.top());
                 p.setClipRect(top);
-                p.setClipRect(bottom, Qt::ClipOperation::ReplaceClip);
+                p.setClipRect(bottom, Qt::UniteClip);
             } else {
 
             }
@@ -919,11 +879,9 @@ void QtColorLinePrivate::mousePressEvent(QMouseEvent *event)
     if (event->button() != Qt::LeftButton)
         return;
 
-    QVector<QRect> r = rects(m_point);
-    QPoint clickPos = event->pos();
+    QList<QRect> r = rects(m_point);
+    QPoint clickPos = event->position().toPoint();
 
-    QSize fieldSize = q_ptr->geometry().size() -
-            QSize(m_indicatorSize + 2 * m_indicatorSpace - 1, m_indicatorSize + 2 * m_indicatorSpace - 1);
     QPoint posOnField = r[1].topLeft() - QPoint(m_indicatorSpace, m_indicatorSpace);
     m_clickOffset = posOnField - clickPos;
 
@@ -937,7 +895,7 @@ void QtColorLinePrivate::mouseMoveEvent(QMouseEvent *event)
 {
     if (!m_dragging)
         return;
-    QPoint newPos = event->pos();
+    QPoint newPos = event->position().toPoint();
 
     QSize fieldSize = q_ptr->geometry().size() -
             QSize(m_indicatorSize + 2 * m_indicatorSpace - 1, m_indicatorSize + 2 * m_indicatorSpace - 1);
@@ -951,8 +909,8 @@ void QtColorLinePrivate::mouseMoveEvent(QMouseEvent *event)
     else if (newPosOnField.y() > fieldSize.height())
         newPosOnField.setY(fieldSize.height());
 
-    double x = (double)newPosOnField.x() / fieldSize.width();
-    double y = (double)newPosOnField.y() / fieldSize.height();
+    const double x = double(newPosOnField.x()) / fieldSize.width();
+    const double y = double(newPosOnField.y()) / fieldSize.height();
     m_point = QPointF(x, y);
     QColor color = colorFromPoint(m_point);
     if (m_color == color)
@@ -975,8 +933,8 @@ void QtColorLinePrivate::mouseDoubleClickEvent(QMouseEvent *event)
     if (event->button() != Qt::LeftButton)
         return;
 
-    QVector<QRect> r = rects(m_point);
-    QPoint clickPos = event->pos();
+    QList<QRect> r = rects(m_point);
+    QPoint clickPos = event->position().toPoint();
     if (!r[0].contains(clickPos) && !r[2].contains(clickPos))
         return;
     QPoint newPosOnField = clickPos;
@@ -985,8 +943,8 @@ void QtColorLinePrivate::mouseDoubleClickEvent(QMouseEvent *event)
     QSize fieldSize = q_ptr->geometry().size() -
             QSize(m_indicatorSize + 2 * m_indicatorSpace - 1, m_indicatorSize + 2 * m_indicatorSpace - 1);
 
-    double x = (double)newPosOnField.x() / fieldSize.width();
-    double y = (double)newPosOnField.y() / fieldSize.height();
+    const double x = double(newPosOnField.x()) / fieldSize.width();
+    const double y = double(newPosOnField.y()) / fieldSize.height();
     m_point = QPointF(x, y);
     QColor color = colorFromPoint(m_point);
     if (m_color == color)

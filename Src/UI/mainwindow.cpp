@@ -19,7 +19,6 @@
 #include "TextItem.h"
 
 #include <algorithm>
-#include <QDateTime>
 
 #include <QActionGroup>
 #include <QApplication>
@@ -45,9 +44,6 @@
 #include <QStatusBar>
 #include <QToolBar>
 #include <QVBoxLayout>
-#include <QColorSpace>
-#include <tiff.h>
-#include <tiffio.h>
 
 static const char *kMimeFormat = "application/x-graphicsdemo-items";
 
@@ -715,190 +711,14 @@ void MainWindow::onExportImage()
 
     // 第四步：根据参数导出
     if (path.endsWith(".tif", Qt::CaseInsensitive) || path.endsWith(".tiff", Qt::CaseInsensitive)) {
-        exportTiffLossless(path, image, exportParams);
-    } else if (path.endsWith(".png", Qt::CaseInsensitive)) {
-        // PNG 导出（应用压缩级别）
-        // Qt 的 QImage::save() 不支持直接设置 PNG 压缩级别
-        // 需要通过 QImageWriter 设置
-        exportImageWithParams(path, image, exportParams);
-    } else if (path.endsWith(".jpg", Qt::CaseInsensitive) || path.endsWith(".jpeg", Qt::CaseInsensitive)) {
-        // JPEG 导出（应用质量参数）
-        exportImageWithParams(path, image, exportParams);
+        ImageUtils::exportTiffLossless(path, image, exportParams);
+    } else if (path.endsWith(".png", Qt::CaseInsensitive) ||
+               path.endsWith(".jpg", Qt::CaseInsensitive) ||
+               path.endsWith(".jpeg", Qt::CaseInsensitive)) {
+        ImageUtils::exportImageWithParams(path, image, exportParams);
     } else {
         // BMP 等其他格式
         image.save(path);
-    }
-}
-
-// 写入 TIFF 元数据
-static void writeTiffMetadata(TIFF *tif, const ImageUtils::ExportParameters &params);
-
-// 应用颜色空间转换（导出时）
-static void applyColorSpaceForExport(QImage &image, ImageUtils::ExportParameters::ColorSpace colorSpace);
-
-// ============================================================
-// TIFF 导出（使用 libtiff，支持压缩参数）
-// ============================================================
-bool MainWindow::exportTiffLossless(const QString &path, const QImage &image,
-                                     const ImageUtils::ExportParameters &params)
-{
-    QImage img = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-    TIFF *tif = TIFFOpen(path.toUtf8().constData(), "w");
-    if (!tif)
-        return false;
-
-    int width = img.width();
-    int height = img.height();
-
-    TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, width);
-    TIFFSetField(tif, TIFFTAG_IMAGELENGTH, height);
-    TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
-
-    // 根据参数设置压缩类型
-    uint16_t compression = COMPRESSION_NONE;
-    switch (params.compression) {
-    case ImageUtils::ExportParameters::CompressionType::None:
-        compression = COMPRESSION_NONE;
-        break;
-    case ImageUtils::ExportParameters::CompressionType::LZW:
-        compression = COMPRESSION_LZW;
-        break;
-    case ImageUtils::ExportParameters::CompressionType::ZIP:
-        compression = COMPRESSION_ADOBE_DEFLATE;
-        break;
-    case ImageUtils::ExportParameters::CompressionType::JPEG:
-        compression = COMPRESSION_JPEG;
-        TIFFSetField(tif, TIFFTAG_JPEGQUALITY, params.jpegQuality);
-        break;
-    }
-    TIFFSetField(tif, TIFFTAG_COMPRESSION, compression);
-
-    // 如果启用了ZIP水平差分
-    if (params.compression == ImageUtils::ExportParameters::CompressionType::ZIP &&
-        params.tiffZipHorizontalDifferencing) {
-        TIFFSetField(tif, TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL);
-    }
-
-    TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
-    TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, 4); // RGBA
-    TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, 1);
-    TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-
-    // 设置 DPI
-    TIFFSetField(tif, TIFFTAG_XRESOLUTION, static_cast<float>(params.dpi));
-    TIFFSetField(tif, TIFFTAG_YRESOLUTION, static_cast<float>(params.dpi));
-    TIFFSetField(tif, TIFFTAG_RESOLUTIONUNIT, RESUNIT_INCH);
-
-    // 写入元数据（如果启用）
-    if (params.preserveMetadata) {
-        writeTiffMetadata(tif, params);
-    }
-
-    // 转换 ARGB32 → RGBA
-    QVector<uint8_t> rgbaRow(width * 4);
-    bool writeError = false;
-    for (int y = 0; y < height; ++y) {
-        const QRgb *scanLine = reinterpret_cast<const QRgb *>(img.constScanLine(y));
-        for (int x = 0; x < width; ++x) {
-            QRgb c = scanLine[x];
-            rgbaRow[x * 4 + 0] = qRed(c);
-            rgbaRow[x * 4 + 1] = qGreen(c);
-            rgbaRow[x * 4 + 2] = qBlue(c);
-            rgbaRow[x * 4 + 3] = qAlpha(c);
-        }
-        if (TIFFWriteScanline(tif, rgbaRow.data(), y) < 0) {
-            qWarning("TIFFWriteScanline failed at row %d", y);
-            writeError = true;
-            break;
-        }
-    }
-
-    TIFFClose(tif);
-    return !writeError;
-}
-
-// 写入 TIFF 元数据
-static void writeTiffMetadata(TIFF *tif, const ImageUtils::ExportParameters &params)
-{
-    Q_UNUSED(params);
-
-    // 写入软件信息
-    QString software = "GraphicsDemo";
-    TIFFSetField(tif, TIFFTAG_SOFTWARE, software.toUtf8().constData());
-
-    // 写入日期时间
-    QString dateTime = QDateTime::currentDateTime().toString("yyyy:MM:dd HH:mm:ss");
-    TIFFSetField(tif, TIFFTAG_DATETIME, dateTime.toUtf8().constData());
-
-    // 可以在这里添加更多元数据写入
-    // 例如：作者、版权、图像描述等
-}
-
-// ============================================================
-// 使用参数导出图像（PNG/JPEG 等格式）
-// ============================================================
-bool MainWindow::exportImageWithParams(const QString &path, const QImage &image,
-                                      const ImageUtils::ExportParameters &params)
-{
-    QImage img = image;
-
-    // 处理透明度
-    if (params.transparency == ImageUtils::ExportParameters::TransparencyHandling::FlattenOnWhite) {
-        QImage flattened(img.size(), QImage::Format_ARGB32_Premultiplied);
-        flattened.fill(Qt::white);
-        QPainter painter(&flattened);
-        painter.drawImage(0, 0, img);
-        painter.end();
-        img = flattened;
-    }
-
-    // 处理颜色空间转换
-    applyColorSpaceForExport(img, params.colorSpace);
-
-    // 使用 QImageWriter 设置参数
-    QImageWriter writer(path);
-    if (!writer.canWrite()) {
-        qWarning("Cannot write image format: %s", qPrintable(path));
-        return false;
-    }
-
-    // 应用导出参数（压缩等）
-    ImageUtils::applyExportParameters(writer, params);
-
-    // 注意：QImageWriter 在 Qt 5.15 中可能不支持直接设置 DPI
-    // 对于 TIFF，已在 exportTiffLossless() 中通过 libtiff 设置 DPI
-    // 对于 PNG/JPEG，DPI 信息可能通过元数据存储
-
-    // 保留元数据（如果启用）
-    if (params.preserveMetadata) {
-        // QImageWriter 会自动保留一些元数据
-        // 可以在这里添加更多元数据写入逻辑
-    }
-
-    return writer.write(img);
-}
-
-// 应用颜色空间转换（导出时）
-static void applyColorSpaceForExport(QImage &image, ImageUtils::ExportParameters::ColorSpace colorSpace)
-{
-    if (colorSpace == ImageUtils::ExportParameters::ColorSpace::KeepOriginal)
-        return;
-
-    // 使用 Qt 的 QColorSpace 进行颜色空间转换
-    QColorSpace targetSpace;
-    switch (colorSpace) {
-    case ImageUtils::ExportParameters::ColorSpace::ConvertToSRGB:
-        targetSpace = QColorSpace::SRgb;
-        break;
-    case ImageUtils::ExportParameters::ColorSpace::ConvertToAdobeRGB:
-        targetSpace = QColorSpace(QColorSpace::Primaries::AdobeRgb, QColorSpace::TransferFunction::Gamma, 2.2);
-        break;
-    default:
-        return;
-    }
-
-    if (image.colorSpace() != targetSpace) {
-        image.convertToColorSpace(targetSpace);
     }
 }
 
@@ -965,15 +785,7 @@ void MainWindow::onDelete()
     if (items.isEmpty())
         return;
 
-    // 过滤掉 CanvasItem 和 ResizeHandleItem
-    QList<QGraphicsItem *> deletable;
-    for (auto *item : items) {
-        if (qgraphicsitem_cast<CanvasItem *>(item))
-            continue;
-        if (item->type() == ResizeHandleItem::Type)
-            continue;
-        deletable << item;
-    }
+    auto deletable = ::filterSelectableItems(items);
     if (deletable.isEmpty())
         return;
 
@@ -983,10 +795,9 @@ void MainWindow::onDelete()
 void MainWindow::onSelectAll()
 {
     auto items = m_pView->scene()->items();
-    for (auto *item : items) {
-        if (!qgraphicsitem_cast<CanvasItem *>(item) && item->type() != ResizeHandleItem::Type)
-            item->setSelected(true);
-    }
+    auto selectable = ::filterSelectableItems(items);
+    for (auto *item : selectable)
+        item->setSelected(true);
 }
 
 // ============================================================
@@ -1145,12 +956,7 @@ void MainWindow::onToolTriggered(Tool tool)
 void MainWindow::onSelectionChanged()
 {
     auto items = m_pView->scene()->selectedItems();
-    // 过滤掉 CanvasItem 和 ResizeHandleItem
-    QList<QGraphicsItem *> selectable;
-    for (auto *item : items) {
-        if (!qgraphicsitem_cast<CanvasItem *>(item) && item->type() != ResizeHandleItem::Type)
-            selectable << item;
-    }
+    auto selectable = ::filterSelectableItems(items);
 
     if (selectable.size() == 1) {
         m_pPropertyPanel->setItem(selectable.first());
@@ -1299,13 +1105,7 @@ void MainWindow::rotateSelectedItems(qreal angleDelta)
 // ============================================================
 QList<QGraphicsItem *> MainWindow::filterSelectableItems() const
 {
-    auto items = m_pView->scene()->selectedItems();
-    QList<QGraphicsItem *> result;
-    for (auto *item : items) {
-        if (!qgraphicsitem_cast<CanvasItem *>(item) && item->type() != ResizeHandleItem::Type)
-            result << item;
-    }
-    return result;
+    return ::filterSelectableItems(m_pView->scene()->selectedItems());
 }
 
 void MainWindow::copyItemsToClipboard(const QList<QGraphicsItem *> &items)
@@ -1316,23 +1116,17 @@ void MainWindow::copyItemsToClipboard(const QList<QGraphicsItem *> &items)
     // 写入序列化版本号
     out << IGraphicsItem::kSerializationVersion;
 
+    auto filtered = ::filterSelectableItems(items);
     int count = 0;
-    for (auto *item : items) {
-        if (qgraphicsitem_cast<CanvasItem *>(item))
-            continue;
-        if (item->type() == ResizeHandleItem::Type)
-            continue;
-        count++;
+    for (auto *item : filtered) {
+        if (dynamic_cast<IGraphicsItem *>(item))
+            count++;
     }
 
     out << count;
-    for (auto *item : items) {
+    for (auto *item : filtered) {
         auto *gi = dynamic_cast<IGraphicsItem *>(item);
         if (!gi)
-            continue;
-        if (qgraphicsitem_cast<CanvasItem *>(item))
-            continue;
-        if (item->type() == ResizeHandleItem::Type)
             continue;
         out << static_cast<int>(gi->itemType());
         gi->serialize(out);

@@ -87,9 +87,9 @@ ExportImageDialog::ExportImageDialog(QWidget *parent,
     // TIFF 特定选项
     QGroupBox *tiffGroup = new QGroupBox(tr("TIFF Options"), this);
     auto *tiffLayout = new QFormLayout(tiffGroup);
-    auto *diffCheck = new QCheckBox(tr("ZIP Horizontal Differencing"), this);
-    diffCheck->setChecked(false);
-    tiffLayout->addRow(tr(""), diffCheck);
+    m_zipDiffCheck = new QCheckBox(tr("ZIP Horizontal Differencing"), this);
+    m_zipDiffCheck->setChecked(false);
+    tiffLayout->addRow(tr(""), m_zipDiffCheck);
     layout->addRow(tr(""), tiffGroup);
 
     // 按钮
@@ -116,6 +116,7 @@ ExportParameters ExportImageDialog::getParameters() const
         m_colorCombo->currentData().toInt());
     params.preserveMetadata = m_metadataCheck->isChecked();
     params.preserveICCProfile = m_iccCheck->isChecked();
+    params.tiffZipHorizontalDifferencing = m_zipDiffCheck->isChecked();
     params.transparency = static_cast<ExportParameters::TransparencyHandling>(
         m_transparencyCombo->currentData().toInt());
     return params;
@@ -136,6 +137,7 @@ void ExportImageDialog::setParameters(const ExportParameters &params)
 
     m_metadataCheck->setChecked(params.preserveMetadata);
     m_iccCheck->setChecked(params.preserveICCProfile);
+    m_zipDiffCheck->setChecked(params.tiffZipHorizontalDifferencing);
 
     int transIndex = m_transparencyCombo->findData(static_cast<int>(params.transparency));
     m_transparencyCombo->setCurrentIndex(qMax(0, transIndex));

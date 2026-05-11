@@ -175,13 +175,10 @@ ImportResult loadImageFromFile(const QString &path, const ImportParameters &para
         QImageReader reader(path);
         result.image = reader.read();
 
-        // 读取 DPI 信息（通过 QImage 的 dotsPerMeterX/Y 转换）
-        QImage tempImage;
-        if (reader.read(&tempImage)) {
-            result.image = tempImage;
-            // 从 QImage 获取 DPI（dots per meter 转为 DPI）
-            int dpmX = tempImage.dotsPerMeterX();
-            int dpmY = tempImage.dotsPerMeterY();
+        // 从已读取的图像获取 DPI（dots per meter 转为 DPI）
+        if (!result.image.isNull()) {
+            int dpmX = result.image.dotsPerMeterX();
+            int dpmY = result.image.dotsPerMeterY();
             result.dpiX = qRound(dpmX / 39.3701);  // DPM to DPI
             result.dpiY = qRound(dpmY / 39.3701);
         }
@@ -293,7 +290,7 @@ static void applyAlphaHandling(QImage &image, ImportParameters::AlphaHandling al
 
 bool applyExportParameters(QImageWriter &writer, const ExportParameters &params)
 {
-    // 设置压缩类型
+    // 设置压缩类型（TIFF 使用 libtiff 压缩方案枚举）
     switch (params.compression) {
     case ExportParameters::CompressionType::None:
         writer.setCompression(0);
@@ -305,7 +302,7 @@ bool applyExportParameters(QImageWriter &writer, const ExportParameters &params)
         writer.setCompression(2);  // ZIP/DEFLATE compression
         break;
     case ExportParameters::CompressionType::JPEG:
-        writer.setCompression(params.jpegQuality);
+        writer.setCompression(7);  // COMPRESSION_JPEG from libtiff
         break;
     }
 
@@ -314,8 +311,8 @@ bool applyExportParameters(QImageWriter &writer, const ExportParameters &params)
         writer.setCompression(params.pngCompression);
     }
 
-    // 设置 JPEG 质量（仅对 JPEG 有效）
-    if (writer.format() == "jpeg" || writer.format() == "jpg") {
+    // 设置 JPEG 质量
+    if (writer.format() == "jpeg" || writer.format() == "jpg" || writer.format() == "tif" || writer.format() == "tiff") {
         writer.setQuality(params.jpegQuality);
     }
 
@@ -330,11 +327,12 @@ bool applyExportParameters(QImageWriter &writer, const ExportParameters &params)
 
 void applyDpiToImage(QImage &image, const ImportResult &result, const ExportParameters &params)
 {
-    Q_UNUSED(image);
+    // DPI 转为 dots-per-meter（QImage 内部存储单位）
+    int dpmX = qRound(params.dpi * 39.3701);
+    int dpmY = qRound(params.dpi * 39.3701);
+    image.setDotsPerMeterX(dpmX);
+    image.setDotsPerMeterY(dpmY);
     Q_UNUSED(result);
-    Q_UNUSED(params);
-    // QImage 本身不存储 DPI，DPI 信息在导出时通过 QImageWriter::setResolution() 设置
-    // 这个函数在导出时调用，在实际导出函数中会用到
 }
 
 ImportResult importImageWithDialog(QWidget *parent, ImportParameters *params)
@@ -364,6 +362,153 @@ ImportResult importImageWithDialog(QWidget *parent, ImportParameters *params)
 
     // 第三步：加载图像并应用参数
     return loadImageFromFile(path, importParams);
+}
+
+// ========== TIFF 导出 ==========
+
+// 写入 TIFF 元数据
+static void writeTiffMetadata(TIFF *tif, const ExportParameters &params)
+{
+    Q_UNUSED(params);
+
+    // 写入软件信息
+    QString software = "GraphicsDemo";
+    TIFFSetField(tif, TIFFTAG_SOFTWARE, software.toUtf8().constData());
+
+    // 写入日期时间
+    QString dateTime = QDateTime::currentDateTime().toString("yyyy:MM:dd HH:mm:ss");
+    TIFFSetField(tif, TIFFTAG_DATETIME, dateTime.toUtf8().constData());
+}
+
+// 应用颜色空间转换（导出时）
+static void applyColorSpaceForExport(QImage &image, ExportParameters::ColorSpace colorSpace)
+{
+    if (colorSpace == ExportParameters::ColorSpace::KeepOriginal)
+        return;
+
+    QColorSpace targetSpace;
+    switch (colorSpace) {
+    case ExportParameters::ColorSpace::ConvertToSRGB:
+        targetSpace = QColorSpace::SRgb;
+        break;
+    case ExportParameters::ColorSpace::ConvertToAdobeRGB:
+        targetSpace = QColorSpace(QColorSpace::Primaries::AdobeRgb,
+                                  QColorSpace::TransferFunction::Gamma, 2.2);
+        break;
+    default:
+        return;
+    }
+
+    if (image.colorSpace() != targetSpace) {
+        image.convertToColorSpace(targetSpace);
+    }
+}
+
+bool exportTiffLossless(const QString &path, const QImage &image, const ExportParameters &params)
+{
+    QImage img = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    TIFF *tif = TIFFOpen(path.toUtf8().constData(), "w");
+    if (!tif)
+        return false;
+
+    int width = img.width();
+    int height = img.height();
+
+    TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, width);
+    TIFFSetField(tif, TIFFTAG_IMAGELENGTH, height);
+    TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
+
+    // 根据参数设置压缩类型
+    uint16_t compression = COMPRESSION_NONE;
+    switch (params.compression) {
+    case ExportParameters::CompressionType::None:
+        compression = COMPRESSION_NONE;
+        break;
+    case ExportParameters::CompressionType::LZW:
+        compression = COMPRESSION_LZW;
+        break;
+    case ExportParameters::CompressionType::ZIP:
+        compression = COMPRESSION_ADOBE_DEFLATE;
+        break;
+    case ExportParameters::CompressionType::JPEG:
+        compression = COMPRESSION_JPEG;
+        TIFFSetField(tif, TIFFTAG_JPEGQUALITY, params.jpegQuality);
+        break;
+    }
+    TIFFSetField(tif, TIFFTAG_COMPRESSION, compression);
+
+    // 如果启用了ZIP水平差分
+    if (params.compression == ExportParameters::CompressionType::ZIP &&
+        params.tiffZipHorizontalDifferencing) {
+        TIFFSetField(tif, TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL);
+    }
+
+    TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
+    TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, 4); // RGBA
+    TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, 1);
+    TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+
+    // 设置 DPI
+    TIFFSetField(tif, TIFFTAG_XRESOLUTION, static_cast<float>(params.dpi));
+    TIFFSetField(tif, TIFFTAG_YRESOLUTION, static_cast<float>(params.dpi));
+    TIFFSetField(tif, TIFFTAG_RESOLUTIONUNIT, RESUNIT_INCH);
+
+    // 写入元数据（如果启用）
+    if (params.preserveMetadata) {
+        writeTiffMetadata(tif, params);
+    }
+
+    // 转换 ARGB32 → RGBA
+    QVector<uint8_t> rgbaRow(width * 4);
+    bool writeError = false;
+    for (int y = 0; y < height; ++y) {
+        const QRgb *scanLine = reinterpret_cast<const QRgb *>(img.constScanLine(y));
+        for (int x = 0; x < width; ++x) {
+            QRgb c = scanLine[x];
+            rgbaRow[x * 4 + 0] = qRed(c);
+            rgbaRow[x * 4 + 1] = qGreen(c);
+            rgbaRow[x * 4 + 2] = qBlue(c);
+            rgbaRow[x * 4 + 3] = qAlpha(c);
+        }
+        if (TIFFWriteScanline(tif, rgbaRow.data(), y) < 0) {
+            qWarning("TIFFWriteScanline failed at row %d", y);
+            writeError = true;
+            break;
+        }
+    }
+
+    TIFFClose(tif);
+    return !writeError;
+}
+
+bool exportImageWithParams(const QString &path, const QImage &image, const ExportParameters &params)
+{
+    QImage img = image;
+
+    // 处理透明度
+    if (params.transparency == ExportParameters::TransparencyHandling::FlattenOnWhite) {
+        QImage flattened(img.size(), QImage::Format_ARGB32_Premultiplied);
+        flattened.fill(Qt::white);
+        QPainter painter(&flattened);
+        painter.drawImage(0, 0, img);
+        painter.end();
+        img = flattened;
+    }
+
+    // 处理颜色空间转换
+    applyColorSpaceForExport(img, params.colorSpace);
+
+    // 使用 QImageWriter 设置参数
+    QImageWriter writer(path);
+    if (!writer.canWrite()) {
+        qWarning("Cannot write image format: %s", qPrintable(path));
+        return false;
+    }
+
+    // 应用导出参数（压缩等）
+    applyExportParameters(writer, params);
+
+    return writer.write(img);
 }
 
 } // namespace ImageUtils

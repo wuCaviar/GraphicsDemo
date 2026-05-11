@@ -19,9 +19,6 @@ Checks: >
   -modernize-pass-by-value,
   -readability-implicit-bool-conversion,
   -google-build-using-namespace,
-  -bugprone-narrowing-conversions,
-  -bugprone-implicit-widening-of-multiplication-result,
-  -clang-analyzer-cplusplus.NewDeleteLeaks,
 
   # 启用的检查类别
   bugprone-*,

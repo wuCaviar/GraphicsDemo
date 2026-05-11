@@ -117,6 +117,14 @@ bool applyExportParameters(QImageWriter &writer, const ExportParameters &params)
 // 将 ImportResult 的 DPI 信息应用到图像（用于导出）
 void applyDpiToImage(QImage &image, const ImportResult &result, const ExportParameters &params);
 
+// 使用 libtiff 导出 TIFF（支持压缩参数、DPI、元数据）
+bool exportTiffLossless(const QString &path, const QImage &image,
+                        const ExportParameters &params = ExportParameters());
+
+// 使用 QImageWriter 导出 PNG/JPEG 等格式（支持压缩参数）
+bool exportImageWithParams(const QString &path, const QImage &image,
+                           const ExportParameters &params);
+
 } // namespace ImageUtils
 
 #endif // IMAGEUTILS_H

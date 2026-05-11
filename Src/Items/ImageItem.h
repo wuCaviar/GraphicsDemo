@@ -38,6 +38,8 @@ public:
     // 精确几何矩形 — 返回 m_rect 或原始图片包围
     QRectF geometryRect() const override;
     bool supportsGeometryRect() const override { return true; }
+    void setGeometryRect(const QRectF &rect) override { setRect(rect); }
+    bool supportsSetGeometryRect() const override { return true; }
 
     // 原始 TIFF 数据，用于无损导出
     QByteArray rawTiffData() const { return m_rawTiffData; }

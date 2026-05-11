@@ -240,13 +240,7 @@ void AlignLayoutDialog::refreshSelectionInfo()
 QList<QGraphicsItem *> AlignLayoutDialog::filterSelectableItems() const
 {
     if (!m_scene) return {};
-    auto items = m_scene->selectedItems();
-    QList<QGraphicsItem *> result;
-    for (auto *item : items) {
-        if (!qgraphicsitem_cast<CanvasItem *>(item) && item->type() != ResizeHandleItem::Type)
-            result << item;
-    }
-    return result;
+    return ::filterSelectableItems(m_scene->selectedItems());
 }
 
 // ============================================================

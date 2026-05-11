@@ -29,6 +29,8 @@ QGraphicsItem *TextItem::cloneItem() const
     item->setItemBrush(m_bgBrush);
     item->setPos(pos());
     item->setRotation(rotation());
+    item->setTransform(transform());
+    item->setTransformOriginPoint(transformOriginPoint());
     if (m_rect.isValid())
         item->setRect(m_rect);
     return item;

@@ -27,6 +27,8 @@ public:
     // 精确几何矩形 — 返回不含画笔边距的 rect()
     QRectF geometryRect() const override { return rect(); }
     bool supportsGeometryRect() const override { return true; }
+    void setGeometryRect(const QRectF &r) override { setRect(r); }
+    bool supportsSetGeometryRect() const override { return true; }
 
     qreal cornerRadius() const;
     void setCornerRadius(qreal r);

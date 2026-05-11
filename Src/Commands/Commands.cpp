@@ -1,9 +1,5 @@
 #include "Commands.h"
 #include "RectItem.h"
-#include "EllipseItem.h"
-#include "BezierCurveItem.h"
-#include "TextItem.h"
-#include "ImageItem.h"
 
 #include <QGraphicsScene>
 
@@ -166,18 +162,9 @@ void PropertyChangeCommand::undo()
     case Brush:        gi->setItemBrush(m_oldValue.value<QBrush>()); break;
     case Font:         gi->setItemFont(m_oldValue.value<QFont>()); break;
     case Text:         gi->setText(m_oldValue.toString()); break;
-    case Geometry: {
-        auto rect = m_oldValue.toRectF();
-        if (auto *ri = qgraphicsitem_cast<RectItem *>(m_item))
-            ri->setRect(rect);
-        else if (auto *ei = qgraphicsitem_cast<EllipseItem *>(m_item))
-            ei->setRect(rect);
-        else if (auto *ti = qgraphicsitem_cast<TextItem *>(m_item))
-            ti->setRect(rect);
-        else if (auto *ii = qgraphicsitem_cast<ImageItem *>(m_item))
-            ii->setRect(rect);
+    case Geometry:
+        gi->setGeometryRect(m_oldValue.toRectF());
         break;
-    }
     case CornerRadius:
         if (auto *ri = qgraphicsitem_cast<RectItem *>(m_item))
             ri->setCornerRadius(m_oldValue.toReal());
@@ -199,18 +186,9 @@ void PropertyChangeCommand::redo()
     case Brush:        gi->setItemBrush(m_newValue.value<QBrush>()); break;
     case Font:         gi->setItemFont(m_newValue.value<QFont>()); break;
     case Text:         gi->setText(m_newValue.toString()); break;
-    case Geometry: {
-        auto rect = m_newValue.toRectF();
-        if (auto *ri = qgraphicsitem_cast<RectItem *>(m_item))
-            ri->setRect(rect);
-        else if (auto *ei = qgraphicsitem_cast<EllipseItem *>(m_item))
-            ei->setRect(rect);
-        else if (auto *ti = qgraphicsitem_cast<TextItem *>(m_item))
-            ti->setRect(rect);
-        else if (auto *ii = qgraphicsitem_cast<ImageItem *>(m_item))
-            ii->setRect(rect);
+    case Geometry:
+        gi->setGeometryRect(m_newValue.toRectF());
         break;
-    }
     case CornerRadius:
         if (auto *ri = qgraphicsitem_cast<RectItem *>(m_item))
             ri->setCornerRadius(m_newValue.toReal());
@@ -374,21 +352,23 @@ RotationChangeCommand::RotationChangeCommand(QGraphicsItem *item, qreal oldRotat
     , m_oldPos(item->pos())
     , m_scene(scene)
 {
-    // 计算中心旋转的位置补偿：
-    // 1. 记录旋转前图元中心在场景中的位置
-    QPointF center = item->mapToScene(item->boundingRect().center());
+    // 纯数学计算中心旋转的位置补偿（不修改 item 状态）
+    // 旋转绕 transformOriginPoint 进行，需要补偿使 boundingRect 中心保持不变
+    QPointF origin = item->mapToScene(item->transformOriginPoint());
+    QPointF oldCenter = item->mapToScene(item->boundingRect().center());
 
-    // 2. 临时应用新旋转角度，计算旋转后中心偏移
-    item->setRotation(newRotation);
-    QPointF newCenter = item->mapToScene(item->boundingRect().center());
+    // 用 QTransform 计算旋转后中心位置
+    qreal delta = newRotation - oldRotation;
+    QTransform t;
+    t.translate(origin.x(), origin.y());
+    t.rotate(delta);
+    t.translate(-origin.x(), -origin.y());
+    QPointF newCenter = t.map(oldCenter);
 
-    // 3. 补偿位置使中心保持不变：newPos = 当前pos + (旧中心 - 新中心)
-    m_newPos = item->pos() + (center - newCenter);
+    // 补偿位置使中心保持不变
+    m_newPos = m_oldPos + (oldCenter - newCenter);
 
-    // 4. 恢复原始旋转
-    item->setRotation(oldRotation);
-
-    setText(QObject::tr("Rotate %1°").arg(newRotation - oldRotation, 0, 'f', 1));
+    setText(QObject::tr("Rotate %1°").arg(delta, 0, 'f', 1));
 }
 
 void RotationChangeCommand::undo()

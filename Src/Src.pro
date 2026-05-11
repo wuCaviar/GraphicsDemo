@@ -11,7 +11,10 @@ include(Qt-Color-Widgets/color_widgets.pri)
 include(QtGradientEditor/qtgradienteditor.pri)
 
 # 启用 RTTI（AlignmentUtils 使用 dynamic_cast<IGraphicsItem*>）
-CONFIG += rtti
+CONFIG += rtti c++17
+
+# 编译器警告
+QMAKE_CXXFLAGS += -Wall -Wextra -Wpedantic
 
 HEADERS += \
     UI/mainwindow.h \

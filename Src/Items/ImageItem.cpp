@@ -23,6 +23,8 @@ QGraphicsItem *ImageItem::cloneItem() const
     item->setItemPen(m_pen);
     item->setPos(pos());
     item->setRotation(rotation());
+    item->setTransform(transform());
+    item->setTransformOriginPoint(transformOriginPoint());
     if (m_rect.isValid())
         item->setRect(m_rect);
     item->setFilePath(m_filePath);

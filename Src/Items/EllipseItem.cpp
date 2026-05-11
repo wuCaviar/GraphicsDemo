@@ -24,6 +24,7 @@ QGraphicsItem *EllipseItem::cloneItem() const
     item->setPos(pos());
     item->setRotation(rotation());
     item->setTransform(transform());
+    item->setTransformOriginPoint(transformOriginPoint());
     return item;
 }
 

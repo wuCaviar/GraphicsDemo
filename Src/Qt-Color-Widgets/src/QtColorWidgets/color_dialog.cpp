@@ -241,12 +241,12 @@ void ColorDialog::setColorInternal(const QColor &col)
     p->ui.slide_hue->setColorValue(p->ui.wheel->value());
     p->ui.spin_hue->setValue(p->ui.slide_hue->value());
 
-    p->ui.slide_saturation->setValue(qRound(p->ui.wheel->saturation()*255.0));
+    p->ui.slide_saturation->setValue(qRound(p->ui.wheel->saturation()*100.0));
     p->ui.spin_saturation->setValue(p->ui.slide_saturation->value());
     p->ui.slide_saturation->setFirstColor(QColor::fromHsvF(p->ui.wheel->hue(),0,p->ui.wheel->value()));
     p->ui.slide_saturation->setLastColor(QColor::fromHsvF(p->ui.wheel->hue(),1,p->ui.wheel->value()));
 
-    p->ui.slide_value->setValue(qRound(p->ui.wheel->value()*255.0));
+    p->ui.slide_value->setValue(qRound(p->ui.wheel->value()*100.0));
     p->ui.spin_value->setValue(p->ui.slide_value->value());
     p->ui.slide_value->setFirstColor(QColor::fromHsvF(p->ui.wheel->hue(), p->ui.wheel->saturation(),0));
     p->ui.slide_value->setLastColor(QColor::fromHsvF(p->ui.wheel->hue(), p->ui.wheel->saturation(),1));
@@ -300,8 +300,8 @@ void ColorDialog::set_hsv()
     {
         QColor col = QColor::fromHsv(
             p->ui.slide_hue->value(),
-            p->ui.slide_saturation->value(),
-            p->ui.slide_value->value(),
+            p->ui.slide_saturation->value() * 255 / 100,
+            p->ui.slide_value->value() * 255 / 100,
             p->ui.slide_alpha->value()
         );
         p->ui.wheel->setColor(col);

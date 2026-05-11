@@ -42,6 +42,7 @@ private:
     QSpinBox *m_dpiSpin;
     QComboBox *m_colorCombo;
     QLabel *m_qualityLabel;
+    QCheckBox *m_zipDiffCheck;
 };
 
 } // namespace ImageUtils

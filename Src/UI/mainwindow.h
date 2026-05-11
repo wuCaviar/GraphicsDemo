@@ -93,14 +93,6 @@ private:
     void applyDistribute(AlignmentUtils::DistributeDirection direction,
                          const AlignmentUtils::DistributeParams &params = AlignmentUtils::DistributeParams());
 
-    // 无损 TIFF 导出
-    bool exportTiffLossless(const QString &path, const QImage &image,
-                             const ImageUtils::ExportParameters &params = ImageUtils::ExportParameters());
-
-    // 使用参数导出图像（PNG/JPEG 等格式）
-    bool exportImageWithParams(const QString &path, const QImage &image,
-                              const ImageUtils::ExportParameters &params);
-
     Ui::MainWindow *ui;
 
     QAtGraphicsView *m_pView = nullptr;

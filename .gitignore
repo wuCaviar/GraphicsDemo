@@ -91,8 +91,18 @@ compile_commands.json
 .vscode
 
 Build*
+build/
 
+.DS_Store
 libtiffpic
 
 .agents
 .claude
+
+# 测试构建产物
+Tests/tst_alignment
+Tests/*.o
+Tests/*.moc
+Tests/moc_predefs.h
+
+.cache

@@ -7,6 +7,9 @@ CONFIG -= app_bundle
 # RTTI needed for dynamic_cast in AlignmentUtils
 CONFIG += rtti
 
+# 编译器警告
+QMAKE_CXXFLAGS += -Wall -Wextra -Wpedantic
+
 SOURCES += \
     tst_alignment.cpp \
     ../Src/Utils/AlignmentUtils.cpp

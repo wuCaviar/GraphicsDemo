@@ -1,53 +1,20 @@
-/****************************************************************************
-**
-** Copyright (C) 2009 Nokia Corporation and/or its subsidiary(-ies).
-** All rights reserved.
-** Contact: Nokia Corporation (qt-info@nokia.com)
-**
-** This file is part of the tools applications of the Qt Toolkit.
-**
-** $QT_BEGIN_LICENSE:LGPL$
-** No Commercial Usage
-** This file contains pre-release code and may not be distributed.
-** You may use this file in accordance with the terms and conditions
-** contained in the Technology Preview License Agreement accompanying
-** this package.
-**
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 as published by the Free Software
-** Foundation and appearing in the file LICENSE.LGPL included in the
-** packaging of this file.  Please review the following information to
-** ensure the GNU Lesser General Public License version 2.1 requirements
-** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** In addition, as a special exception, Nokia gives you certain additional
-** rights.  These rights are described in the Nokia Qt LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
-**
-** If you have questions regarding the use of this file, please contact
-** Nokia at qt-info@nokia.com.
-**
-**
-**
-**
-**
-**
-**
-**
-** $QT_END_LICENSE$
-**
-****************************************************************************/
+// Copyright (C) 2016 The Qt Company Ltd.
+// SPDX-License-Identifier: LicenseRef-Qt-Commercial OR LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only
 
 #include "qtgradientview.h"
 #include "qtgradientmanager.h"
 #include "qtgradientdialog.h"
 #include "qtgradientutils.h"
-#include <QPainter>
-#include <QMessageBox>
-#include <QClipboard>
-#include <QAction>
+
+#include <QtWidgets/QMessageBox>
+
+#include <QtGui/QAction>
+#include <QtGui/QClipboard>
+#include <QtGui/QPainter>
+
 QT_BEGIN_NAMESPACE
+
+using namespace Qt::StringLiterals;
 
 void QtGradientView::slotGradientAdded(const QString &id, const QGradient &gradient)
 {
@@ -148,7 +115,7 @@ void QtGradientView::slotRenameGradient()
     m_ui.listWidget->editItem(item);
 }
 
-void QtGradientView::slotRenameGradient(QListWidgetItem *item)
+void QtGradientView::slotRenameGradientItem(QListWidgetItem *item)
 {
     if (!item)
         return;
@@ -175,7 +142,7 @@ void QtGradientView::slotGradientActivated(QListWidgetItem *item)
 QtGradientView::QtGradientView(QWidget *parent)
     : QWidget(parent)
 {
-    m_manager = 0;
+    m_manager = nullptr;
 
     m_ui.setupUi(this);
 
@@ -201,19 +168,19 @@ QtGradientView::QtGradientView(QWidget *parent)
     pal.setBrush(QPalette::Base, QBrush(pm));
     m_ui.listWidget->viewport()->setPalette(pal);
 
-    connect(m_ui.listWidget, SIGNAL(itemDoubleClicked(QListWidgetItem*)), this, SLOT(slotGradientActivated(QListWidgetItem*)));
-    connect(m_ui.listWidget, SIGNAL(itemChanged(QListWidgetItem*)), this, SLOT(slotRenameGradient(QListWidgetItem*)));
-    connect(m_ui.listWidget, SIGNAL(currentItemChanged(QListWidgetItem*,QListWidgetItem*)), this, SLOT(slotCurrentItemChanged(QListWidgetItem*)));
+    connect(m_ui.listWidget, &QListWidget::itemDoubleClicked, this, &QtGradientView::slotGradientActivated);
+    connect(m_ui.listWidget, &QListWidget::itemChanged, this, &QtGradientView::slotRenameGradientItem);
+    connect(m_ui.listWidget, &QListWidget::currentItemChanged, this, &QtGradientView::slotCurrentItemChanged);
 
-    m_newAction = new QAction(QIcon(QLatin1String(":/trolltech/qtgradienteditor/images/plus.png")), tr("New..."), this);
-    m_editAction = new QAction(QIcon(QLatin1String(":/trolltech/qtgradienteditor/images/edit.png")), tr("Edit..."), this);
+    m_newAction = new QAction(QIcon(":/qtgradienteditor/images/plus.png"_L1), tr("New..."), this);
+    m_editAction = new QAction(QIcon(":/qtgradienteditor/images/edit.png"_L1), tr("Edit..."), this);
     m_renameAction = new QAction(tr("Rename"), this);
-    m_removeAction = new QAction(QIcon(QLatin1String(":/trolltech/qtgradienteditor/images/minus.png")), tr("Remove"), this);
+    m_removeAction = new QAction(QIcon(":/qtgradienteditor/images/minus.png"_L1), tr("Remove"), this);
 
-    connect(m_newAction, SIGNAL(triggered()), this, SLOT(slotNewGradient()));
-    connect(m_editAction, SIGNAL(triggered()), this, SLOT(slotEditGradient()));
-    connect(m_removeAction, SIGNAL(triggered()), this, SLOT(slotRemoveGradient()));
-    connect(m_renameAction, SIGNAL(triggered()), this, SLOT(slotRenameGradient()));
+    connect(m_newAction, &QAction::triggered, this, &QtGradientView::slotNewGradient);
+    connect(m_editAction, &QAction::triggered, this, &QtGradientView::slotEditGradient);
+    connect(m_removeAction, &QAction::triggered, this, &QtGradientView::slotRemoveGradient);
+    connect(m_renameAction, &QAction::triggered, this, &QtGradientView::slotRenameGradient);
 
     m_ui.listWidget->addAction(m_newAction);
     m_ui.listWidget->addAction(m_editAction);
@@ -234,14 +201,14 @@ void QtGradientView::setGradientManager(QtGradientManager *manager)
         return;
 
     if (m_manager) {
-        disconnect(m_manager, SIGNAL(gradientAdded(QString,QGradient)),
-                    this, SLOT(slotGradientAdded(QString,QGradient)));
-        disconnect(m_manager, SIGNAL(gradientRenamed(QString,QString)),
-                    this, SLOT(slotGradientRenamed(QString,QString)));
-        disconnect(m_manager, SIGNAL(gradientChanged(QString,QGradient)),
-                    this, SLOT(slotGradientChanged(QString,QGradient)));
-        disconnect(m_manager, SIGNAL(gradientRemoved(QString)),
-                    this, SLOT(slotGradientRemoved(QString)));
+        disconnect(m_manager, &QtGradientManager::gradientAdded,
+                    this, &QtGradientView::slotGradientAdded);
+        disconnect(m_manager, &QtGradientManager::gradientRenamed,
+                    this, &QtGradientView::slotGradientRenamed);
+        disconnect(m_manager, &QtGradientManager::gradientChanged,
+                    this, &QtGradientView::slotGradientChanged);
+        disconnect(m_manager, &QtGradientManager::gradientRemoved,
+                    this, &QtGradientView::slotGradientRemoved);
 
         m_ui.listWidget->clear();
         m_idToItem.clear();
@@ -254,20 +221,17 @@ void QtGradientView::setGradientManager(QtGradientManager *manager)
         return;
 
     QMap<QString, QGradient> gradients = m_manager->gradients();
-    QMapIterator<QString, QGradient> itGrad(gradients);
-    while (itGrad.hasNext()) {
-        itGrad.next();
+    for (auto itGrad = gradients.cbegin(), end = gradients.cend(); itGrad != end; ++itGrad)
         slotGradientAdded(itGrad.key(), itGrad.value());
-    }
 
-    connect(m_manager, SIGNAL(gradientAdded(QString,QGradient)),
-            this, SLOT(slotGradientAdded(QString,QGradient)));
-    connect(m_manager, SIGNAL(gradientRenamed(QString,QString)),
-            this, SLOT(slotGradientRenamed(QString,QString)));
-    connect(m_manager, SIGNAL(gradientChanged(QString,QGradient)),
-            this, SLOT(slotGradientChanged(QString,QGradient)));
-    connect(m_manager, SIGNAL(gradientRemoved(QString)),
-            this, SLOT(slotGradientRemoved(QString)));
+    connect(m_manager, &QtGradientManager::gradientAdded,
+            this, &QtGradientView::slotGradientAdded);
+    connect(m_manager, &QtGradientManager::gradientRenamed,
+            this, &QtGradientView::slotGradientRenamed);
+    connect(m_manager, &QtGradientManager::gradientChanged,
+            this, &QtGradientView::slotGradientChanged);
+    connect(m_manager, &QtGradientManager::gradientRemoved,
+            this, &QtGradientView::slotGradientRemoved);
 }
 
 QtGradientManager *QtGradientView::gradientManager() const
@@ -290,13 +254,3 @@ QString QtGradientView::currentGradient() const
 }
 
 QT_END_NAMESPACE
-
-void QtGradientView::on_newButton_clicked()
-{
-
-}
-
-void QtGradientView::on_editButton_clicked()
-{
-
-}
