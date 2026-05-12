@@ -1,5 +1,7 @@
 TEMPLATE = subdirs
 
 SUBDIRS += Src \
+    LittleCMSTest \
     Tests \
-    ColorConversionTests
+    ColorConversionTests \
+    WidgetTest

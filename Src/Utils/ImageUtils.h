@@ -6,7 +6,6 @@
 #include <QMap>
 #include <QVariant>
 #include <QString>
-#include <QImageWriter>
 
 namespace ImageUtils {
 
@@ -47,45 +46,60 @@ struct ImportParameters {
 
 // 导出参数
 struct ExportParameters {
-    // 分辨率/DPI 设置
-    int dpi = 300;  // 导出图像的分辨率
+    // ===== 通用参数 =====
+    int dpi = 300;
 
-    // 压缩设置
-    enum class CompressionType {
-        None,    // 无压缩
-        LZW,      // LZW 压缩（TIFF/PNG）
-        ZIP,      // ZIP/DEFLATE 压缩（TIFF/PNG）
-        JPEG     // JPEG 压缩（TIFF）
-    };
-    CompressionType compression = CompressionType::LZW;
-
-    // JPEG 质量（仅 JPEG 压缩）
-    int jpegQuality = 95;  // 1-100
-
-    // PNG 压缩级别（仅 PNG）
-    int pngCompression = 6;  // 0-9
-
-    // 颜色空间
     enum class ColorSpace {
-        KeepOriginal,    // 保持原始颜色空间
-        ConvertToSRGB,   // 转换为 sRGB
-        ConvertToAdobeRGB // 转换为 Adobe RGB
+        KeepOriginal,
+        ConvertToSRGB,
+        ConvertToAdobeRGB
     };
     ColorSpace colorSpace = ColorSpace::KeepOriginal;
 
-    // 元数据处理
-    bool preserveMetadata = true;   // 保留元数据（EXIF、ICC 等）
-    bool preserveICCProfile = true;  // 保留 ICC 配置文件
-
-    // 透明度处理
     enum class TransparencyHandling {
-        Keep,            // 保持透明度
-        FlattenOnWhite  // 扁平化为白色背景
+        Keep,
+        FlattenOnWhite
     };
     TransparencyHandling transparency = TransparencyHandling::Keep;
 
-    // TIFF 特定选项
-    bool tiffZipHorizontalDifferencing = false;  // ZIP 压缩时启用水平差分（减小文件大小）
+    // ===== 格式通用枚举 =====
+    enum class CompressionType {
+        None,
+        LZW,
+        ZIP,
+        JPEG,
+        PackBits
+    };
+
+    enum class ByteOrder { LittleEndian, BigEndian };
+    enum class BitDepth { Bits8, Bits16 };
+    enum class PlanarConfig { Contig, Separate };
+    enum class Predictor { None, Horizontal };
+
+    // ===== TIFF 专业参数 =====
+    struct TiffOptions {
+        CompressionType compression = CompressionType::LZW;
+        ByteOrder byteOrder = ByteOrder::LittleEndian;
+        BitDepth bitDepth = BitDepth::Bits8;
+        PlanarConfig planarConfig = PlanarConfig::Contig;
+        Predictor predictor = Predictor::None;
+        bool embedICCProfile = true;
+        bool preserveMetadata = true;
+        int jpegQuality = 95;  // 1-100, 仅 JPEG 压缩时有效
+    };
+    TiffOptions tiff;
+
+    // ===== PNG 参数（预留扩展） =====
+    struct PngOptions {
+        int compressionLevel = 6;  // 0-9
+    };
+    PngOptions png;
+
+    // ===== JPEG 参数（预留扩展） =====
+    struct JpegOptions {
+        int quality = 95;  // 1-100
+    };
+    JpegOptions jpeg;
 };
 
 // 判断文件路径是否为 TIFF 格式
@@ -110,12 +124,6 @@ ImportResult loadImageFromFile(const QString &path, const ImportParameters &para
 
 // 弹出文件对话框并加载所选图像
 ImportResult importImageWithDialog(QWidget *parent, ImportParameters *params = nullptr);
-
-// 应用导出参数到 QImageWriter
-bool applyExportParameters(QImageWriter &writer, const ExportParameters &params);
-
-// 将 ImportResult 的 DPI 信息应用到图像（用于导出）
-void applyDpiToImage(QImage &image, const ImportResult &result, const ExportParameters &params);
 
 // 使用 libtiff 导出 TIFF（支持压缩参数、DPI、元数据）
 bool exportTiffLossless(const QString &path, const QImage &image,
