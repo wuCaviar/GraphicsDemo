@@ -152,6 +152,12 @@ void QtGradientStopsControllerPrivate::slotCurrentStopChanged(QtGradientStop *st
     enableCurrent(true);
 
     QTimer::singleShot(0, this, &QtGradientStopsControllerPrivate::slotUpdatePositionSpinBox);
+
+    // block signals to avoid changing the stop color when setting the color widget's color
+    disconnect(m_ui->colorWidget, &color_widgets::ColorSelector::colorChanged, this, nullptr);
+    m_ui->colorWidget->setColor(stop->color());
+    connect(m_ui->colorWidget, &color_widgets::ColorSelector::colorChanged,
+            this, &QtGradientStopsControllerPrivate::slotChangeColor);
 }
 
 void QtGradientStopsControllerPrivate::slotStopMoved(QtGradientStop *stop, qreal newPos)

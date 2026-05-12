@@ -291,6 +291,9 @@ void QtGradientEditorPrivate::setLayout(bool details)
     QHBoxLayout *hboxLayout1 = new QHBoxLayout();
     hboxLayout1->setObjectName(QString::fromUtf8("hboxLayout1"));
     hboxLayout1->addWidget(m_ui.colorLabel);
+
+    m_ui.colorWidget->setMinimumWidth(60);
+    m_ui.colorWidget->setMinimumHeight(23);
     hboxLayout1->addWidget(m_ui.colorWidget);
     hboxLayout1->addItem(new QSpacerItem(16, 23, QSizePolicy::Expanding, QSizePolicy::Minimum));
     int addRow = 0;
