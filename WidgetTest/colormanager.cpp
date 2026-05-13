@@ -8,18 +8,6 @@
 // ================================================================
 //  内部辅助: QColor ↔ lcms2 BGRA8
 // ================================================================
-
-void errorLogger(
-    cmsContext context,
-    cmsUInt32Number code,
-    const char* error)
-{
-    fprintf(stderr,
-            "[LCMS Error] Code: %u, Message: %s\n",
-            (unsigned)code,
-            error);
-}
-
 static inline void qcolorToRGB(const QColor &c, uchar out[3])
 {
     out[0] = static_cast<uchar>(c.red());
@@ -44,6 +32,18 @@ ColorManager &ColorManager::instance()
     static ColorManager s;
     return s;
 }
+
+void errorLogger(
+    cmsContext context,
+    cmsUInt32Number code,
+    const char* error)
+{
+    fprintf(stderr,
+            "[LCMS Error] Code: %u, Message: %s\n",
+            (unsigned)code,
+            error);
+}
+
 
 // ================================================================
 //  初始化
@@ -75,8 +75,17 @@ QString ColorManager::errorString() const { return m_err; }
 
 bool ColorManager::loadProfiles()
 {
+#if defined(Q_OS_WIN)
+    QString path = QCoreApplication::applicationDirPath();
+#elif defined(Q_OS_MACOS)
+    QString path = "/Volumes/Caviar/Test/GraphicsDemo/Bin";
+#endif
+
     m_srgb = cmsOpenProfileFromFile(
-        "/Volumes/Caviar/Test/sRGB IEC61966-2.1.icc", "r");
+        QString("%1%2")
+            .arg(path)
+            .arg("/../ICC Profile/RGB/SRGB IEC61966-2.1.icc").toStdString().c_str(),
+        "r");
     if (!m_srgb)
     {
         m_ok = false;
@@ -84,7 +93,10 @@ bool ColorManager::loadProfiles()
     }
 
     m_cmyk = cmsOpenProfileFromFile(
-        "/Volumes/Caviar/Test/Japan Color 2001 Coated.icc", "r");
+        QString("%1%2")
+            .arg(path)
+            .arg("/../ICC Profile/CMYK/JapanColor2001Coated.icc").toStdString().c_str(),
+        "r");
     if (!m_cmyk) {
         cmsCloseProfile(m_srgb);
         m_srgb = nullptr;

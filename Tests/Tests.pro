@@ -10,6 +10,8 @@ CONFIG += rtti
 # 编译器警告
 QMAKE_CXXFLAGS += -Wall -Wextra -Wpedantic
 
+include(../Common.pri)
+
 SOURCES += \
     tst_alignment.cpp \
     ../Src/Utils/AlignmentUtils.cpp

@@ -20,7 +20,7 @@ TiffExportWorker::TiffExportWorker(QObject *parent) : QObject(parent) {}
 void TiffExportWorker::exportTiff(const QImage &img)
 {
     constexpr int SIZE = 24;
-    const QString path = QStringLiteral("/Volumes/Caviar/Test/color_swatch.tiff");
+    const QString path = QStringLiteral("color_swatch.tiff");
 
     TIFF *tif = TIFFOpen(path.toLocal8Bit().constData(), "w");
     if (!tif) {

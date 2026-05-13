@@ -124,7 +124,7 @@ Q_SIGNALS:
 
 private Q_SLOTS:
     /// Update all the Ui elements to match the selected color
-    void setColorInternal(const QColor &color);
+    void setColorInternal(const QColor &color, bool fromCmyk = false);
     /// Update from HSV sliders
     void set_hsv();
     /// Update from RGB sliders
@@ -145,6 +145,10 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) Q_DECL_OVERRIDE;
     void mouseMoveEvent(QMouseEvent *event) Q_DECL_OVERRIDE;
     void keyReleaseEvent(QKeyEvent *event) Q_DECL_OVERRIDE;
+
+    void rgb_to_cmyk(const QColor &color, double &c, double &m, double &y, double &k);
+
+    QColor cmyk_to_rgb(double c, double m, double y, double k);
 
 private:
     class Private;

@@ -6,5 +6,7 @@ CONFIG -= app_bundle
 
 QMAKE_CXXFLAGS += -Wall -Wextra -Wpedantic
 
+include(../Common.pri)
+
 SOURCES += \
     tst_colorconversion.cpp

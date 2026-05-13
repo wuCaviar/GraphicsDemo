@@ -106,3 +106,8 @@ Tests/*.moc
 Tests/moc_predefs.h
 
 .cache
+
+Build
+Bin
+
+.qtcreator

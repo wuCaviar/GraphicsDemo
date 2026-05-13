@@ -39,7 +39,8 @@ HEADERS += \
     Commands/Commands.h \
     Utils/ImageUtils.h \
     Utils/ColorUtils.h \
-    Utils/AlignmentUtils.h
+    Utils/AlignmentUtils.h \
+    ColorTrans/colortransform.h
 
 
 SOURCES += \
@@ -66,7 +67,8 @@ SOURCES += \
     Commands/Commands.cpp \
     Utils/ImageUtils.cpp \
     Utils/ColorUtils.cpp \
-    Utils/AlignmentUtils.cpp
+    Utils/AlignmentUtils.cpp \
+    ColorTrans/colortransform.cpp
 
 FORMS += \
     UI/mainwindow.ui \
@@ -87,4 +89,4 @@ INCLUDEPATH += \
     $$PWD/Commands \
     $$PWD/Utils
 
-include(Common.pri)
+include(../Common.pri)
