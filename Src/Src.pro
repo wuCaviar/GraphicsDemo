@@ -87,6 +87,7 @@ INCLUDEPATH += \
     $$PWD/Common \
     $$PWD/Items \
     $$PWD/Commands \
-    $$PWD/Utils
+    $$PWD/Utils \
+    $$PWD/ColorTrans
 
 include(../Common.pri)

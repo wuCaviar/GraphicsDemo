@@ -2,6 +2,7 @@
 #define IMAGEUTILS_H
 
 #include <QByteArray>
+#include <QGraphicsItem>
 #include <QImage>
 #include <QMap>
 #include <QVariant>
@@ -52,7 +53,8 @@ struct ExportParameters {
     enum class ColorSpace {
         KeepOriginal,
         ConvertToSRGB,
-        ConvertToAdobeRGB
+        ConvertToAdobeRGB,
+        ConvertToCMYK
     };
     ColorSpace colorSpace = ColorSpace::KeepOriginal;
 
@@ -105,9 +107,6 @@ struct ExportParameters {
 // 判断文件路径是否为 TIFF 格式
 bool isTiffFile(const QString &path);
 
-// 使用 libtiff 导入 TIFF 图像（支持 RGBA、安全检查）
-QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params = ImportParameters());
-
 // 图像导入结果
 struct ImportResult {
     QImage image;              // 解码后的图像
@@ -117,7 +116,17 @@ struct ImportResult {
     int dpiX = 72;            // 水平 DPI
     int dpiY = 72;            // 垂直 DPI
     bool isValid() const { return !image.isNull(); }
+
+    // CMYK 源数据（仅 CMYK TIFF 导入时有值）
+    QByteArray rawCmykPixels;  // 原始 CMYK 像素（4 bytes/pixel, 0-255/通道, libtiff 顺序）
+    int cmykWidth = 0;
+    int cmykHeight = 0;
+    bool isCmykSource = false;
 };
+
+// 使用 libtiff 导入 TIFF 图像（支持 RGBA、CMYK、安全检查）
+QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params = ImportParameters(),
+                             ImportResult *result = nullptr);
 
 // 从文件加载图像（自动识别 TIFF 与普通格式，保留 TIFF 原始数据）
 ImportResult loadImageFromFile(const QString &path, const ImportParameters &params = ImportParameters());
@@ -128,6 +137,11 @@ ImportResult importImageWithDialog(QWidget *parent, ImportParameters *params = n
 // 使用 libtiff 导出 TIFF（支持压缩参数、DPI、元数据）
 bool exportTiffLossless(const QString &path, const QImage &image,
                         const ExportParameters &params = ExportParameters());
+
+// 导出 CMYK TIFF：RGB 图像逐像素转换 CMYK，并用图元存储的精确 CMYK 覆写纯色区域
+bool exportTiffCmyk(const QString &path, const QImage &image,
+                    const QList<QGraphicsItem *> &items, const QRectF &exportRect,
+                    const ExportParameters &params = ExportParameters());
 
 // 使用 QImageWriter 导出 PNG/JPEG 等格式（支持压缩参数）
 bool exportImageWithParams(const QString &path, const QImage &image,

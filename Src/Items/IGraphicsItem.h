@@ -8,6 +8,8 @@
 #include <QImage>
 #include <QPen>
 
+#include "colortransform.h"
+
 // 统一属性接口，所有自定义图元均实现此接口
 class IGraphicsItem
 {
@@ -58,6 +60,17 @@ public:
     virtual void setItemImage(const QImage &) {}
     virtual QString filePath() const { return {}; }
     virtual void setFilePath(const QString &) {}
+
+    // CMYK 颜色存储（可选，用于 TIFF 导出精确 CMYK 值）
+    virtual void setItemPenCmyk(double c, double m, double y, double k) { Q_UNUSED(c); Q_UNUSED(m); Q_UNUSED(y); Q_UNUSED(k); }
+    virtual bool hasPenCmyk() const { return false; }
+    virtual void penCmyk(double &c, double &m, double &y, double &k) const { c = m = y = k = 0; }
+    virtual void clearPenCmyk() {}
+
+    virtual void setItemBrushCmyk(double c, double m, double y, double k) { Q_UNUSED(c); Q_UNUSED(m); Q_UNUSED(y); Q_UNUSED(k); }
+    virtual bool hasBrushCmyk() const { return false; }
+    virtual void brushCmyk(double &c, double &m, double &y, double &k) const { c = m = y = k = 0; }
+    virtual void clearBrushCmyk() {}
 
     // 精确几何矩形（不含画笔边距），用于对齐/分布等精确计算
     // 默认实现返回空 QRectF 并报告不支持；子类应按需重写

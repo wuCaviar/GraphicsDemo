@@ -22,6 +22,12 @@ public:
     QBrush itemBrush() const override { return Qt::NoBrush; }
     void setItemBrush(const QBrush &) override {}
 
+    // CMYK 颜色存储
+    void setItemPenCmyk(double c, double m, double y, double k) override { m_penCmyk = {c, m, y, k, true}; }
+    bool hasPenCmyk() const override { return m_penCmyk.valid; }
+    void penCmyk(double &c, double &m, double &y, double &k) const override { c = m_penCmyk.c; m = m_penCmyk.m; y = m_penCmyk.y; k = m_penCmyk.k; }
+    void clearPenCmyk() override { m_penCmyk.valid = false; }
+
     // 追加路径点（自由绘制时调用）
     void appendPoint(const QPointF &scenePos);
 
@@ -31,6 +37,9 @@ public:
 protected:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget) override;
+
+private:
+    CmykColor m_penCmyk;
 };
 
 #endif // FREEHANDITEM_H

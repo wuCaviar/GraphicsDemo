@@ -465,7 +465,7 @@
         <item>
          <layout class="QGridLayout" name="gridLayout">
           <item row="1" column="1">
-           <widget class="QSpinBox" name="spin_magenta">
+           <widget class="QDoubleSpinBox" name="spin_magenta">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -478,13 +478,19 @@
               <height>16777215</height>
              </size>
             </property>
+            <property name="decimals">
+             <number>1</number>
+            </property>
+            <property name="singleStep">
+             <double>0.500000000000000</double>
+            </property>
             <property name="maximum">
-             <number>100</number>
+             <double>100.000000000000000</double>
             </property>
            </widget>
           </item>
           <item row="3" column="1">
-           <widget class="QSpinBox" name="spin_black">
+           <widget class="QDoubleSpinBox" name="spin_black">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -497,8 +503,14 @@
               <height>16777215</height>
              </size>
             </property>
+            <property name="decimals">
+             <number>1</number>
+            </property>
+            <property name="singleStep">
+             <double>0.500000000000000</double>
+            </property>
             <property name="maximum">
-             <number>100</number>
+             <double>100.000000000000000</double>
             </property>
            </widget>
           </item>
@@ -542,7 +554,7 @@
            </widget>
           </item>
           <item row="2" column="1">
-           <widget class="QSpinBox" name="spin_yellow">
+           <widget class="QDoubleSpinBox" name="spin_yellow">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -555,13 +567,19 @@
               <height>16777215</height>
              </size>
             </property>
+            <property name="decimals">
+             <number>1</number>
+            </property>
+            <property name="singleStep">
+             <double>0.500000000000000</double>
+            </property>
             <property name="maximum">
-             <number>100</number>
+             <double>100.000000000000000</double>
             </property>
            </widget>
           </item>
           <item row="0" column="1">
-           <widget class="QSpinBox" name="spin_cyan">
+           <widget class="QDoubleSpinBox" name="spin_cyan">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -574,8 +592,14 @@
               <height>16777215</height>
              </size>
             </property>
+            <property name="decimals">
+             <number>1</number>
+            </property>
+            <property name="singleStep">
+             <double>0.500000000000000</double>
+            </property>
             <property name="maximum">
-             <number>100</number>
+             <double>100.000000000000000</double>
             </property>
            </widget>
           </item>

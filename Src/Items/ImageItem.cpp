@@ -29,6 +29,8 @@ QGraphicsItem *ImageItem::cloneItem() const
         item->setRect(m_rect);
     item->setFilePath(m_filePath);
     item->setRawTiffData(m_rawTiffData);
+    if (m_isCmykSource)
+        item->setCmykSourceData(m_rawCmykPixels, m_cmykWidth, m_cmykHeight);
     return item;
 }
 
@@ -83,6 +85,9 @@ void ImageItem::serialize(QDataStream &out) const
 {
     QImage img = pixmap().toImage();
     out << img << m_pen << pos() << rotation() << m_filePath << m_rawTiffData << m_rect;
+    out << m_isCmykSource;
+    if (m_isCmykSource)
+        out << m_rawCmykPixels << m_cmykWidth << m_cmykHeight;
 }
 
 bool ImageItem::deserialize(QDataStream &in)
@@ -93,8 +98,25 @@ bool ImageItem::deserialize(QDataStream &in)
     in >> img >> m_pen >> pos_ >> rot >> m_filePath >> m_rawTiffData >> m_rect;
     if (in.status() != QDataStream::Ok)
         return false;
+
+    // 读取 CMYK 源数据（版本兼容：如果没有则跳过）
+    m_isCmykSource = false;
+    if (!in.atEnd()) {
+        in >> m_isCmykSource;
+        if (m_isCmykSource)
+            in >> m_rawCmykPixels >> m_cmykWidth >> m_cmykHeight;
+    }
+
     setPixmap(QPixmap::fromImage(img));
     setPos(pos_);
     setRotation(rot);
     return true;
+}
+
+void ImageItem::setCmykSourceData(const QByteArray &data, int w, int h)
+{
+    m_rawCmykPixels = data;
+    m_cmykWidth = w;
+    m_cmykHeight = h;
+    m_isCmykSource = true;
 }

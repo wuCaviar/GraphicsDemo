@@ -672,6 +672,8 @@ void MainWindow::onImportImage()
     item->setItemPen(QPen(Qt::NoPen));
     item->setFilePath(result.filePath);
     item->setRawTiffData(result.rawTiffData);
+    if (result.isCmykSource)
+        item->setCmykSourceData(result.rawCmykPixels, result.cmykWidth, result.cmykHeight);
 
     m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
 }
@@ -701,17 +703,22 @@ void MainWindow::onExportImage()
         exportRect = m_pView->scene()->itemsBoundingRect().adjusted(-10, -10, 10, 10);
     }
 
-    QImage image(exportRect.size().toSize(), QImage::Format_ARGB32_Premultiplied);
+    QImage image(exportRect.size().toSize(), QImage::Format_ARGB32);
     image.fill(Qt::white);
 
     QPainter painter(&image);
-    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setRenderHint(QPainter::LosslessImageRendering);
     m_pView->scene()->render(&painter, QRectF(), exportRect);
     painter.end();
 
     // 第四步：根据参数导出
     if (path.endsWith(".tif", Qt::CaseInsensitive) || path.endsWith(".tiff", Qt::CaseInsensitive)) {
-        ImageUtils::exportTiffLossless(path, image, exportParams);
+        if (exportParams.colorSpace == ImageUtils::ExportParameters::ColorSpace::ConvertToCMYK) {
+            QList<QGraphicsItem *> items = ::filterSelectableItems(m_pView->scene()->items());
+            ImageUtils::exportTiffCmyk(path, image, items, exportRect, exportParams);
+        } else {
+            ImageUtils::exportTiffLossless(path, image, exportParams);
+        }
     } else if (path.endsWith(".png", Qt::CaseInsensitive) ||
                path.endsWith(".jpg", Qt::CaseInsensitive) ||
                path.endsWith(".jpeg", Qt::CaseInsensitive)) {

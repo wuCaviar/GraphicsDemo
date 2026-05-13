@@ -22,6 +22,12 @@ public:
     QBrush itemBrush() const override { return Qt::NoBrush; }
     void setItemBrush(const QBrush &) override {}
 
+    // CMYK 颜色存储
+    void setItemPenCmyk(double c, double m, double y, double k) override { m_penCmyk = {c, m, y, k, true}; }
+    bool hasPenCmyk() const override { return m_penCmyk.valid; }
+    void penCmyk(double &c, double &m, double &y, double &k) const override { c = m_penCmyk.c; m = m_penCmyk.m; y = m_penCmyk.y; k = m_penCmyk.k; }
+    void clearPenCmyk() override { m_penCmyk.valid = false; }
+
     // 根据起点、两个控制点和终点构建三次贝塞尔曲线路径
     void setBezierCurve(const QPointF &start, const QPointF &cp1, const QPointF &cp2, const QPointF &end);
 
@@ -31,6 +37,9 @@ public:
 protected:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget) override;
+
+private:
+    CmykColor m_penCmyk;
 };
 
 #endif // BEZIERCURVEITEM_H

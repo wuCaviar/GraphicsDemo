@@ -85,10 +85,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     connect(ui->gSpB, &QSpinBox::valueChanged, this, &MainWindow::_editRGB);
     connect(ui->bSpB, &QSpinBox::valueChanged, this, &MainWindow::_editRGB);
 
-    connect(ui->cSpB, &QSpinBox::valueChanged, this, &MainWindow::_editCMYK);
-    connect(ui->mSpB, &QSpinBox::valueChanged, this, &MainWindow::_editCMYK);
-    connect(ui->ySpB, &QSpinBox::valueChanged, this, &MainWindow::_editCMYK);
-    connect(ui->kSpB, &QSpinBox::valueChanged, this, &MainWindow::_editCMYK);
+    connect(ui->cSpB, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &MainWindow::_editCMYK);
+    connect(ui->mSpB, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &MainWindow::_editCMYK);
+    connect(ui->ySpB, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &MainWindow::_editCMYK);
+    connect(ui->kSpB, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &MainWindow::_editCMYK);
 
     color = QColor(Qt::white);
     _updateColorLabel();
@@ -128,10 +132,10 @@ void MainWindow::_updateCMYKColor()
         const QSignalBlocker yBlock(ui->ySpB);
         const QSignalBlocker kBlock(ui->kSpB);
 
-        ui->cSpB->setValue(int(std::round(cmyk.c)));
-        ui->mSpB->setValue(int(std::round(cmyk.m)));
-        ui->ySpB->setValue(int(std::round(cmyk.y)));
-        ui->kSpB->setValue(int(std::round(cmyk.k)));
+        ui->cSpB->setValue(cmyk.c);
+        ui->mSpB->setValue(cmyk.m);
+        ui->ySpB->setValue(cmyk.y);
+        ui->kSpB->setValue(cmyk.k);
     }
 
     _updateColorLabel();

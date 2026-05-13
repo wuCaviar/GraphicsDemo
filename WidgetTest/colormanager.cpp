@@ -115,7 +115,7 @@ bool ColorManager::loadProfiles()
 bool ColorManager::buildRGB2CMYKTransforms(cmsUInt32Number Intent, cmsUInt32Number dwFlags)
 {
     m_tRgbToCmyk = cmsCreateTransform(
-        m_srgb, TYPE_RGB_8, m_cmyk, TYPE_CMYK_8,
+        m_srgb, TYPE_RGB_8, m_cmyk, TYPE_CMYK_DBL,
         Intent, dwFlags);
 
     return m_tRgbToCmyk != nullptr;
@@ -124,7 +124,7 @@ bool ColorManager::buildRGB2CMYKTransforms(cmsUInt32Number Intent, cmsUInt32Numb
 bool ColorManager::buildCMYK2RGBTransforms(cmsUInt32Number Intent, cmsUInt32Number dwFlags)
 {
     m_tCmykToRgb = cmsCreateTransform(
-        m_cmyk, TYPE_CMYK_8, m_srgb, TYPE_RGB_8,
+        m_cmyk, TYPE_CMYK_DBL, m_srgb, TYPE_RGB_8,
         Intent, dwFlags);
 
     return m_tCmykToRgb != nullptr;
@@ -158,22 +158,17 @@ cmsToneCurve *ColorManager::buildDotGain15Curve()
 ColorManager::Cmyk ColorManager::toCmyk(const QColor &rgb) const
 {
     Q_ASSERT(m_ok);
-    uchar src[3], dst[4];
+    uchar src[3];
+    double dst[4];
     qcolorToRGB(rgb, src);
     cmsDoTransform(m_tRgbToCmyk, src, dst, 1);
-    return { dst[0] / 255.0 * 100, dst[1] / 255.0 * 100,
-            dst[2] / 255.0 * 100, dst[3] / 255.0 * 100 };
+    return {dst[0], dst[1], dst[2], dst[3]};
 }
 
 QColor ColorManager::toRgb(const Cmyk &cmyk) const
 {
     Q_ASSERT(m_ok);
-    uchar src[4] = {
-        uchar(cmyk.c / 100.0 * 255),
-        uchar(cmyk.m / 100.0 * 255),
-        uchar(cmyk.y / 100.0 * 255),
-        uchar(cmyk.k / 100.0 * 255)
-    };
+    double src[4] = {cmyk.c, cmyk.m, cmyk.y, cmyk.k};
     uchar dst[3];
     cmsDoTransform(m_tCmykToRgb, src, dst, 1);
     return rgbToQcolor(dst);

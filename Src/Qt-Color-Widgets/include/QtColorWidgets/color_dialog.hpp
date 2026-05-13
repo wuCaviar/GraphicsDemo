@@ -115,6 +115,12 @@ Q_SIGNALS:
      */
     void colorSelected(QColor);
 
+    /**
+     * Color changed with optional CMYK source values.
+     * c,m,y,k < 0 means the color did not originate from CMYK input.
+     */
+    void colorSelectedCmyk(const QColor &color, double c, double m, double y, double k);
+
     void wheelShapeChanged(ColorWheel::ShapeEnum shape);
     void colorSpaceChanged(ColorWheel::ColorSpaceEnum space);
     void wheelRotatingChanged(bool rotating);
@@ -124,7 +130,7 @@ Q_SIGNALS:
 
 private Q_SLOTS:
     /// Update all the Ui elements to match the selected color
-    void setColorInternal(const QColor &color, bool fromCmyk = false);
+    void setColorInternal(const QColor &color);
     /// Update from HSV sliders
     void set_hsv();
     /// Update from RGB sliders

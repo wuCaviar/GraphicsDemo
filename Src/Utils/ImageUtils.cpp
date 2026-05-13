@@ -1,6 +1,10 @@
 #include "ImageUtils.h"
 #include "ImportImageDialog.h"
+#include "IGraphicsItem.h"
+#include "ImageItem.h"
+#include "colortransform.h"
 
+#include <QCoreApplication>
 #include <QFileDialog>
 #include <QFile>
 #include <QFileInfo>
@@ -73,8 +77,12 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
         return QImage();
     }
 
-    QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
-    QVector<uint32_t> buf(width);
+    // 检测色彩空间
+    uint16_t photometric = PHOTOMETRIC_MINISWHITE;
+    uint16_t samplesPerPixel = 1;
+    TIFFGetField(tif, TIFFTAG_PHOTOMETRIC, &photometric);
+    TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &samplesPerPixel);
+    bool isCmyk = (photometric == PHOTOMETRIC_SEPARATED && samplesPerPixel >= 4);
 
     // 读取 DPI 信息
     if (result) {
@@ -88,21 +96,83 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
         readTiffMetadata(tif, result->metadata);
     }
 
+    QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
     bool readError = false;
-    for (uint32_t y = 0; y < height; ++y) {
-        if (TIFFReadScanline(tif, buf.data(), y) < 0) {
-            qWarning("TIFFReadScanline failed at row %u", y);
-            readError = true;
-            break;
+
+    if (isCmyk) {
+        // CMYK TIFF：读取原始 CMYK 扫描线，同时转换为 RGB 用于显示
+        QATColorManager &cm = QATColorManager::instance();
+        bool useLcms2 = cm.isValid();
+        if (useLcms2) {
+            cm.buildCMYK2RGBTransforms(INTENT_PERCEPTUAL,
+                                       cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
         }
-        QRgb *scanLine = reinterpret_cast<QRgb *>(image.scanLine(y));
-        for (uint32_t x = 0; x < width; ++x) {
-            uint32_t rgba = buf[x];
-            int a = (rgba >> 24) & 0xFF;
-            int r = (rgba >> 16) & 0xFF;
-            int g = (rgba >> 8) & 0xFF;
-            int b = rgba & 0xFF;
-            scanLine[x] = qRgba(r, g, b, a);
+
+        // 保留原始 CMYK 像素数据
+        QByteArray cmykBuf;
+        if (result)
+            cmykBuf.resize(width * height * 4);
+
+        QVector<uint8_t> cmykLine(width * 4);
+        for (uint32_t y = 0; y < height; ++y) {
+            if (TIFFReadScanline(tif, cmykLine.data(), y) < 0) {
+                qWarning("TIFFReadScanline failed at row %u", y);
+                readError = true;
+                break;
+            }
+
+            // 保存原始 CMYK 数据
+            if (result)
+                memcpy(cmykBuf.data() + y * width * 4, cmykLine.data(), width * 4);
+
+            // 转换为 RGB 用于显示
+            QRgb *scanLine = reinterpret_cast<QRgb *>(image.scanLine(y));
+            for (uint32_t x = 0; x < width; ++x) {
+                int off = x * 4;
+                // libtiff CMYK: 0 = max ink, 255 = no ink
+                // QATColorManager::toRgb 期望 0-100 范围
+                double c = (255 - cmykLine[off + 0]) / 255.0 * 100.0;
+                double m = (255 - cmykLine[off + 1]) / 255.0 * 100.0;
+                double yv = (255 - cmykLine[off + 2]) / 255.0 * 100.0;
+                double k = (255 - cmykLine[off + 3]) / 255.0 * 100.0;
+
+                if (useLcms2) {
+                    QColor rgb = cm.toRgb(QATColorManager::Cmyk{c, m, yv, k});
+                    scanLine[x] = rgb.rgba();
+                } else {
+                    // Fallback: naive CMYK→RGB
+                    int ri = qBound(0, static_cast<int>((100 - c) * 2.55), 255);
+                    int gi = qBound(0, static_cast<int>((100 - m) * 2.55), 255);
+                    int bi = qBound(0, static_cast<int>((100 - yv) * 2.55), 255);
+                    scanLine[x] = qRgba(ri, gi, bi, 255);
+                }
+            }
+        }
+
+        if (result && !readError) {
+            result->rawCmykPixels = cmykBuf;
+            result->cmykWidth = width;
+            result->cmykHeight = height;
+            result->isCmykSource = true;
+        }
+    } else {
+        // RGBA/RGB TIFF：原有逻辑
+        QVector<uint32_t> buf(width);
+        for (uint32_t y = 0; y < height; ++y) {
+            if (TIFFReadScanline(tif, buf.data(), y) < 0) {
+                qWarning("TIFFReadScanline failed at row %u", y);
+                readError = true;
+                break;
+            }
+            QRgb *scanLine = reinterpret_cast<QRgb *>(image.scanLine(y));
+            for (uint32_t x = 0; x < width; ++x) {
+                uint32_t rgba = buf[x];
+                int a = (rgba >> 24) & 0xFF;
+                int r = (rgba >> 16) & 0xFF;
+                int g = (rgba >> 8) & 0xFF;
+                int b = rgba & 0xFF;
+                scanLine[x] = qRgba(r, g, b, a);
+            }
         }
     }
 
@@ -552,6 +622,220 @@ bool exportTiffLossless(const QString &path, const QImage &image, const ExportPa
 
     TIFFClose(tif);
     return !writeError;
+}
+
+bool exportTiffCmyk(const QString &path, const QImage &image,
+                    const QList<QGraphicsItem *> &items, const QRectF &exportRect,
+                    const ExportParameters &params)
+{
+    // 1. Flatten transparency on white
+    QImage img(image.size(), QImage::Format_ARGB32);
+    img.fill(Qt::white);
+    {
+        QPainter p(&img);
+        p.drawImage(0, 0, image);
+        p.end();
+    }
+
+    int width = img.width();
+    int height = img.height();
+
+    // 2. Open TIFF
+    const char *mode = (params.tiff.byteOrder == ExportParameters::ByteOrder::LittleEndian)
+                           ? "wl" : "wb";
+    TIFF *tif = TIFFOpen(path.toUtf8().constData(), mode);
+    if (!tif)
+        return false;
+
+    // 3. TIFF tags — CMYK
+    TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, width);
+    TIFFSetField(tif, TIFFTAG_IMAGELENGTH, height);
+    TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
+    TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, 4);
+    TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_SEPARATED);
+    TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
+    TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+
+    uint16_t compression = COMPRESSION_NONE;
+    switch (params.tiff.compression) {
+    case ExportParameters::CompressionType::None:    compression = COMPRESSION_NONE; break;
+    case ExportParameters::CompressionType::LZW:     compression = COMPRESSION_LZW; break;
+    case ExportParameters::CompressionType::ZIP:     compression = COMPRESSION_ADOBE_DEFLATE; break;
+    case ExportParameters::CompressionType::JPEG:    compression = COMPRESSION_JPEG;
+        TIFFSetField(tif, TIFFTAG_JPEGQUALITY, params.tiff.jpegQuality); break;
+    case ExportParameters::CompressionType::PackBits: compression = COMPRESSION_PACKBITS; break;
+    }
+    TIFFSetField(tif, TIFFTAG_COMPRESSION, compression);
+
+    if (params.tiff.predictor == ExportParameters::Predictor::Horizontal &&
+        (params.tiff.compression == ExportParameters::CompressionType::LZW ||
+         params.tiff.compression == ExportParameters::CompressionType::ZIP))
+        TIFFSetField(tif, TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL);
+
+    TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, TIFFDefaultStripSize(tif, 0));
+    TIFFSetField(tif, TIFFTAG_XRESOLUTION, static_cast<float>(params.dpi));
+    TIFFSetField(tif, TIFFTAG_YRESOLUTION, static_cast<float>(params.dpi));
+    TIFFSetField(tif, TIFFTAG_RESOLUTIONUNIT, RESUNIT_INCH);
+    writeTiffMetadata(tif, params);
+
+    // 4. Embed CMYK ICC profile
+    QATColorManager &cm = QATColorManager::instance();
+    bool useLcms2 = cm.isValid();
+    if (useLcms2) {
+        cm.buildRGB2CMYKTransforms(INTENT_PERCEPTUAL,
+                                   cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
+    }
+    // Always embed the CMYK ICC profile (same path as QATColorManager)
+#if defined(Q_OS_WIN)
+    QString iccPath = QCoreApplication::applicationDirPath() + "/../ICC Profile/CMYK/JapanColor2001Coated.icc";
+#elif defined(Q_OS_MACOS)
+    QString iccPath = "/Volumes/Caviar/Test/GraphicsDemo/Bin/../ICC Profile/CMYK/JapanColor2001Coated.icc";
+#endif
+    {
+        QFile iccFile(iccPath);
+        if (iccFile.open(QIODevice::ReadOnly)) {
+            QByteArray iccData = iccFile.readAll();
+            TIFFSetField(tif, TIFFTAG_ICCPROFILE,
+                         static_cast<uint32_t>(iccData.size()), iccData.constData());
+            iccFile.close();
+        }
+    }
+
+    // 5. Convert and write pixel data
+    QVector<uint8_t> rowBuf(width * 4);
+    QImage img32 = img.convertToFormat(QImage::Format_ARGB32);
+
+    for (int y = 0; y < height; ++y) {
+        const QRgb *scanLine = reinterpret_cast<const QRgb *>(img32.constScanLine(y));
+
+        for (int x = 0; x < width; ++x) {
+            QRgb c = scanLine[x];
+            double cd, md, yd, kd;
+            if (useLcms2) {
+                QATColorManager::Cmyk cmyk = cm.toCmyk(QColor(c));
+                cd = cmyk.c; md = cmyk.m; yd = cmyk.y; kd = cmyk.k;
+            } else {
+                // Fallback: naive conversion
+                double r = qRed(c) / 255.0, g = qGreen(c) / 255.0, b = qBlue(c) / 255.0;
+                cd = 1.0 - r; md = 1.0 - g; yd = 1.0 - b;
+                kd = qMin(cd, qMin(md, yd));
+                cd = (cd - kd) / (1.0 - kd) * 100.0;
+                md = (md - kd) / (1.0 - kd) * 100.0;
+                yd = (yd - kd) / (1.0 - kd) * 100.0;
+                kd *= 100.0;
+            }
+            int off = x * 4;
+            rowBuf[off + 0] = static_cast<uint8_t>(qBound(0.0, cd * 2.55, 255.0));
+            rowBuf[off + 1] = static_cast<uint8_t>(qBound(0.0, md * 2.55, 255.0));
+            rowBuf[off + 2] = static_cast<uint8_t>(qBound(0.0, yd * 2.55, 255.0));
+            rowBuf[off + 3] = static_cast<uint8_t>(qBound(0.0, kd * 2.55, 255.0));
+        }
+
+        // Overwrite with exact CMYK for items that have stored values
+        for (QGraphicsItem *gi : items) {
+            auto *ii = dynamic_cast<IGraphicsItem *>(gi);
+            if (!ii) continue;
+
+            // Brush (solid fill)
+            if (ii->hasBrushCmyk() && ii->itemBrush().style() != Qt::NoBrush) {
+                double bc, bm, by, bk;
+                ii->brushCmyk(bc, bm, by, bk);
+                QRectF sceneRect = gi->sceneBoundingRect();
+                QRectF pixelRect((sceneRect.x() - exportRect.x()),
+                                 (sceneRect.y() - exportRect.y()),
+                                 sceneRect.width(), sceneRect.height());
+                int x0 = qBound(0, static_cast<int>(pixelRect.left()), width - 1);
+                int x1 = qBound(0, static_cast<int>(pixelRect.right()), width - 1);
+                if (y >= pixelRect.top() && y <= pixelRect.bottom()) {
+                    uint8_t c8 = static_cast<uint8_t>(qBound(0.0, bc * 2.55, 255.0));
+                    uint8_t m8 = static_cast<uint8_t>(qBound(0.0, bm * 2.55, 255.0));
+                    uint8_t y8 = static_cast<uint8_t>(qBound(0.0, by * 2.55, 255.0));
+                    uint8_t k8 = static_cast<uint8_t>(qBound(0.0, bk * 2.55, 255.0));
+                    for (int x = x0; x <= x1; ++x) {
+                        int off = x * 4;
+                        rowBuf[off + 0] = c8;
+                        rowBuf[off + 1] = m8;
+                        rowBuf[off + 2] = y8;
+                        rowBuf[off + 3] = k8;
+                    }
+                }
+            }
+
+            // Pen (stroke)
+            if (ii->hasPenCmyk() && ii->itemPen().style() != Qt::NoPen) {
+                double pc, pm, py, pk;
+                ii->penCmyk(pc, pm, py, pk);
+                qreal penWidth = ii->itemPen().widthF();
+                QRectF sceneRect = gi->sceneBoundingRect();
+                // Expand rect by half pen width to cover stroke area
+                QRectF strokeRect = sceneRect.adjusted(-penWidth/2, -penWidth/2,
+                                                       penWidth/2, penWidth/2);
+                QRectF pixelRect((strokeRect.x() - exportRect.x()),
+                                 (strokeRect.y() - exportRect.y()),
+                                 strokeRect.width(), strokeRect.height());
+                // Only overwrite border pixels (not interior, which is handled by brush)
+                if (ii->itemBrush().style() == Qt::NoBrush && ii->hasBrushCmyk()) {
+                    // skip — brush already handled
+                } else if (ii->itemBrush().style() == Qt::NoBrush) {
+                    // No brush — overwrite entire stroke area
+                    int x0 = qBound(0, static_cast<int>(pixelRect.left()), width - 1);
+                    int x1 = qBound(0, static_cast<int>(pixelRect.right()), width - 1);
+                    if (y >= pixelRect.top() && y <= pixelRect.bottom()) {
+                        uint8_t c8 = static_cast<uint8_t>(qBound(0.0, pc * 2.55, 255.0));
+                        uint8_t m8 = static_cast<uint8_t>(qBound(0.0, pm * 2.55, 255.0));
+                        uint8_t y8 = static_cast<uint8_t>(qBound(0.0, py * 2.55, 255.0));
+                        uint8_t k8 = static_cast<uint8_t>(qBound(0.0, pk * 2.55, 255.0));
+                        for (int x = x0; x <= x1; ++x) {
+                            int off = x * 4;
+                            rowBuf[off + 0] = c8;
+                            rowBuf[off + 1] = m8;
+                            rowBuf[off + 2] = y8;
+                            rowBuf[off + 3] = k8;
+                        }
+                    }
+                }
+            }
+
+            // ImageItem with raw CMYK source: composite raw CMYK pixels directly
+            auto *imgItem = dynamic_cast<ImageItem *>(gi);
+            if (imgItem && imgItem->isCmykSource()) {
+                QRectF sceneRect = gi->sceneBoundingRect();
+                QRectF pixelRect((sceneRect.x() - exportRect.x()),
+                                 (sceneRect.y() - exportRect.y()),
+                                 sceneRect.width(), sceneRect.height());
+                int srcW = imgItem->cmykSourceWidth();
+                int srcH = imgItem->cmykSourceHeight();
+                if (srcW > 0 && srcH > 0 && y >= pixelRect.top() && y <= pixelRect.bottom()) {
+                    int x0 = qBound(0, static_cast<int>(pixelRect.left()), width - 1);
+                    int x1 = qBound(0, static_cast<int>(pixelRect.right()), width - 1);
+                    double scaleX = static_cast<double>(srcW) / pixelRect.width();
+                    double scaleY = static_cast<double>(srcH) / pixelRect.height();
+                    int srcY = qBound(0, static_cast<int>((y - pixelRect.top()) * scaleY), srcH - 1);
+                    const uint8_t *srcRow = reinterpret_cast<const uint8_t *>(
+                        imgItem->rawCmykPixels().constData() + srcY * srcW * 4);
+                    for (int x = x0; x <= x1; ++x) {
+                        int srcX = qBound(0, static_cast<int>((x - pixelRect.left()) * scaleX), srcW - 1);
+                        int srcOff = srcX * 4;
+                        int dstOff = x * 4;
+                        // libtiff: 0 = max ink, 255 = no ink
+                        // export:  0 = no ink,  255 = max ink → invert
+                        rowBuf[dstOff + 0] = 255 - srcRow[srcOff + 0];
+                        rowBuf[dstOff + 1] = 255 - srcRow[srcOff + 1];
+                        rowBuf[dstOff + 2] = 255 - srcRow[srcOff + 2];
+                        rowBuf[dstOff + 3] = 255 - srcRow[srcOff + 3];
+                    }
+                }
+            }
+        }
+
+        if (TIFFWriteScanline(tif, rowBuf.data(), y) < 0) {
+            TIFFClose(tif);
+            return false;
+        }
+    }
+
+    TIFFClose(tif);
+    return true;
 }
 
 bool exportImageWithParams(const QString &path, const QImage &image, const ExportParameters &params)

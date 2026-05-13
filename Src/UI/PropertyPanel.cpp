@@ -173,6 +173,13 @@ void PropertyPanel::setupUI()
     connect(m_penColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onPenColorSelected);
     connect(m_penColorSelector, &ColorSelector::colorSelectionCanceled, this,
             [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::Border); });
+    connect(m_penColorSelector, &ColorSelector::colorSelectedCmyk, this,
+            [this](const QColor &, double c, double m, double y, double k) {
+                if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem)) {
+                    if (c >= 0) gi->setItemPenCmyk(c, m, y, k);
+                    else gi->clearPenCmyk();
+                }
+            });
 
     connect(m_penWidthSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
             &PropertyPanel::onPenWidthChanged);
@@ -185,6 +192,13 @@ void PropertyPanel::setupUI()
     connect(m_brushSolid, &ColorSelector::colorSelected, this, &PropertyPanel::onBrushColorClicked);
     connect(m_brushSolid, &ColorSelector::colorSelectionCanceled, this,
             [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::Fill); });
+    connect(m_brushSolid, &ColorSelector::colorSelectedCmyk, this,
+            [this](const QColor &, double c, double m, double y, double k) {
+                if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem)) {
+                    if (c >= 0) gi->setItemBrushCmyk(c, m, y, k);
+                    else gi->clearBrushCmyk();
+                }
+            });
 
     connect(m_fillModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &PropertyPanel::onFillModeChanged);
@@ -210,6 +224,13 @@ void PropertyPanel::setupUI()
     connect(m_textColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onTextColorClicked);
     connect(m_textColorSelector, &ColorSelector::colorSelectionCanceled, this,
             [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::Text); });
+    connect(m_textColorSelector, &ColorSelector::colorSelectedCmyk, this,
+            [this](const QColor &, double c, double m, double y, double k) {
+                if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem)) {
+                    if (c >= 0) gi->setItemPenCmyk(c, m, y, k);
+                    else gi->clearPenCmyk();
+                }
+            });
 
     connect(m_textBgColorSelector, &ColorSelector::colorEditingStarted, this,
             [this](const QColor &) { beginColorPreview(ColorPreviewTarget::TextBackground); });
@@ -218,6 +239,13 @@ void PropertyPanel::setupUI()
     connect(m_textBgColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onTextBgColorClicked);
     connect(m_textBgColorSelector, &ColorSelector::colorSelectionCanceled, this,
             [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::TextBackground); });
+    connect(m_textBgColorSelector, &ColorSelector::colorSelectedCmyk, this,
+            [this](const QColor &, double c, double m, double y, double k) {
+                if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem)) {
+                    if (c >= 0) gi->setItemBrushCmyk(c, m, y, k);
+                    else gi->clearBrushCmyk();
+                }
+            });
 
     connect(m_textEdit, &QLineEdit::editingFinished, this, &PropertyPanel::onTextChanged);
     connect(m_xSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,

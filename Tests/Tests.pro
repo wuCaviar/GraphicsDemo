@@ -24,4 +24,5 @@ INCLUDEPATH += $$PWD/../Src \
                $$PWD/../Src/Utils \
                $$PWD/../Src/Items \
                $$PWD/../Src/Commands \
-               $$PWD/../Src/UI
+               $$PWD/../Src/UI \
+               $$PWD/../Src/ColorTrans

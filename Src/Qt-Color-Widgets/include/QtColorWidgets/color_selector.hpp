@@ -54,6 +54,8 @@ Q_SIGNALS:
     void colorEditingStarted(const QColor& oldColor);
     /// Emitted when a color is selected by the user
     void colorSelected(const QColor& c);
+    /// Emitted when a color changes, with optional CMYK source values (c,m,y,k < 0 if not from CMYK)
+    void colorSelectedCmyk(const QColor &color, double c, double m, double y, double k);
     /// Emitted when an interactive color edit is canceled
     void colorSelectionCanceled(const QColor& oldColor);
 

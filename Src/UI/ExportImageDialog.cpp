@@ -47,6 +47,8 @@ ExportImageDialog::ExportImageDialog(QWidget *parent,
                           static_cast<int>(ExportParameters::ColorSpace::ConvertToSRGB));
     m_colorCombo->addItem(tr("Convert to Adobe RGB"),
                           static_cast<int>(ExportParameters::ColorSpace::ConvertToAdobeRGB));
+    m_colorCombo->addItem(tr("Convert to CMYK (TIFF only)"),
+                          static_cast<int>(ExportParameters::ColorSpace::ConvertToCMYK));
     mainLayout->addRow(tr("Color Space:"), m_colorCombo);
 
     m_transparencyCombo = new QComboBox(this);

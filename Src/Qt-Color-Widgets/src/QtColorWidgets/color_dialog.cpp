@@ -51,15 +51,14 @@ void ColorDialog::rgb_to_cmyk(const QColor &color, double &c, double &m, double 
     QATColorManager &cm = QATColorManager::instance();
     if (cm.isValid()) {
         cm.buildRGB2CMYKTransforms(INTENT_PERCEPTUAL,
-                                   cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_LOWRESPRECALC);
+                                   cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
 
         QATColorManager::Cmyk cmyk = cm.toCmyk(color);
 
-        // Clamp values to valid range
-        c = qRound(cmyk.c);
-        m = qRound(cmyk.m);
-        y = qRound(cmyk.y);
-        k = qRound(cmyk.k);
+        c = cmyk.c;
+        m = cmyk.m;
+        y = cmyk.y;
+        k = cmyk.k;
     }
 }
 
@@ -71,6 +70,7 @@ public:
     bool pick_from_screen;
     bool alpha_enabled;
     QColor color;
+    CmykColor pendingCmyk;  // CMYK 来源值，用于导出精确 CMYK
 
     Private() : pick_from_screen(false), alpha_enabled(true)
     {}
@@ -113,10 +113,14 @@ ColorDialog::ColorDialog(QWidget *parent, Qt::WindowFlags f) : QDialog(parent, f
     connect(p->ui.wheel, &ColorWheel::mirroredSelectorChanged, this,
             &ColorDialog::wheelMirroredChanged);
 
-    connect(p->ui.spin_cyan, &QSpinBox::valueChanged, this, &ColorDialog::set_cmyk);
-    connect(p->ui.spin_magenta, &QSpinBox::valueChanged, this, &ColorDialog::set_cmyk);
-    connect(p->ui.spin_yellow, &QSpinBox::valueChanged, this, &ColorDialog::set_cmyk);
-    connect(p->ui.spin_black, &QSpinBox::valueChanged, this, &ColorDialog::set_cmyk);
+    connect(p->ui.spin_cyan, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &ColorDialog::set_cmyk);
+    connect(p->ui.spin_magenta, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &ColorDialog::set_cmyk);
+    connect(p->ui.spin_yellow, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &ColorDialog::set_cmyk);
+    connect(p->ui.spin_black, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &ColorDialog::set_cmyk);
 
     QATColorManager &cm = QATColorManager::instance();
     cm.initialize();
@@ -206,7 +210,7 @@ ColorDialog::ButtonMode ColorDialog::buttonMode() const
     return p->button_mode;
 }
 
-void ColorDialog::setColorInternal(const QColor &col, bool fromCmyk)
+void ColorDialog::setColorInternal(const QColor &col)
 {
     /**
      * \note Unlike setColor, this is used to update the current color which
@@ -221,9 +225,106 @@ void ColorDialog::setColorInternal(const QColor &col, bool fromCmyk)
     for (QWidget *w : findChildren<QWidget *>())
         w->blockSignals(true);
 
-    if (fromCmyk) {
-        QColor newColor = cmyk_to_rgb(col.cyanF() * 100, col.magentaF() * 100, col.yellowF() * 100,
-                                      col.blackF() * 100);
+    p->ui.slide_red->setValue(col.red());
+    p->ui.spin_red->setValue(p->ui.slide_red->value());
+    p->ui.slide_red->setFirstColor(QColor(0, col.green(), col.blue()));
+    p->ui.slide_red->setLastColor(QColor(255, col.green(), col.blue()));
+
+    p->ui.slide_green->setValue(col.green());
+    p->ui.spin_green->setValue(p->ui.slide_green->value());
+    p->ui.slide_green->setFirstColor(QColor(col.red(), 0, col.blue()));
+    p->ui.slide_green->setLastColor(QColor(col.red(), 255, col.blue()));
+
+    p->ui.slide_blue->setValue(col.blue());
+    p->ui.spin_blue->setValue(p->ui.slide_blue->value());
+    p->ui.slide_blue->setFirstColor(QColor(col.red(), col.green(), 0));
+    p->ui.slide_blue->setLastColor(QColor(col.red(), col.green(), 255));
+
+    p->ui.slide_hue->setValue(qRound(p->ui.wheel->hue() * 360.0));
+    p->ui.slide_hue->setColorSaturation(p->ui.wheel->saturation());
+    p->ui.slide_hue->setColorValue(p->ui.wheel->value());
+    p->ui.spin_hue->setValue(p->ui.slide_hue->value());
+
+    p->ui.slide_saturation->setValue(qRound(p->ui.wheel->saturation() * 100.0));
+    p->ui.spin_saturation->setValue(p->ui.slide_saturation->value());
+    p->ui.slide_saturation->setFirstColor(
+        QColor::fromHsvF(p->ui.wheel->hue(), 0, p->ui.wheel->value()));
+    p->ui.slide_saturation->setLastColor(
+        QColor::fromHsvF(p->ui.wheel->hue(), 1, p->ui.wheel->value()));
+
+    p->ui.slide_value->setValue(qRound(p->ui.wheel->value() * 100.0));
+    p->ui.spin_value->setValue(p->ui.slide_value->value());
+    p->ui.slide_value->setFirstColor(
+        QColor::fromHsvF(p->ui.wheel->hue(), p->ui.wheel->saturation(), 0));
+    p->ui.slide_value->setLastColor(
+        QColor::fromHsvF(p->ui.wheel->hue(), p->ui.wheel->saturation(), 1));
+
+    // RGB → CMYK
+    double c, m, y, k;
+    rgb_to_cmyk(col, c, m, y, k);
+    p->ui.spin_cyan->setValue(c);
+    p->ui.spin_magenta->setValue(m);
+    p->ui.spin_yellow->setValue(y);
+    p->ui.spin_black->setValue(k);
+
+    QColor apha_color = col;
+    apha_color.setAlpha(0);
+    p->ui.slide_alpha->setFirstColor(apha_color);
+    apha_color.setAlpha(255);
+    p->ui.slide_alpha->setLastColor(apha_color);
+    p->ui.spin_alpha->setValue(col.alpha());
+    p->ui.slide_alpha->setValue(col.alpha());
+
+    if (!p->ui.edit_hex->isModified())
+        p->ui.edit_hex->setColor(col);
+
+    p->ui.preview->setColor(col);
+
+    blockSignals(blocked);
+    for (QWidget *w : findChildren<QWidget *>())
+        w->blockSignals(false);
+
+    Q_EMIT colorSelectedCmyk(col, -1, -1, -1, -1); // 非 CMYK 来源
+    Q_EMIT colorChanged(col);
+}
+
+void ColorDialog::set_hsv()
+{
+    if (!signalsBlocked()) {
+        QColor col = QColor::fromHsv(p->ui.slide_hue->value(), p->ui.slide_saturation->value(),
+                                     p->ui.slide_value->value(), p->ui.slide_alpha->value());
+        p->ui.wheel->setColor(col);
+        setColorInternal(col);
+    }
+}
+
+void ColorDialog::set_alpha()
+{
+    if (!signalsBlocked()) {
+        QColor col = p->color;
+        col.setAlpha(p->ui.slide_alpha->value());
+        setColorInternal(col);
+    }
+}
+
+void ColorDialog::set_cmyk()
+{
+    if (!signalsBlocked()) {
+        double c = p->ui.spin_cyan->value();
+        double m = p->ui.spin_magenta->value();
+        double y = p->ui.spin_yellow->value();
+        double k = p->ui.spin_black->value();
+
+        QColor newColor = cmyk_to_rgb(c, m, y, k);
+        newColor.setAlpha(p->ui.slide_alpha->value());
+        p->ui.wheel->setColor(newColor);
+
+        p->color = newColor;
+
+        bool blocked = signalsBlocked();
+        blockSignals(true);
+        for (QWidget *w : findChildren<QWidget *>())
+            w->blockSignals(true);
 
         p->ui.slide_red->setValue(newColor.red());
         p->ui.spin_red->setValue(p->ui.slide_red->value());
@@ -258,107 +359,24 @@ void ColorDialog::setColorInternal(const QColor &col, bool fromCmyk)
             QColor::fromHsvF(p->ui.wheel->hue(), p->ui.wheel->saturation(), 0));
         p->ui.slide_value->setLastColor(
             QColor::fromHsvF(p->ui.wheel->hue(), p->ui.wheel->saturation(), 1));
-    } else {
-        p->ui.slide_red->setValue(col.red());
-        p->ui.spin_red->setValue(p->ui.slide_red->value());
-        p->ui.slide_red->setFirstColor(QColor(0, col.green(), col.blue()));
-        p->ui.slide_red->setLastColor(QColor(255, col.green(), col.blue()));
 
-        p->ui.slide_green->setValue(col.green());
-        p->ui.spin_green->setValue(p->ui.slide_green->value());
-        p->ui.slide_green->setFirstColor(QColor(col.red(), 0, col.blue()));
-        p->ui.slide_green->setLastColor(QColor(col.red(), 255, col.blue()));
+        p->ui.slide_alpha->setFirstColor(QColor(newColor.red(), newColor.green(), newColor.blue(), 0));
+        p->ui.slide_alpha->setLastColor(QColor(newColor.red(), newColor.green(), newColor.blue(), 255));
+        p->ui.spin_alpha->setValue(newColor.alpha());
+        p->ui.slide_alpha->setValue(newColor.alpha());
 
-        p->ui.slide_blue->setValue(col.blue());
-        p->ui.spin_blue->setValue(p->ui.slide_blue->value());
-        p->ui.slide_blue->setFirstColor(QColor(col.red(), col.green(), 0));
-        p->ui.slide_blue->setLastColor(QColor(col.red(), col.green(), 255));
+        if (!p->ui.edit_hex->isModified())
+            p->ui.edit_hex->setColor(newColor);
 
-        p->ui.slide_hue->setValue(qRound(p->ui.wheel->hue() * 360.0));
-        p->ui.slide_hue->setColorSaturation(p->ui.wheel->saturation());
-        p->ui.slide_hue->setColorValue(p->ui.wheel->value());
-        p->ui.spin_hue->setValue(p->ui.slide_hue->value());
+        p->ui.preview->setColor(newColor);
 
-        p->ui.slide_saturation->setValue(qRound(p->ui.wheel->saturation() * 100.0));
-        p->ui.spin_saturation->setValue(p->ui.slide_saturation->value());
-        p->ui.slide_saturation->setFirstColor(
-            QColor::fromHsvF(p->ui.wheel->hue(), 0, p->ui.wheel->value()));
-        p->ui.slide_saturation->setLastColor(
-            QColor::fromHsvF(p->ui.wheel->hue(), 1, p->ui.wheel->value()));
+        blockSignals(blocked);
+        for (QWidget *w : findChildren<QWidget *>())
+            w->blockSignals(false);
 
-        p->ui.slide_value->setValue(qRound(p->ui.wheel->value() * 100.0));
-        p->ui.spin_value->setValue(p->ui.slide_value->value());
-        p->ui.slide_value->setFirstColor(
-            QColor::fromHsvF(p->ui.wheel->hue(), p->ui.wheel->saturation(), 0));
-        p->ui.slide_value->setLastColor(
-            QColor::fromHsvF(p->ui.wheel->hue(), p->ui.wheel->saturation(), 1));
-    }
-
-    // Update CMYK sliders with gradient colors
-    if (fromCmyk) {
-        p->ui.spin_cyan->setValue(col.cyanF() * 100);
-        p->ui.spin_magenta->setValue(col.magentaF() * 100);
-        p->ui.spin_yellow->setValue(col.yellowF() * 100);
-        p->ui.spin_black->setValue(col.blackF() * 100);
-    } else {
-        // 转换成cmyk
-        double c, m, y, k;
-        rgb_to_cmyk(col, c, m, y, k);
-        p->ui.spin_cyan->setValue(c);
-        p->ui.spin_magenta->setValue(m);
-        p->ui.spin_yellow->setValue(y);
-        p->ui.spin_black->setValue(k);
-    }
-
-    QColor apha_color = col;
-    apha_color.setAlpha(0);
-    p->ui.slide_alpha->setFirstColor(apha_color);
-    apha_color.setAlpha(255);
-    p->ui.slide_alpha->setLastColor(apha_color);
-    p->ui.spin_alpha->setValue(col.alpha());
-    p->ui.slide_alpha->setValue(col.alpha());
-
-    if (!p->ui.edit_hex->isModified())
-        p->ui.edit_hex->setColor(col);
-
-    p->ui.preview->setColor(col);
-
-    blockSignals(blocked);
-    for (QWidget *w : findChildren<QWidget *>())
-        w->blockSignals(false);
-
-    Q_EMIT colorChanged(col);
-}
-
-void ColorDialog::set_hsv()
-{
-    if (!signalsBlocked()) {
-        QColor col = QColor::fromHsv(p->ui.slide_hue->value(), p->ui.slide_saturation->value(),
-                                     p->ui.slide_value->value(), p->ui.slide_alpha->value());
-        p->ui.wheel->setColor(col);
-        setColorInternal(col);
-    }
-}
-
-void ColorDialog::set_alpha()
-{
-    if (!signalsBlocked()) {
-        QColor col = p->color;
-        col.setAlpha(p->ui.slide_alpha->value());
-        setColorInternal(col);
-    }
-}
-
-void ColorDialog::set_cmyk()
-{
-    if (!signalsBlocked()) {
-        QColor col = QColor::fromCmykF(
-            p->ui.spin_cyan->value() / 100.0, p->ui.spin_magenta->value() / 100.0,
-            p->ui.spin_yellow->value() / 100.0, p->ui.spin_black->value() / 100.0);
-        col.setAlpha(p->ui.slide_alpha->value());
-        p->ui.wheel->setColor(col);
-
-        setColorInternal(col, true);
+        p->pendingCmyk = {c, m, y, k, true};
+        Q_EMIT colorSelectedCmyk(newColor, c, m, y, k);
+        Q_EMIT colorChanged(newColor);
     }
 }
 
@@ -395,6 +413,9 @@ void ColorDialog::on_buttonBox_clicked(QAbstractButton *btn)
     case QDialogButtonBox::ApplyRole:
         // Explicitly select the color
         p->ui.preview->setComparisonColor(color());
+        if (p->pendingCmyk.valid)
+            Q_EMIT colorSelectedCmyk(color(), p->pendingCmyk.c, p->pendingCmyk.m,
+                                      p->pendingCmyk.y, p->pendingCmyk.k);
         Q_EMIT colorSelected(color());
         break;
 

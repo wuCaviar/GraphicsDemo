@@ -39,6 +39,7 @@ ColorSelector::ColorSelector(QWidget *parent) :
     connect(p->dialog, &ColorDialog::wheelRotatingChanged, this, &ColorSelector::wheelRotatingChanged);
     connect(p->dialog, &ColorDialog::wheelShapeChanged, this, &ColorSelector::wheelShapeChanged);
     connect(p->dialog, &ColorDialog::colorSpaceChanged, this, &ColorSelector::colorSpaceChanged);
+    connect(p->dialog, &ColorDialog::colorSelectedCmyk, this, &ColorSelector::colorSelectedCmyk);
 
     setAcceptDrops(true);
 }

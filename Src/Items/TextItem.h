@@ -25,6 +25,16 @@ public:
     QBrush itemBrush() const override;
     void setItemBrush(const QBrush &brush) override;
 
+    // CMYK 颜色存储
+    void setItemPenCmyk(double c, double m, double y, double k) override { m_penCmyk = {c, m, y, k, true}; }
+    bool hasPenCmyk() const override { return m_penCmyk.valid; }
+    void penCmyk(double &c, double &m, double &y, double &k) const override { c = m_penCmyk.c; m = m_penCmyk.m; y = m_penCmyk.y; k = m_penCmyk.k; }
+    void clearPenCmyk() override { m_penCmyk.valid = false; }
+    void setItemBrushCmyk(double c, double m, double y, double k) override { m_brushCmyk = {c, m, y, k, true}; }
+    bool hasBrushCmyk() const override { return m_brushCmyk.valid; }
+    void brushCmyk(double &c, double &m, double &y, double &k) const override { c = m_brushCmyk.c; m = m_brushCmyk.m; y = m_brushCmyk.y; k = m_brushCmyk.k; }
+    void clearBrushCmyk() override { m_brushCmyk.valid = false; }
+
     QString text() const override;
     void setText(const QString &text) override;
     QFont itemFont() const override;
@@ -63,6 +73,8 @@ private:
     QBrush m_bgBrush;   // 背景画刷
     QRectF m_rect;       // 自定义包围矩形（由缩放手柄设置）
     bool m_editing = false;
+    CmykColor m_penCmyk;
+    CmykColor m_brushCmyk;
 };
 
 #endif // TEXTITEM_H
