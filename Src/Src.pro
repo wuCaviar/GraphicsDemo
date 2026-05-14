@@ -1,7 +1,7 @@
 
 TEMPLATE = app
 
-QT += core gui widgets
+QT += core gui widgets network
 
 TARGET = GraphicsDemo
 
@@ -14,7 +14,7 @@ include(QtGradientEditor/qtgradienteditor.pri)
 CONFIG += rtti c++17
 
 # 编译器警告
-QMAKE_CXXFLAGS += -Wall -Wextra -Wpedantic
+QMAKE_CXXFLAGS += -Wall
 
 HEADERS += \
     UI/mainwindow.h \
@@ -40,8 +40,10 @@ HEADERS += \
     Utils/ImageUtils.h \
     Utils/ColorUtils.h \
     Utils/AlignmentUtils.h \
-    ColorTrans/colortransform.h
-
+    ColorTrans/colortransform.h \
+    NetWork/QHttp.h \
+    CommonDefs.h \
+    QCommonDefs.h
 
 SOURCES += \
     App/main.cpp \
@@ -68,7 +70,8 @@ SOURCES += \
     Utils/ImageUtils.cpp \
     Utils/ColorUtils.cpp \
     Utils/AlignmentUtils.cpp \
-    ColorTrans/colortransform.cpp
+    ColorTrans/colortransform.cpp \
+    NetWork/QHttp.cpp \
 
 FORMS += \
     UI/mainwindow.ui \

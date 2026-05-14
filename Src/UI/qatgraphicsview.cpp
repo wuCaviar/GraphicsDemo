@@ -35,7 +35,7 @@
 QAtGraphicsView::QAtGraphicsView(QWidget *parent) : QGraphicsView(parent)
 {
     m_pMainScene = new QGraphicsScene(this);
-    m_pMainScene->setBackgroundBrush(QColor(100, 100, 100));
+    m_pMainScene->setBackgroundBrush(QColor(255, 255, 255));
     setScene(m_pMainScene);
     setDragMode(RubberBandDrag);
     setRenderHint(QPainter::Antialiasing);
@@ -44,7 +44,7 @@ QAtGraphicsView::QAtGraphicsView(QWidget *parent) : QGraphicsView(parent)
     setResizeAnchor(AnchorViewCenter);
 
     // 默认样式
-    m_defaultPen = QPen(Qt::black, 2);
+    m_defaultPen = QPen(Qt::black, 1.0);
     m_defaultBrush = QBrush(Qt::NoBrush);
     m_defaultFont = QFont("Arial", 14);
 
@@ -221,31 +221,44 @@ void QAtGraphicsView::onSceneSelectionChanged()
     if (!anyPastedSelected)
         m_pastedItems.clear();
 
-    // 使用延迟更新，避免框选过程中 ResizeHandle 闪烁
-    scheduleResizeHandleUpdate();
+    // 框选进行中：延迟更新避免闪烁
+    if (m_rubberBanding) {
+        scheduleResizeHandleUpdate();
+        emit selectionChanged();
+        return;
+    }
+
+    // 选择为空：立即移除 ResizeHandle（防止残留影响后续鼠标事件）
+    // 选择非空：同步更新（updateResizeHandle 支持就地复用已有 handle）
+    auto selectableItems = ::filterSelectableItems(currentSelection);
+    if (selectableItems.isEmpty())
+        removeResizeHandle();
+    else
+        updateResizeHandle();
+
     emit selectionChanged();
 }
 
 void QAtGraphicsView::updateResizeHandle()
 {
-    removeResizeHandle();
-
     auto selectableItems = ::filterSelectableItems(m_pMainScene->selectedItems());
 
-    if (selectableItems.isEmpty())
+    if (selectableItems.isEmpty()) {
+        removeResizeHandle();
         return;
-
-    m_resizeHandle = new ResizeHandleItem(nullptr);
-    m_pMainScene->addItem(m_resizeHandle);
-    m_resizeHandle->setUndoStack(m_undoStack);
-
-    if (selectableItems.size() == 1) {
-        // 单目标模式
-        m_resizeHandle->setTargetItem(selectableItems.first());
-    } else {
-        // 组模式：包围框 + 8个手柄
-        m_resizeHandle->setTargetItems(selectableItems);
     }
+
+    // 复用已有 handle 或创建新的
+    if (!m_resizeHandle) {
+        m_resizeHandle = new ResizeHandleItem(nullptr);
+        m_pMainScene->addItem(m_resizeHandle);
+        m_resizeHandle->setUndoStack(m_undoStack);
+    }
+
+    if (selectableItems.size() == 1)
+        m_resizeHandle->setTargetItem(selectableItems.first());
+    else
+        m_resizeHandle->setTargetItems(selectableItems);
 
     // 检查选中项是否包含粘贴图元，设置样式
     bool hasPasted = false;
@@ -328,6 +341,12 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
     }
 
     if (m_tool == Tool::Select) {
+        // 检测是否将启动框选（点击位置没有可选图元）
+        QGraphicsItem *hit = m_pMainScene->itemAt(scenePos, transform());
+        bool isCanvasOrHandle = hit && (hit->type() == CanvasItem::Type
+                                        || hit->type() == ResizeHandleItem::Type);
+        m_rubberBanding = (!hit || isCanvasOrHandle);
+
         // 记录移动起始位置（用于 MoveItemsCommand）
         m_moving = true;
         m_moveStartPositions.clear();
@@ -510,6 +529,9 @@ void QAtGraphicsView::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
 
+    // 框选结束
+    m_rubberBanding = false;
+
     // 处理移动操作的 Undo
     if (m_moving && m_tool == Tool::Select) {
         m_moving = false;
@@ -537,6 +559,8 @@ void QAtGraphicsView::mouseReleaseEvent(QMouseEvent *event)
         // 更新 ResizeHandle 位置
         if (m_resizeHandle)
             m_resizeHandle->updateHandlePositions();
+        else
+            updateResizeHandle();
     }
 
     if (!m_drawing) {

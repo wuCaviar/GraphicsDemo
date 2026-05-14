@@ -1,7 +1,7 @@
 TEMPLATE = subdirs
 
-SUBDIRS += Src \
+SUBDIRS += \
+    NetWorkTest \
+    Src \
     LittleCMSTest \
-    Tests \
-    ColorConversionTests \
     WidgetTest

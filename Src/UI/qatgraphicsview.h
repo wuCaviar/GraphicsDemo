@@ -126,6 +126,9 @@ private:
     bool m_handPanning = false;
     QPoint m_handLastPos;
 
+    // 框选状态（用于延迟 ResizeHandle 更新）
+    bool m_rubberBanding = false;
+
     // 网格
     bool m_gridVisible = true;
 

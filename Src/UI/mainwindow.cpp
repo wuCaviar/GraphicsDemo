@@ -395,6 +395,7 @@ void MainWindow::_initToolBar()
 void MainWindow::_initPropertyPanel()
 {
     m_pPropertyPanel = new PropertyPanel(this);
+    m_pPropertyPanel->setMinimumWidth(300);
     addDockWidget(Qt::RightDockWidgetArea, m_pPropertyPanel);
 }
 

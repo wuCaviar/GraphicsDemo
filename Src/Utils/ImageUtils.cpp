@@ -156,24 +156,34 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
             result->isCmykSource = true;
         }
     } else {
-        // RGBA/RGB TIFF：原有逻辑
-        QVector<uint32_t> buf(width);
-        for (uint32_t y = 0; y < height; ++y) {
-            if (TIFFReadScanline(tif, buf.data(), y) < 0) {
-                qWarning("TIFFReadScanline failed at row %u", y);
-                readError = true;
-                break;
-            }
-            QRgb *scanLine = reinterpret_cast<QRgb *>(image.scanLine(y));
-            for (uint32_t x = 0; x < width; ++x) {
-                uint32_t rgba = buf[x];
-                int a = (rgba >> 24) & 0xFF;
-                int r = (rgba >> 16) & 0xFF;
-                int g = (rgba >> 8) & 0xFF;
-                int b = rgba & 0xFF;
-                scanLine[x] = qRgba(r, g, b, a);
-            }
+        // 非 CMYK TIFF：使用 TIFFReadRGBAImage 自动处理各种格式
+        // （RGB/RGBA/灰度/调色板/16-bit/压缩/tiled 等）
+        uint32_t *raster = static_cast<uint32_t *>(_TIFFmalloc(width * height * sizeof(uint32_t)));
+        if (!raster) {
+            qWarning("Failed to allocate raster buffer for TIFF import");
+            TIFFClose(tif);
+            return QImage();
         }
+
+        if (!TIFFReadRGBAImage(tif, width, height, raster, 0)) {
+            qWarning("TIFFReadRGBAImage failed");
+            _TIFFfree(raster);
+            TIFFClose(tif);
+            return QImage();
+        }
+
+        // TIFFReadRGBAImage 输出 ABGR（libtiff 约定）：需要转换为 ARGB
+        QRgb *scanLine = reinterpret_cast<QRgb *>(image.scanLine(0));
+        for (uint32_t i = 0; i < width * height; ++i) {
+            uint32_t abgr = raster[i];
+            int a = (abgr >> 24) & 0xFF;
+            int b = (abgr >> 16) & 0xFF;
+            int g = (abgr >> 8) & 0xFF;
+            int r = abgr & 0xFF;
+            scanLine[i] = qRgba(r, g, b, a);
+        }
+
+        _TIFFfree(raster);
     }
 
     TIFFClose(tif);
