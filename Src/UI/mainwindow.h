@@ -46,6 +46,7 @@ private slots:
     void onBringToFront();
     void onSendToBack();
     void onAlignLayoutDialog();
+    void onSettings();
     void onAlignLeft();
     void onAlignRight();
     void onAlignTop();

@@ -1,7 +1,7 @@
 
 TEMPLATE = app
 
-QT += core gui widgets network
+QT += core gui widgets network xml
 
 TARGET = GraphicsDemo
 
@@ -26,6 +26,7 @@ HEADERS += \
     UI/AlignLayoutDialog.h \
     UI/ImportImageDialog.h \
     UI/ExportImageDialog.h \
+    UI/SettingsDialog.h \
     Items/IGraphicsItem.h \
     Items/RectItem.h \
     Items/EllipseItem.h \
@@ -56,6 +57,7 @@ SOURCES += \
     UI/AlignLayoutDialog.cpp \
     UI/ImportImageDialog.cpp \
     UI/ExportImageDialog.cpp \
+    UI/SettingsDialog.cpp \
     Items/IGraphicsItem.cpp \
     Items/RectItem.cpp \
     Items/EllipseItem.cpp \

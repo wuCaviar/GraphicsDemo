@@ -13,6 +13,7 @@
 #include "ImportImageDialog.h"
 #include "LineItem.h"
 #include "NewFileDialog.h"
+#include "SettingsDialog.h"
 #include "RectItem.h"
 #include "ResizeHandleItem.h"
 #include "RulerBar.h"
@@ -237,6 +238,10 @@ void MainWindow::_initMenuBar()
     rotateMenu->addAction(QIcon(":/icons/icons/rotate-ccw.svg"), tr("90\u00b0 Counter-clockwise"),
                           this, [this]() { rotateSelectedItems(-90.0); });
     rotateMenu->addAction(tr("180\u00b0"), this, [this]() { rotateSelectedItems(180.0); });
+
+    // ---- 设置 ----
+    QMenu *settingsMenu = menu->addMenu(tr("&Settings"));
+    settingsMenu->addAction(tr("设置..."), this, &MainWindow::onSettings);
 
     // ---- 视图 ----
     QMenu *viewMenu = menu->addMenu(tr("&View"));
@@ -863,6 +868,18 @@ void MainWindow::onAlignLayoutDialog()
     m_alignLayoutDlg->show();
     m_alignLayoutDlg->raise();
     m_alignLayoutDlg->activateWindow();
+}
+
+// ============================================================
+// 设置对话框
+// ============================================================
+void MainWindow::onSettings()
+{
+    SettingsDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    // TODO: 使用 dlg.resolutionX(), dlg.resolutionY(),
+    //       dlg.dotCurvePath(), dlg.colorCurvePath(), dlg.outputPath()
 }
 
 // ============================================================
