@@ -80,7 +80,7 @@ struct ExportParameters {
 
     // ===== TIFF 专业参数 =====
     struct TiffOptions {
-        CompressionType compression = CompressionType::LZW;
+        CompressionType compression = CompressionType::None;
         ByteOrder byteOrder = ByteOrder::LittleEndian;
         BitDepth bitDepth = BitDepth::Bits8;
         PlanarConfig planarConfig = PlanarConfig::Contig;

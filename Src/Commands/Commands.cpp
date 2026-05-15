@@ -1,5 +1,6 @@
 #include "Commands.h"
 #include "RectItem.h"
+#include "GraphicsItemGroup.h"
 
 #include <QGraphicsScene>
 
@@ -385,4 +386,168 @@ void RotationChangeCommand::redo()
         return;
     m_item->setRotation(m_newRotation);
     m_item->setPos(m_newPos);
+}
+
+// ============================================================
+// GroupItemsCommand
+// ============================================================
+GroupItemsCommand::GroupItemsCommand(QGraphicsScene *scene,
+                                     const QList<QGraphicsItem *> &items,
+                                     QUndoCommand *parent)
+    : QUndoCommand(parent), m_scene(scene), m_children(items)
+{
+    setText(QObject::tr("Group Items"));
+
+    // 计算子图元的联合包围矩形中心作为组的位置
+    QRectF united;
+    for (auto *child : m_children) {
+        QRectF r = child->mapToScene(child->boundingRect()).boundingRect();
+        if (united.isEmpty())
+            united = r;
+        else
+            united = united.united(r);
+    }
+    m_groupPos = united.center();
+
+    // 创建组（但暂不添加到场景）
+    m_group = new GraphicsItemGroup;
+}
+
+GroupItemsCommand::~GroupItemsCommand()
+{
+    if (!m_scene)
+        return;
+    // 如果 command 持有组且组不在场景中，删除组
+    if (m_owned && m_group && !m_group->scene())
+        delete m_group;
+    // 如果 command 持有子图元且不在场景/组中，删除
+    if (m_owned) {
+        for (auto *child : m_children) {
+            if (child && !child->scene() && !child->parentItem())
+                delete child;
+        }
+    }
+}
+
+void GroupItemsCommand::undo()
+{
+    if (!m_scene || !m_group)
+        return;
+
+    // 从组中提取子图元到场景
+    auto *grp = qgraphicsitem_cast<GraphicsItemGroup *>(m_group);
+    if (grp)
+        grp->extractChildren();
+
+    // 移除组
+    m_scene->removeItem(m_group);
+
+    // 子图元回到场景
+    for (auto *child : m_children) {
+        if (child)
+            m_scene->addItem(child);
+    }
+
+    m_owned = true; // command 持有组和子图元
+}
+
+void GroupItemsCommand::redo()
+{
+    if (!m_scene || !m_group)
+        return;
+
+    auto *grp = qgraphicsitem_cast<GraphicsItemGroup *>(m_group);
+    if (!grp)
+        return;
+
+    // 设置组的位置
+    grp->setPos(m_groupPos);
+
+    // 将子图元从场景中移除并加入组
+    for (auto *child : m_children) {
+        if (child)
+            grp->addChildFromScene(child);
+    }
+
+    // 将组添加到场景
+    m_scene->addItem(grp);
+    m_owned = false; // 组和子图元都在场景中
+}
+
+// ============================================================
+// UngroupItemsCommand
+// ============================================================
+UngroupItemsCommand::UngroupItemsCommand(QGraphicsScene *scene, QGraphicsItem *groupItem,
+                                         QUndoCommand *parent)
+    : QUndoCommand(parent), m_scene(scene), m_group(groupItem)
+{
+    setText(QObject::tr("Ungroup Items"));
+
+    // 记录组内的子图元和组的位置/旋转
+    auto *grp = qgraphicsitem_cast<GraphicsItemGroup *>(groupItem);
+    if (grp) {
+        m_children = grp->childGraphicsItems();
+        m_groupPos = grp->pos();
+        m_groupRotation = grp->rotation();
+    }
+}
+
+UngroupItemsCommand::~UngroupItemsCommand()
+{
+    if (!m_scene)
+        return;
+    // command 持有组时（undo 状态）删除组
+    if (m_owned && m_group && !m_group->scene())
+        delete m_group;
+    // command 持有子图元时（redo 状态，已从场景移除）删除
+    if (m_owned) {
+        for (auto *child : m_children) {
+            if (child && !child->scene() && !child->parentItem())
+                delete child;
+        }
+    }
+}
+
+void UngroupItemsCommand::undo()
+{
+    if (!m_scene || !m_group)
+        return;
+
+    auto *grp = qgraphicsitem_cast<GraphicsItemGroup *>(m_group);
+    if (!grp)
+        return;
+
+    // 恢复组的位置和旋转
+    grp->setPos(m_groupPos);
+    grp->setRotation(m_groupRotation);
+
+    // 将子图元从场景中移除，重新加入组
+    for (auto *child : m_children) {
+        if (child && child->scene())
+            child->scene()->removeItem(child);
+        grp->addToGroup(child);
+    }
+
+    // 将组添加回场景
+    m_scene->addItem(grp);
+    m_owned = false; // 组和子图元都在场景中
+}
+
+void UngroupItemsCommand::redo()
+{
+    if (!m_scene || !m_group)
+        return;
+
+    auto *grp = qgraphicsitem_cast<GraphicsItemGroup *>(m_group);
+    if (!grp)
+        return;
+
+    // 从组中提取子图元到场景坐标
+    // extractChildren 内部 removeFromGroup 使子图元成为场景中的顶级图元
+    grp->extractChildren();
+
+    // 移除组（子图元已在场景中）
+    m_scene->removeItem(m_group);
+
+    m_owned = true; // command 持有组（子图元在场景中）
 }

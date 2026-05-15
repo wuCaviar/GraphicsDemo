@@ -35,6 +35,7 @@ HEADERS += \
     Items/TextItem.h \
     Items/ImageItem.h \
     Items/FreehandItem.h \
+    Items/GraphicsItemGroup.h \
     Items/CanvasItem.h \
     Items/ResizeHandleItem.h \
     Commands/Commands.h \
@@ -44,7 +45,9 @@ HEADERS += \
     ColorTrans/colortransform.h \
     NetWork/QHttp.h \
     CommonDefs.h \
-    QCommonDefs.h
+    QCommonDefs.h \
+    Utils/NetWorkDefs.h \
+    Utils/NetWorkUtils.h
 
 SOURCES += \
     App/main.cpp \
@@ -66,6 +69,7 @@ SOURCES += \
     Items/TextItem.cpp \
     Items/ImageItem.cpp \
     Items/FreehandItem.cpp \
+    Items/GraphicsItemGroup.cpp \
     Items/CanvasItem.cpp \
     Items/ResizeHandleItem.cpp \
     Commands/Commands.cpp \
@@ -74,6 +78,7 @@ SOURCES += \
     Utils/AlignmentUtils.cpp \
     ColorTrans/colortransform.cpp \
     NetWork/QHttp.cpp \
+    Utils/NetWorkUtils.cpp
 
 FORMS += \
     UI/mainwindow.ui \
@@ -93,6 +98,7 @@ INCLUDEPATH += \
     $$PWD/Items \
     $$PWD/Commands \
     $$PWD/Utils \
-    $$PWD/ColorTrans
+    $$PWD/ColorTrans \
+    $$PWD/NetWork
 
 include(../Common.pri)

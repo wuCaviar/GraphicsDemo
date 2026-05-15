@@ -6,6 +6,7 @@
 #include "TextItem.h"
 #include "ImageItem.h"
 #include "FreehandItem.h"
+#include "GraphicsItemGroup.h"
 
 IGraphicsItem *createItemByType(IGraphicsItem::ItemType type)
 {
@@ -17,6 +18,7 @@ IGraphicsItem *createItemByType(IGraphicsItem::ItemType type)
     case IGraphicsItem::TextItemType:       return new TextItem;
     case IGraphicsItem::ImageItemType:      return new ImageItem;
     case IGraphicsItem::FreehandItemType:   return new FreehandItem;
+    case IGraphicsItem::GroupItemType:      return new GraphicsItemGroup;
     }
     return nullptr;
 }

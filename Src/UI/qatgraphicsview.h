@@ -69,6 +69,8 @@ signals:
     // 右键菜单请求（复用 MainWindow 已有功能）
     void bringToFrontRequested();
     void sendToBackRequested();
+    void groupRequested();
+    void ungroupRequested();
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;

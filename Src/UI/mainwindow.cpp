@@ -18,6 +18,7 @@
 #include "ResizeHandleItem.h"
 #include "RulerBar.h"
 #include "TextItem.h"
+#include "GraphicsItemGroup.h"
 
 #include <algorithm>
 
@@ -61,7 +62,8 @@ QFrame *createStatusSeparator(QWidget *parent)
 }
 } // namespace
 
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
 
@@ -74,6 +76,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     _initToolBar();
     _initConnections();
     _initStatusBar();
+    _initNetWork();
 
     // 加载 QSS 样式表
     loadStyleSheet();
@@ -108,6 +111,10 @@ MainWindow::~MainWindow()
     // 清空 undo 栈，避免命令引用已销毁的图元
     if (m_undoStack)
         m_undoStack->clear();
+
+    // 停止网络请求线程
+    if (m_pNetWorkUtils)
+        m_pNetWorkUtils->stop();
 
     delete ui;
 }
@@ -154,19 +161,20 @@ void MainWindow::_initMenuBar()
     // ---- 文件 ----
     QMenu *fileMenu = menu->addMenu(tr("&File"));
 
-    QAction *newAct = fileMenu->addAction(QIcon(":/icons/icons/file-new.svg"), tr("&New..."));
+    QAction *newAct =
+        fileMenu->addAction(QIcon(":/icons/icons/file-new.svg"), tr("&New..."));
     newAct->setShortcut(QKeySequence::New);
     connect(newAct, &QAction::triggered, this, &MainWindow::onNew);
 
     fileMenu->addSeparator();
 
-    QAction *importAct =
-        fileMenu->addAction(QIcon(":/icons/icons/file-import.svg"), tr("&Import Image..."));
+    QAction *importAct = fileMenu->addAction(
+        QIcon(":/icons/icons/file-import.svg"), tr("&Import Image..."));
     importAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_I));
     connect(importAct, &QAction::triggered, this, &MainWindow::onImportImage);
 
-    QAction *exportAct =
-        fileMenu->addAction(QIcon(":/icons/icons/file-export.svg"), tr("&Export Image..."));
+    QAction *exportAct = fileMenu->addAction(
+        QIcon(":/icons/icons/file-export.svg"), tr("&Export Image..."));
     exportAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     connect(exportAct, &QAction::triggered, this, &MainWindow::onExportImage);
 
@@ -179,45 +187,60 @@ void MainWindow::_initMenuBar()
     // ---- 编辑 ----
     QMenu *editMenu = menu->addMenu(tr("&Edit"));
 
-    m_undoAction = editMenu->addAction(QIcon(":/icons/icons/edit-undo.svg"), tr("&Undo"));
+    m_undoAction =
+        editMenu->addAction(QIcon(":/icons/icons/edit-undo.svg"), tr("&Undo"));
     m_undoAction->setShortcut(QKeySequence::Undo);
     connect(m_undoAction, &QAction::triggered, this, &MainWindow::onUndo);
 
-    m_redoAction = editMenu->addAction(QIcon(":/icons/icons/edit-redo.svg"), tr("&Redo"));
+    m_redoAction =
+        editMenu->addAction(QIcon(":/icons/icons/edit-redo.svg"), tr("&Redo"));
     m_redoAction->setShortcut(QKeySequence::Redo);
     connect(m_redoAction, &QAction::triggered, this, &MainWindow::onRedo);
 
     editMenu->addSeparator();
 
-    QAction *cutAct = editMenu->addAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cu&t"));
+    QAction *cutAct =
+        editMenu->addAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cu&t"));
     cutAct->setShortcut(QKeySequence::Cut);
     connect(cutAct, &QAction::triggered, this, &MainWindow::onCut);
 
-    QAction *copyAct = editMenu->addAction(QIcon(":/icons/icons/edit-copy.svg"), tr("&Copy"));
+    QAction *copyAct =
+        editMenu->addAction(QIcon(":/icons/icons/edit-copy.svg"), tr("&Copy"));
     copyAct->setShortcut(QKeySequence::Copy);
     connect(copyAct, &QAction::triggered, this, &MainWindow::onCopy);
 
-    QAction *pasteAct = editMenu->addAction(QIcon(":/icons/icons/edit-paste.svg"), tr("&Paste"));
+    QAction *pasteAct = editMenu->addAction(
+        QIcon(":/icons/icons/edit-paste.svg"), tr("&Paste"));
     pasteAct->setShortcut(QKeySequence::Paste);
     connect(pasteAct, &QAction::triggered, this, &MainWindow::onPaste);
 
     editMenu->addSeparator();
 
-    QAction *deleteAct = editMenu->addAction(QIcon(":/icons/icons/edit-delete.svg"), tr("&Delete"));
+    QAction *deleteAct = editMenu->addAction(
+        QIcon(":/icons/icons/edit-delete.svg"), tr("&Delete"));
     deleteAct->setShortcut(QKeySequence::Delete);
     connect(deleteAct, &QAction::triggered, this, &MainWindow::onDelete);
 
-    QAction *selectAllAct =
-        editMenu->addAction(QIcon(":/icons/icons/edit-select-all.svg"), tr("Select &All"));
+    QAction *selectAllAct = editMenu->addAction(
+        QIcon(":/icons/icons/edit-select-all.svg"), tr("Select &All"));
     selectAllAct->setShortcut(QKeySequence::SelectAll);
     connect(selectAllAct, &QAction::triggered, this, &MainWindow::onSelectAll);
 
     // ---- 排列 ----
     QMenu *arrMenu = menu->addMenu(tr("&Arrange"));
-    arrMenu->addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring to Front"), this,
-                       &MainWindow::onBringToFront);
-    arrMenu->addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send to Back"), this,
-                       &MainWindow::onSendToBack);
+    arrMenu->addAction(QIcon(":/icons/icons/bring-front.svg"),
+                       tr("Bring to Front"), this, &MainWindow::onBringToFront);
+    arrMenu->addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send to Back"),
+                       this, &MainWindow::onSendToBack);
+    arrMenu->addSeparator();
+    QAction *groupAct =
+        arrMenu->addAction(QIcon(":/icons/icons/group.svg"), tr("&Group"));
+    groupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
+    connect(groupAct, &QAction::triggered, this, &MainWindow::onGroup);
+    QAction *ungroupAct =
+        arrMenu->addAction(QIcon(":/icons/icons/ungroup.svg"), tr("&Ungroup"));
+    ungroupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
+    connect(ungroupAct, &QAction::triggered, this, &MainWindow::onUngroup);
     arrMenu->addSeparator();
     QMenu *alignMenu = arrMenu->addMenu(tr("Align"));
     alignMenu->addAction(tr("Left"), this, &MainWindow::onAlignLeft);
@@ -230,14 +253,18 @@ void MainWindow::_initMenuBar()
     distMenu->addAction(tr("Horizontally"), this, &MainWindow::onDistributeH);
     distMenu->addAction(tr("Vertically"), this, &MainWindow::onDistributeV);
     distMenu->addSeparator();
-    distMenu->addAction(tr("Align && Layout..."), this, &MainWindow::onAlignLayoutDialog);
+    distMenu->addAction(tr("Align && Layout..."), this,
+                        &MainWindow::onAlignLayoutDialog);
     arrMenu->addSeparator();
     QMenu *rotateMenu = arrMenu->addMenu(tr("Rotate"));
-    rotateMenu->addAction(QIcon(":/icons/icons/rotate-cw.svg"), tr("90\u00b0 Clockwise"), this,
+    rotateMenu->addAction(QIcon(":/icons/icons/rotate-cw.svg"),
+                          tr("90\u00b0 Clockwise"), this,
                           [this]() { rotateSelectedItems(90.0); });
-    rotateMenu->addAction(QIcon(":/icons/icons/rotate-ccw.svg"), tr("90\u00b0 Counter-clockwise"),
-                          this, [this]() { rotateSelectedItems(-90.0); });
-    rotateMenu->addAction(tr("180\u00b0"), this, [this]() { rotateSelectedItems(180.0); });
+    rotateMenu->addAction(QIcon(":/icons/icons/rotate-ccw.svg"),
+                          tr("90\u00b0 Counter-clockwise"), this,
+                          [this]() { rotateSelectedItems(-90.0); });
+    rotateMenu->addAction(tr("180\u00b0"), this,
+                          [this]() { rotateSelectedItems(180.0); });
 
     // ---- 设置 ----
     QMenu *settingsMenu = menu->addMenu(tr("&Settings"));
@@ -249,7 +276,8 @@ void MainWindow::_initMenuBar()
     viewMenu->addSeparator();
 
     // 网格显示/隐藏
-    m_gridAction = viewMenu->addAction(QIcon(":/icons/icons/view-grid.svg"), tr("Show Grid"));
+    m_gridAction = viewMenu->addAction(QIcon(":/icons/icons/view-grid.svg"),
+                                       tr("Show Grid"));
     m_gridAction->setCheckable(true);
     m_gridAction->setChecked(true);
     connect(m_gridAction, &QAction::toggled, this,
@@ -262,7 +290,8 @@ void MainWindow::_initMenuBar()
         auto unit = checked ? RulerBar::Millimeter : RulerBar::Pixel;
         m_hRuler->setUnit(unit);
         m_vRuler->setUnit(unit);
-        m_rulerUnitAction->setText(checked ? tr("Ruler Unit: mm") : tr("Ruler Unit: px"));
+        m_rulerUnitAction->setText(checked ? tr("Ruler Unit: mm")
+                                           : tr("Ruler Unit: px"));
         // 同步更新状态栏坐标和画布尺寸的单位显示
         _updateCanvasLabel();
         _updatePosLabel(m_lastScenePos);
@@ -270,14 +299,18 @@ void MainWindow::_initMenuBar()
 
     viewMenu->addSeparator();
     // 缩放适配
-    QAction *fitAct = new QAction(QIcon(":/icons/icons/view-fit.svg"), tr("Fit to Canvas"), this);
-    connect(fitAct, &QAction::triggered, this, [this]() { m_pView->fitToCanvas(); });
+    QAction *fitAct = new QAction(QIcon(":/icons/icons/view-fit.svg"),
+                                  tr("Fit to Canvas"), this);
+    connect(fitAct, &QAction::triggered, this,
+            [this]() { m_pView->fitToCanvas(); });
     viewMenu->addAction(fitAct);
 
     QAction *resetZoomAct =
-        new QAction(QIcon(":/icons/icons/view-zoom-reset.svg"), tr("Reset Zoom (Ctrl+0)"), this);
+        new QAction(QIcon(":/icons/icons/view-zoom-reset.svg"),
+                    tr("Reset Zoom (Ctrl+0)"), this);
     resetZoomAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
-    connect(resetZoomAct, &QAction::triggered, this, [this]() { m_pView->setZoomLevel(1.0); });
+    connect(resetZoomAct, &QAction::triggered, this,
+            [this]() { m_pView->setZoomLevel(1.0); });
     viewMenu->addAction(resetZoomAct);
 
     _updateUndoRedoActions();
@@ -294,19 +327,20 @@ void MainWindow::_initToolBar()
     addToolBar(Qt::TopToolBarArea, fileEditBar);
 
     // New 按钮
-    QAction *newAct = new QAction(QIcon(":/icons/icons/file-new.svg"), tr("New"), this);
+    QAction *newAct =
+        new QAction(QIcon(":/icons/icons/file-new.svg"), tr("New"), this);
     connect(newAct, &QAction::triggered, this, &MainWindow::onNew);
     fileEditBar->addAction(newAct);
 
     // Import 按钮
-    QAction *importAct =
-        new QAction(QIcon(":/icons/icons/file-import.svg"), tr("Import Image"), this);
+    QAction *importAct = new QAction(QIcon(":/icons/icons/file-import.svg"),
+                                     tr("Import Image"), this);
     connect(importAct, &QAction::triggered, this, &MainWindow::onImportImage);
     fileEditBar->addAction(importAct);
 
     // Export 按钮
-    QAction *exportAct =
-        new QAction(QIcon(":/icons/icons/file-export.svg"), tr("Export Image"), this);
+    QAction *exportAct = new QAction(QIcon(":/icons/icons/file-export.svg"),
+                                     tr("Export Image"), this);
     connect(exportAct, &QAction::triggered, this, &MainWindow::onExportImage);
     fileEditBar->addAction(exportAct);
 
@@ -318,19 +352,22 @@ void MainWindow::_initToolBar()
     fileEditBar->addSeparator();
 
     // Cut 按钮
-    QAction *cutAct = new QAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cut"), this);
+    QAction *cutAct =
+        new QAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cut"), this);
     cutAct->setShortcut(QKeySequence::Cut);
     connect(cutAct, &QAction::triggered, this, &MainWindow::onCut);
     fileEditBar->addAction(cutAct);
 
     // Copy 按钮
-    QAction *copyAct = new QAction(QIcon(":/icons/icons/edit-copy.svg"), tr("Copy"), this);
+    QAction *copyAct =
+        new QAction(QIcon(":/icons/icons/edit-copy.svg"), tr("Copy"), this);
     copyAct->setShortcut(QKeySequence::Copy);
     connect(copyAct, &QAction::triggered, this, &MainWindow::onCopy);
     fileEditBar->addAction(copyAct);
 
     // Paste 按钮
-    QAction *pasteAct = new QAction(QIcon(":/icons/icons/edit-paste.svg"), tr("Paste"), this);
+    QAction *pasteAct =
+        new QAction(QIcon(":/icons/icons/edit-paste.svg"), tr("Paste"), this);
     pasteAct->setShortcut(QKeySequence::Paste);
     connect(pasteAct, &QAction::triggered, this, &MainWindow::onPaste);
     fileEditBar->addAction(pasteAct);
@@ -346,28 +383,35 @@ void MainWindow::_initToolBar()
     auto *actionGroup = new QActionGroup(this);
     actionGroup->setExclusive(true);
 
-    auto addToolAction = [&](const QString &iconPath, const QString &text, Tool tool,
-                             const QString &shortcut = {}) {
+    auto addToolAction = [&](const QString &iconPath, const QString &text,
+                             Tool tool, const QString &shortcut = {}) {
         QAction *act = drawBar->addAction(QIcon(iconPath), text);
         act->setCheckable(true);
         act->setToolTip(text);
         actionGroup->addAction(act);
         if (!shortcut.isEmpty())
             act->setShortcut(QKeySequence(shortcut));
-        connect(act, &QAction::triggered, this, [this, tool]() { onToolTriggered(tool); });
+        connect(act, &QAction::triggered, this,
+                [this, tool]() { onToolTriggered(tool); });
         m_toolActions[tool] = act;
         return act;
     };
 
-    auto *selectAct =
-        addToolAction(":/icons/icons/tool-select.svg", tr("Select (V)"), Tool::Select, "V");
+    auto *selectAct = addToolAction(":/icons/icons/tool-select.svg",
+                                    tr("Select (V)"), Tool::Select, "V");
     selectAct->setChecked(true);
-    addToolAction(":/icons/icons/tool-rect.svg", tr("Rectangle (R)"), Tool::Rect, "R");
-    addToolAction(":/icons/icons/tool-ellipse.svg", tr("Ellipse (E)"), Tool::Ellipse, "E");
-    addToolAction(":/icons/icons/tool-line.svg", tr("Line (L)"), Tool::Line, "L");
-    addToolAction(":/icons/icons/tool-curve.svg", tr("Curve (C)"), Tool::BezierCurve, "C");
-    addToolAction(":/icons/icons/tool-freehand.svg", tr("Freehand (F)"), Tool::Freehand, "F");
-    addToolAction(":/icons/icons/tool-text.svg", tr("Text (T)"), Tool::Text, "T");
+    addToolAction(":/icons/icons/tool-rect.svg", tr("Rectangle (R)"),
+                  Tool::Rect, "R");
+    addToolAction(":/icons/icons/tool-ellipse.svg", tr("Ellipse (E)"),
+                  Tool::Ellipse, "E");
+    addToolAction(":/icons/icons/tool-line.svg", tr("Line (L)"), Tool::Line,
+                  "L");
+    addToolAction(":/icons/icons/tool-curve.svg", tr("Curve (C)"),
+                  Tool::BezierCurve, "C");
+    addToolAction(":/icons/icons/tool-freehand.svg", tr("Freehand (F)"),
+                  Tool::Freehand, "F");
+    addToolAction(":/icons/icons/tool-text.svg", tr("Text (T)"), Tool::Text,
+                  "T");
 
     // 对齐工具栏
     m_alignToolBar = new QToolBar(tr("Align"), this);
@@ -377,24 +421,42 @@ void MainWindow::_initToolBar()
     m_alignToolBar->setIconSize(QSize(20, 20));
     addToolBar(Qt::TopToolBarArea, m_alignToolBar);
 
-    QAction *alignLayoutAct = m_alignToolBar->addAction(QIcon(":/icons/icons/align-layout.svg"),
-                                                        tr("Align && Layout..."));
+    QAction *alignLayoutAct = m_alignToolBar->addAction(
+        QIcon(":/icons/icons/align-layout.svg"), tr("Align && Layout..."));
     alignLayoutAct->setToolTip(tr("Open Align & Layout dialog"));
-    connect(alignLayoutAct, &QAction::triggered, this, &MainWindow::onAlignLayoutDialog);
+    connect(alignLayoutAct, &QAction::triggered, this,
+            &MainWindow::onAlignLayoutDialog);
+
+    m_alignToolBar->addSeparator();
+
+    // 成组/解组
+    QAction *groupAct = m_alignToolBar->addAction(
+        QIcon(":/icons/icons/group.svg"), tr("Group"));
+    groupAct->setToolTip(tr("Group selected items (Ctrl+G)"));
+    groupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
+    connect(groupAct, &QAction::triggered, this, &MainWindow::onGroup);
+
+    QAction *ungroupAct = m_alignToolBar->addAction(
+        QIcon(":/icons/icons/ungroup.svg"), tr("Ungroup"));
+    ungroupAct->setToolTip(tr("Ungroup selected items (Ctrl+Shift+G)"));
+    ungroupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
+    connect(ungroupAct, &QAction::triggered, this, &MainWindow::onUngroup);
 
     m_alignToolBar->addSeparator();
 
     // 顺时针旋转 90°
-    QAction *rotateCWAct =
-        m_alignToolBar->addAction(QIcon(":/icons/icons/rotate-cw.svg"), tr("Rotate 90\u00b0 CW"));
+    QAction *rotateCWAct = m_alignToolBar->addAction(
+        QIcon(":/icons/icons/rotate-cw.svg"), tr("Rotate 90\u00b0 CW"));
     rotateCWAct->setToolTip(tr("Rotate 90\u00b0 clockwise"));
-    connect(rotateCWAct, &QAction::triggered, this, [this]() { rotateSelectedItems(90.0); });
+    connect(rotateCWAct, &QAction::triggered, this,
+            [this]() { rotateSelectedItems(90.0); });
 
     // 逆时针旋转 90°
-    QAction *rotateCCWAct =
-        m_alignToolBar->addAction(QIcon(":/icons/icons/rotate-ccw.svg"), tr("Rotate 90\u00b0 CCW"));
+    QAction *rotateCCWAct = m_alignToolBar->addAction(
+        QIcon(":/icons/icons/rotate-ccw.svg"), tr("Rotate 90\u00b0 CCW"));
     rotateCCWAct->setToolTip(tr("Rotate 90\u00b0 counter-clockwise"));
-    connect(rotateCCWAct, &QAction::triggered, this, [this]() { rotateSelectedItems(-90.0); });
+    connect(rotateCCWAct, &QAction::triggered, this,
+            [this]() { rotateSelectedItems(-90.0); });
 }
 
 void MainWindow::_initPropertyPanel()
@@ -406,19 +468,29 @@ void MainWindow::_initPropertyPanel()
 
 void MainWindow::_initConnections()
 {
-    connect(m_pView, &QAtGraphicsView::selectionChanged, this, &MainWindow::onSelectionChanged);
-    connect(m_pView, &QAtGraphicsView::itemAdded, this, &MainWindow::onItemAdded);
+    connect(m_pView, &QAtGraphicsView::selectionChanged, this,
+            &MainWindow::onSelectionChanged);
+    connect(m_pView, &QAtGraphicsView::itemAdded, this,
+            &MainWindow::onItemAdded);
 
     // 右键菜单 → 复用菜单栏的 Bring to Front / Send to Back
-    connect(m_pView, &QAtGraphicsView::bringToFrontRequested,
-            this, &MainWindow::onBringToFront);
-    connect(m_pView, &QAtGraphicsView::sendToBackRequested,
-            this, &MainWindow::onSendToBack);
+    connect(m_pView, &QAtGraphicsView::bringToFrontRequested, this,
+            &MainWindow::onBringToFront);
+    connect(m_pView, &QAtGraphicsView::sendToBackRequested, this,
+            &MainWindow::onSendToBack);
+    connect(m_pView, &QAtGraphicsView::groupRequested, this,
+            &MainWindow::onGroup);
+    connect(m_pView, &QAtGraphicsView::ungroupRequested, this,
+            &MainWindow::onUngroup);
 
-    connect(m_pPropertyPanel, &PropertyPanel::penChanged, this, &MainWindow::onPenChanged);
-    connect(m_pPropertyPanel, &PropertyPanel::brushChanged, this, &MainWindow::onBrushChanged);
-    connect(m_pPropertyPanel, &PropertyPanel::fontChanged, this, &MainWindow::onFontChanged);
-    connect(m_pPropertyPanel, &PropertyPanel::textChanged, this, &MainWindow::onTextChanged);
+    connect(m_pPropertyPanel, &PropertyPanel::penChanged, this,
+            &MainWindow::onPenChanged);
+    connect(m_pPropertyPanel, &PropertyPanel::brushChanged, this,
+            &MainWindow::onBrushChanged);
+    connect(m_pPropertyPanel, &PropertyPanel::fontChanged, this,
+            &MainWindow::onFontChanged);
+    connect(m_pPropertyPanel, &PropertyPanel::textChanged, this,
+            &MainWindow::onTextChanged);
     connect(m_pPropertyPanel, &PropertyPanel::geometryChanged, this,
             &MainWindow::onGeometryChanged);
     connect(m_pPropertyPanel, &PropertyPanel::cornerRadiusChanged, this,
@@ -428,8 +500,10 @@ void MainWindow::_initConnections()
     connect(m_pPropertyPanel, &PropertyPanel::rotationChanged, this,
             &MainWindow::onRotationChanged);
 
-    connect(m_undoStack, &QUndoStack::canUndoChanged, this, [this]() { _updateUndoRedoActions(); });
-    connect(m_undoStack, &QUndoStack::canRedoChanged, this, [this]() { _updateUndoRedoActions(); });
+    connect(m_undoStack, &QUndoStack::canUndoChanged, this,
+            [this]() { _updateUndoRedoActions(); });
+    connect(m_undoStack, &QUndoStack::canRedoChanged, this,
+            [this]() { _updateUndoRedoActions(); });
 
     // undo/redo 后更新 ResizeHandleItem 位置（而非重建，避免选中框闪烁）
     connect(m_undoStack, &QUndoStack::indexChanged, this,
@@ -442,12 +516,13 @@ void MainWindow::_initConnections()
             &RulerBar::updateRuler);
 
     // 状态栏：鼠标位置 & 缩放变化 & 刻度尺鼠标位置同步
-    connect(m_pView, &QAtGraphicsView::mousePositionChanged, this, [this](const QPointF &pos) {
-        _updatePosLabel(pos);
-        // 同步鼠标位置到刻度尺
-        m_hRuler->setMousePosition(pos);
-        m_vRuler->setMousePosition(pos);
-    });
+    connect(m_pView, &QAtGraphicsView::mousePositionChanged, this,
+            [this](const QPointF &pos) {
+                _updatePosLabel(pos);
+                // 同步鼠标位置到刻度尺
+                m_hRuler->setMousePosition(pos);
+                m_vRuler->setMousePosition(pos);
+            });
     connect(m_pView, &QAtGraphicsView::zoomChanged, this, [this](qreal level) {
         int pct = qRound(level * 100);
         m_zoomLabel->setText(tr("%1%").arg(pct));
@@ -463,7 +538,8 @@ void MainWindow::_initConnections()
 
     // TextItem 编辑完成时更新属性面板
     connect(m_pView->scene(), &QGraphicsScene::focusItemChanged, this,
-            [this](QGraphicsItem *newFocus, QGraphicsItem *oldFocus, Qt::FocusReason) {
+            [this](QGraphicsItem *newFocus, QGraphicsItem *oldFocus,
+                   Qt::FocusReason) {
                 Q_UNUSED(oldFocus);
                 Q_UNUSED(newFocus);
                 // 当焦点离开 TextItem 时更新属性面板
@@ -491,6 +567,13 @@ void MainWindow::_initStatusBar()
     // 鼠标坐标
     m_posLabel = new QLabel(tr("X: 0.0 px  Y: 0.0 px"));
     m_posLabel->setMinimumWidth(220);
+
+    m_pRipLabel = new QLabel(tr("Rip"));
+    m_pRipLabel->setMinimumWidth(50);
+    m_pProgress = new QProgressBar(this);
+    m_pProgress->setRange(0, 100);
+    m_pProgress->setValue(0);
+    m_pProgress->setFormat("%p%"); // 显示百分比
 
     // 缩放标签
     m_zoomLabel = new QLabel(tr("100%"));
@@ -521,11 +604,26 @@ void MainWindow::_initStatusBar()
 
     bar->addWidget(m_posLabel);
     bar->addPermanentWidget(createStatusSeparator(bar));
+    bar->addPermanentWidget(m_pRipLabel);
+    bar->addPermanentWidget(m_pProgress);
+    bar->addPermanentWidget(createStatusSeparator(bar));
     bar->addPermanentWidget(m_zoomLabel);
     bar->addPermanentWidget(m_zoomSlider);
     bar->addPermanentWidget(createStatusSeparator(bar));
     bar->addPermanentWidget(m_canvasLabel);
     bar->addPermanentWidget(m_toolLabel);
+}
+
+void MainWindow::_initNetWork()
+{
+    m_pNetWorkUtils = new NetWorkUtils(this);
+    m_pTimer = new QTimer(this);
+
+    // connect
+    connect(m_pNetWorkUtils, &NetWorkUtils::requestFinished, this,
+            &MainWindow::onRequestFinished, Qt::QueuedConnection);
+
+    m_pNetWorkUtils->start();
 }
 
 void MainWindow::_updateUndoRedoActions()
@@ -545,10 +643,12 @@ void MainWindow::_updatePosLabel(const QPointF &scenePos)
         qreal kPxToMm = 25.4 / ppi;
         qreal xmm = scenePos.x() * kPxToMm;
         qreal ymm = scenePos.y() * kPxToMm;
-        m_posLabel->setText(tr("X: %1 mm  Y: %2 mm").arg(xmm, 0, 'f', 1).arg(ymm, 0, 'f', 1));
-    } else {
         m_posLabel->setText(
-            tr("X: %1 px  Y: %2 px").arg(scenePos.x(), 0, 'f', 1).arg(scenePos.y(), 0, 'f', 1));
+            tr("X: %1 mm  Y: %2 mm").arg(xmm, 0, 'f', 1).arg(ymm, 0, 'f', 1));
+    } else {
+        m_posLabel->setText(tr("X: %1 px  Y: %2 px")
+                                .arg(scenePos.x(), 0, 'f', 1)
+                                .arg(scenePos.y(), 0, 'f', 1));
     }
 }
 
@@ -679,7 +779,8 @@ void MainWindow::onImportImage()
     item->setFilePath(result.filePath);
     item->setRawTiffData(result.rawTiffData);
     if (result.isCmykSource)
-        item->setCmykSourceData(result.rawCmykPixels, result.cmykWidth, result.cmykHeight);
+        item->setCmykSourceData(result.rawCmykPixels, result.cmykWidth,
+                                result.cmykHeight);
 
     m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
 }
@@ -695,18 +796,22 @@ void MainWindow::onExportImage()
 
     // 第二步：显示导出参数对话框
     ImageUtils::ExportParameters exportParams;
-    ImageUtils::ExportImageDialog dialog(this, exportParams,
-                                           QFileInfo(path).suffix());
-    if (dialog.exec() != QDialog::Accepted)
-        return;
-    exportParams = dialog.getParameters();
+    // ImageUtils::ExportImageDialog dialog(this, exportParams,
+    //                                      QFileInfo(path).suffix());
+    // if (dialog.exec() != QDialog::Accepted)
+    //     return;
+    // exportParams = dialog.getParameters();
+
+    // 不再显示参数设置对话框，直接设置参数
+    exportParams.colorSpace = ImageUtils::ExportParameters::ColorSpace::ConvertToCMYK;
 
     // 第三步：根据画布或场景内容创建图像
     QRectF exportRect;
     if (m_pView->canvasItem()) {
         exportRect = m_pView->canvasItem()->rect();
     } else {
-        exportRect = m_pView->scene()->itemsBoundingRect().adjusted(-10, -10, 10, 10);
+        exportRect =
+            m_pView->scene()->itemsBoundingRect().adjusted(-10, -10, 10, 10);
     }
 
     QImage image(exportRect.size().toSize(), QImage::Format_ARGB32);
@@ -718,20 +823,34 @@ void MainWindow::onExportImage()
     painter.end();
 
     // 第四步：根据参数导出
-    if (path.endsWith(".tif", Qt::CaseInsensitive) || path.endsWith(".tiff", Qt::CaseInsensitive)) {
-        if (exportParams.colorSpace == ImageUtils::ExportParameters::ColorSpace::ConvertToCMYK) {
-            QList<QGraphicsItem *> items = ::filterSelectableItems(m_pView->scene()->items());
-            ImageUtils::exportTiffCmyk(path, image, items, exportRect, exportParams);
+    if (path.endsWith(".tif", Qt::CaseInsensitive)
+        || path.endsWith(".tiff", Qt::CaseInsensitive)) {
+        if (exportParams.colorSpace
+            == ImageUtils::ExportParameters::ColorSpace::ConvertToCMYK) {
+            QList<QGraphicsItem *> items =
+                ::filterSelectableItems(m_pView->scene()->items());
+            ImageUtils::exportTiffCmyk(path, image, items, exportRect,
+                                       exportParams);
         } else {
             ImageUtils::exportTiffLossless(path, image, exportParams);
         }
-    } else if (path.endsWith(".png", Qt::CaseInsensitive) ||
-               path.endsWith(".jpg", Qt::CaseInsensitive) ||
-               path.endsWith(".jpeg", Qt::CaseInsensitive)) {
+    } else if (path.endsWith(".png", Qt::CaseInsensitive)
+               || path.endsWith(".jpg", Qt::CaseInsensitive)
+               || path.endsWith(".jpeg", Qt::CaseInsensitive)) {
         ImageUtils::exportImageWithParams(path, image, exportParams);
     } else {
         // BMP 等其他格式
         image.save(path);
+    }
+
+    // 设置Rip参数
+    SettingsDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted) {
+        // 网络请求
+        if (m_pNetWorkUtils) {
+            m_pNetWorkUtils->doAddRip(dlg.resolutionX(), dlg.resolutionY(),
+                                      path);
+        }
     }
 }
 
@@ -831,7 +950,8 @@ void MainWindow::onBringToFront()
         oldZ << item->zValue();
         newZ << (++maxZ);
     }
-    m_undoStack->push(new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
+    m_undoStack->push(
+        new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
 }
 
 void MainWindow::onSendToBack()
@@ -849,7 +969,76 @@ void MainWindow::onSendToBack()
         oldZ << item->zValue();
         newZ << (--minZ);
     }
-    m_undoStack->push(new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
+    m_undoStack->push(
+        new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
+}
+
+// ============================================================
+// 成组 / 解散组
+// ============================================================
+void MainWindow::onGroup()
+{
+    auto items = filterSelectableItems();
+    if (items.size() < 2)
+        return;
+
+    // 过滤掉已经是组成员的图元（已在某个 GraphicsItemGroup 内的跳过）
+    QList<QGraphicsItem *> topLevel;
+    for (auto *item : items) {
+        if (!item->parentItem())
+            topLevel << item;
+    }
+    if (topLevel.size() < 2)
+        return;
+
+    m_undoStack->push(new GroupItemsCommand(m_pView->scene(), topLevel));
+
+    // 选中新组
+    m_pView->scene()->clearSelection();
+    for (auto *item : m_pView->scene()->items()) {
+        if (auto *grp = qgraphicsitem_cast<GraphicsItemGroup *>(item)) {
+            if (!grp->childGraphicsItems().isEmpty()) {
+                grp->setSelected(true);
+                break;
+            }
+        }
+    }
+}
+
+void MainWindow::onUngroup()
+{
+    auto items = filterSelectableItems();
+    if (items.isEmpty())
+        return;
+
+    // 找出所有选中的 GraphicsItemGroup，并提前收集子图元
+    QList<QGraphicsItem *> groupsToUngroup;
+    QList<QGraphicsItem *> childrenToSelect;
+
+    for (auto *item : items) {
+        auto *grp = qgraphicsitem_cast<GraphicsItemGroup *>(item);
+        if (grp) {
+            groupsToUngroup << item;
+            childrenToSelect << grp->childGraphicsItems();
+        }
+    }
+    if (groupsToUngroup.isEmpty())
+        return;
+
+    m_undoStack->beginMacro(tr("Ungroup"));
+
+    for (auto *groupItem : groupsToUngroup) {
+        m_undoStack->push(new UngroupItemsCommand(m_pView->scene(), groupItem));
+    }
+
+    m_undoStack->endMacro();
+
+    // 选中解散后的子图元
+    m_pView->scene()->clearSelection();
+    for (auto *child : childrenToSelect) {
+        if (child && child->scene())
+            child->setSelected(true);
+    }
 }
 
 // ============================================================
@@ -858,7 +1047,8 @@ void MainWindow::onSendToBack()
 void MainWindow::onAlignLayoutDialog()
 {
     if (!m_alignLayoutDlg) {
-        m_alignLayoutDlg = new AlignLayoutDialog(m_pView->scene(), m_undoStack, this);
+        m_alignLayoutDlg =
+            new AlignLayoutDialog(m_pView->scene(), m_undoStack, this);
         m_alignLayoutDlg->setAttribute(Qt::WA_DeleteOnClose);
         // 关闭后清空指针，下次重新创建
         connect(m_alignLayoutDlg, &QObject::destroyed, this,
@@ -899,7 +1089,8 @@ void MainWindow::applyAlign(AlignmentUtils::AlignDirection direction)
 
     m_undoStack->push(new AlignItemsCommand(
         items, result.oldPositions, result.newPositions,
-        tr("Align %1").arg(AlignmentUtils::alignDirectionName(direction)), m_pView->scene()));
+        tr("Align %1").arg(AlignmentUtils::alignDirectionName(direction)),
+        m_pView->scene()));
 }
 
 void MainWindow::applyDistribute(AlignmentUtils::DistributeDirection direction,
@@ -915,7 +1106,8 @@ void MainWindow::applyDistribute(AlignmentUtils::DistributeDirection direction,
 
     m_undoStack->push(new AlignItemsCommand(
         items, result.oldPositions, result.newPositions,
-        tr("Distribute %1").arg(AlignmentUtils::distributeDirectionName(direction)),
+        tr("Distribute %1")
+            .arg(AlignmentUtils::distributeDirectionName(direction)),
         m_pView->scene()));
 }
 
@@ -1000,58 +1192,107 @@ void MainWindow::onItemAdded(QGraphicsItem *item)
 // ============================================================
 // 属性变更（通过属性面板触发，创建撤销命令）
 // ============================================================
-void MainWindow::onPenChanged(QGraphicsItem *item, const QPen &oldPen, const QPen &newPen)
-{
-    m_undoStack->push(new PropertyChangeCommand(item, PropertyChangeCommand::Pen,
-                                                QVariant::fromValue(oldPen),
-                                                QVariant::fromValue(newPen), m_pView->scene()));
-}
-
-void MainWindow::onBrushChanged(QGraphicsItem *item, const QBrush &oldBrush, const QBrush &newBrush)
-{
-    m_undoStack->push(new PropertyChangeCommand(item, PropertyChangeCommand::Brush,
-                                                QVariant::fromValue(oldBrush),
-                                                QVariant::fromValue(newBrush), m_pView->scene()));
-}
-
-void MainWindow::onFontChanged(QGraphicsItem *item, const QFont &oldFont, const QFont &newFont)
-{
-    m_undoStack->push(new PropertyChangeCommand(item, PropertyChangeCommand::Font,
-                                                QVariant::fromValue(oldFont),
-                                                QVariant::fromValue(newFont), m_pView->scene()));
-}
-
-void MainWindow::onTextChanged(QGraphicsItem *item, const QString &oldText, const QString &newText)
+void MainWindow::onPenChanged(QGraphicsItem *item, const QPen &oldPen,
+                              const QPen &newPen)
 {
     m_undoStack->push(new PropertyChangeCommand(
-        item, PropertyChangeCommand::Text, QVariant(oldText), QVariant(newText), m_pView->scene()));
+        item, PropertyChangeCommand::Pen, QVariant::fromValue(oldPen),
+        QVariant::fromValue(newPen), m_pView->scene()));
+}
+
+void MainWindow::onBrushChanged(QGraphicsItem *item, const QBrush &oldBrush,
+                                const QBrush &newBrush)
+{
+    m_undoStack->push(new PropertyChangeCommand(
+        item, PropertyChangeCommand::Brush, QVariant::fromValue(oldBrush),
+        QVariant::fromValue(newBrush), m_pView->scene()));
+}
+
+void MainWindow::onFontChanged(QGraphicsItem *item, const QFont &oldFont,
+                               const QFont &newFont)
+{
+    m_undoStack->push(new PropertyChangeCommand(
+        item, PropertyChangeCommand::Font, QVariant::fromValue(oldFont),
+        QVariant::fromValue(newFont), m_pView->scene()));
+}
+
+void MainWindow::onTextChanged(QGraphicsItem *item, const QString &oldText,
+                               const QString &newText)
+{
+    m_undoStack->push(new PropertyChangeCommand(
+        item, PropertyChangeCommand::Text, QVariant(oldText), QVariant(newText),
+        m_pView->scene()));
 }
 
 void MainWindow::onGeometryChanged(QGraphicsItem *item, const QRectF &oldRect,
                                    const QRectF &newRect)
 {
-    m_undoStack->push(new PropertyChangeCommand(item, PropertyChangeCommand::Geometry,
-                                                QVariant(oldRect), QVariant(newRect),
-                                                m_pView->scene()));
+    m_undoStack->push(new PropertyChangeCommand(
+        item, PropertyChangeCommand::Geometry, QVariant(oldRect),
+        QVariant(newRect), m_pView->scene()));
 }
 
-void MainWindow::onCornerRadiusChanged(QGraphicsItem *item, qreal oldR, qreal newR)
+void MainWindow::onCornerRadiusChanged(QGraphicsItem *item, qreal oldR,
+                                       qreal newR)
 {
-    m_undoStack->push(new PropertyChangeCommand(item, PropertyChangeCommand::CornerRadius,
-                                                QVariant(oldR), QVariant(newR), m_pView->scene()));
+    m_undoStack->push(new PropertyChangeCommand(
+        item, PropertyChangeCommand::CornerRadius, QVariant(oldR),
+        QVariant(newR), m_pView->scene()));
 }
 
 void MainWindow::onPositionChanged(QGraphicsItem *item, const QPointF &oldPos,
                                    const QPointF &newPos)
 {
-    m_undoStack->push(new PositionChangeCommand(item, oldPos, newPos, m_pView->scene()));
+    m_undoStack->push(
+        new PositionChangeCommand(item, oldPos, newPos, m_pView->scene()));
 }
 
-void MainWindow::onRotationChanged(QGraphicsItem *item, qreal oldRotation, qreal newRotation)
+void MainWindow::onRotationChanged(QGraphicsItem *item, qreal oldRotation,
+                                   qreal newRotation)
 {
-    m_undoStack->push(new RotationChangeCommand(item, oldRotation, newRotation, m_pView->scene()));
+    m_undoStack->push(new RotationChangeCommand(item, oldRotation, newRotation,
+                                                m_pView->scene()));
     // 旋转后需要更新 ResizeHandleItem 以正确显示选中框
     m_pView->scheduleResizeHandleUpdate();
+}
+
+void MainWindow::onRequestFinished(const QJsonDocument &json)
+{
+    // 解析返回数据
+    if (json.isEmpty())
+        return;
+
+    // 获取状态
+    QJsonObject obj = json.object();
+    if (obj.isEmpty()) {
+        // QJsonArray处理
+
+    } else {
+        if (obj.contains("rip_picture_progress")) {
+            QJsonValue value = obj.value("rip_picture_progress");
+            int progress = value.toInt();
+
+            m_pProgress->setValue(progress);
+            if (progress == m_pProgress->maximum()) {
+                m_pTimer->stop();
+                m_pTimer->disconnect();
+            }
+        } else {
+            // 定时获取Rip进度并更新进度条
+            if (m_pTimer) {
+                m_pTimer->stop();
+                connect(m_pTimer, &QTimer::timeout, this,
+                        [&]() { m_pNetWorkUtils->doRipStatus(); });
+
+                m_pTimer->start(1000);
+            }
+        }
+    }
+}
+
+void MainWindow::onUpdateInfo()
+{
+    // 更新信息
 }
 
 // ============================================================
@@ -1068,20 +1309,22 @@ void MainWindow::rotateSelectedItems(qreal angleDelta)
         auto *item = items.first();
         qreal oldRotation = item->rotation();
         qreal newRotation = oldRotation + angleDelta;
-        m_undoStack->push(
-            new RotationChangeCommand(item, oldRotation, newRotation, m_pView->scene()));
+        m_undoStack->push(new RotationChangeCommand(
+            item, oldRotation, newRotation, m_pView->scene()));
     } else {
         // 多个图元：绕组中心整体旋转
         // 1. 计算组中心（所有图元场景包围矩形的并集中心）
         QRectF groupSceneRect;
         for (auto *item : items) {
-            QRectF itemSceneRect = item->mapToScene(item->boundingRect()).boundingRect();
+            QRectF itemSceneRect =
+                item->mapToScene(item->boundingRect()).boundingRect();
             groupSceneRect = groupSceneRect.united(itemSceneRect);
         }
         QPointF groupCenter = groupSceneRect.center();
 
         // 2. 对每个图元：先绕自身中心旋转，再绕组中心公转
-        m_undoStack->beginMacro(tr("Rotate %1\u00b0").arg(angleDelta, 0, 'f', 0));
+        m_undoStack->beginMacro(
+            tr("Rotate %1\u00b0").arg(angleDelta, 0, 'f', 0));
 
         QList<QGraphicsItem *> moveItems;
         QList<QPointF> oldPositions;
@@ -1092,15 +1335,16 @@ void MainWindow::rotateSelectedItems(qreal angleDelta)
             qreal newRotation = oldRotation + angleDelta;
 
             // 推入旋转命令（含中心补偿：旋转后图元中心位置不变）
-            m_undoStack->push(
-                new RotationChangeCommand(item, oldRotation, newRotation, m_pView->scene()));
+            m_undoStack->push(new RotationChangeCommand(
+                item, oldRotation, newRotation, m_pView->scene()));
 
             // 旋转命令 redo 后，图元中心仍位于旋转前的场景位置
             // 记录中心补偿后的位置（公转前的位置）
             QPointF posAfterCenterComp = item->pos();
 
             // 计算绕组中心的公转位移
-            QPointF currentCenter = item->mapToScene(item->boundingRect().center());
+            QPointF currentCenter =
+                item->mapToScene(item->boundingRect().center());
             QLineF line(groupCenter, currentCenter);
             line.setAngle(line.angle() + angleDelta);
             QPointF orbitedCenter = line.p2();
@@ -1114,8 +1358,8 @@ void MainWindow::rotateSelectedItems(qreal angleDelta)
 
         // 公转位移变更作为一个命令
         if (!moveItems.isEmpty()) {
-            m_undoStack->push(
-                new MoveItemsCommand(moveItems, oldPositions, newPositions, m_pView->scene()));
+            m_undoStack->push(new MoveItemsCommand(
+                moveItems, oldPositions, newPositions, m_pView->scene()));
         }
 
         m_undoStack->endMacro();
@@ -1176,8 +1420,8 @@ QList<QGraphicsItem *> MainWindow::pasteItemsFromClipboard()
     int version = 0;
     in >> version;
     if (version < 1 || version > IGraphicsItem::kSerializationVersion) {
-        qWarning("Unsupported clipboard format version: %d (current: %d)", version,
-                 IGraphicsItem::kSerializationVersion);
+        qWarning("Unsupported clipboard format version: %d (current: %d)",
+                 version, IGraphicsItem::kSerializationVersion);
         return result;
     }
 
@@ -1186,11 +1430,13 @@ QList<QGraphicsItem *> MainWindow::pasteItemsFromClipboard()
     for (int i = 0; i < count; ++i) {
         int typeInt = 0;
         in >> typeInt;
-        auto *gi = createItemByType(static_cast<IGraphicsItem::ItemType>(typeInt));
+        auto *gi =
+            createItemByType(static_cast<IGraphicsItem::ItemType>(typeInt));
         if (!gi)
             continue;
         if (!gi->deserialize(in)) {
-            qWarning("Failed to deserialize item type %d (stream corrupted)", typeInt);
+            qWarning("Failed to deserialize item type %d (stream corrupted)",
+                     typeInt);
             delete gi;
             continue;
         }
@@ -1261,13 +1507,16 @@ void MainWindow::loadWindowState()
     QToolBar *alignToolBar = findChild<QToolBar *>("AlignToolBar");
 
     if (fileEditBar && settings.contains("toolbar/FileEditToolBar_visible")) {
-        fileEditBar->setVisible(settings.value("toolbar/FileEditToolBar_visible").toBool());
+        fileEditBar->setVisible(
+            settings.value("toolbar/FileEditToolBar_visible").toBool());
     }
     if (drawBar && settings.contains("toolbar/DrawingToolBar_visible")) {
-        drawBar->setVisible(settings.value("toolbar/DrawingToolBar_visible").toBool());
+        drawBar->setVisible(
+            settings.value("toolbar/DrawingToolBar_visible").toBool());
     }
     if (alignToolBar && settings.contains("toolbar/AlignToolBar_visible")) {
-        alignToolBar->setVisible(settings.value("toolbar/AlignToolBar_visible").toBool());
+        alignToolBar->setVisible(
+            settings.value("toolbar/AlignToolBar_visible").toBool());
     }
 
     // 恢复其他设置
@@ -1298,13 +1547,16 @@ void MainWindow::saveWindowState()
     QToolBar *alignToolBar = findChild<QToolBar *>("AlignToolBar");
 
     if (fileEditBar) {
-        settings.setValue("toolbar/FileEditToolBar_visible", fileEditBar->isVisible());
+        settings.setValue("toolbar/FileEditToolBar_visible",
+                          fileEditBar->isVisible());
     }
     if (drawBar) {
-        settings.setValue("toolbar/DrawingToolBar_visible", drawBar->isVisible());
+        settings.setValue("toolbar/DrawingToolBar_visible",
+                          drawBar->isVisible());
     }
     if (alignToolBar) {
-        settings.setValue("toolbar/AlignToolBar_visible", alignToolBar->isVisible());
+        settings.setValue("toolbar/AlignToolBar_visible",
+                          alignToolBar->isVisible());
     }
 
     // 保存其他设置

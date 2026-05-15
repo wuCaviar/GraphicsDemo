@@ -196,4 +196,47 @@ private:
     QPointer<QGraphicsScene> m_scene;
 };
 
+// ============================================================
+// 成组
+// ============================================================
+class GroupItemsCommand : public QUndoCommand
+{
+public:
+    GroupItemsCommand(QGraphicsScene *scene, const QList<QGraphicsItem *> &items,
+                      QUndoCommand *parent = nullptr);
+    ~GroupItemsCommand();
+
+    void undo() override;
+    void redo() override;
+
+private:
+    QPointer<QGraphicsScene> m_scene;
+    QList<QGraphicsItem *> m_children;   // 子图元列表
+    QGraphicsItem *m_group = nullptr;    // 成组后的图元
+    QPointF m_groupPos;                  // 组的位置（子图元包围中心）
+    bool m_owned = true;                 // 首次 redo 前自己持有
+};
+
+// ============================================================
+// 解散组
+// ============================================================
+class UngroupItemsCommand : public QUndoCommand
+{
+public:
+    UngroupItemsCommand(QGraphicsScene *scene, QGraphicsItem *groupItem,
+                        QUndoCommand *parent = nullptr);
+    ~UngroupItemsCommand();
+
+    void undo() override;
+    void redo() override;
+
+private:
+    QPointer<QGraphicsScene> m_scene;
+    QGraphicsItem *m_group = nullptr;
+    QList<QGraphicsItem *> m_children;   // 解散后的子图元
+    QPointF m_groupPos;                  // 组的原始位置
+    qreal m_groupRotation = 0;           // 组的原始旋转
+    bool m_owned = false;
+};
+
 #endif // COMMANDS_H

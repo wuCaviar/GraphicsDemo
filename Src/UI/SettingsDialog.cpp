@@ -12,13 +12,12 @@
 #include <QPushButton>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include "../Utils/NetWorkDefs.h"
 
-#if defined(Q_OS_MACOS)
-static const QString kConfigFile =
-    QStringLiteral("/Volumes/Caviar/Test/GraphicsDemo/Bin/ripconfig.xml");
-#elif defined(Q_OS_WIN)
-static const QString kConfigFile = QStringLiteral("ripconfig.xml");
-#endif
+/*
+    网点曲线  *.p  icc
+    色彩曲线  *.icm proof
+*/
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
 {
@@ -54,7 +53,7 @@ void SettingsDialog::setupUI()
     mainLayout->addWidget(resGroup);
 
     // ---- 曲线设置 ----
-    auto *curveGroup = new QGroupBox(tr("曲线设置"));
+    auto *curveGroup = new QGroupBox(tr("曲线文件设置"));
     auto *curveLayout = new QFormLayout(curveGroup);
 
     auto *dotCurveRow = new QHBoxLayout;
@@ -91,7 +90,7 @@ void SettingsDialog::setupUI()
 
     // ---- 按钮 ----
     auto *buttonBox =
-        new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+        new QDialogButtonBox(QDialogButtonBox::Ok);
     mainLayout->addWidget(buttonBox);
 
     connect(dotCurveBtn, &QPushButton::clicked, this, [this]() {
@@ -116,7 +115,6 @@ void SettingsDialog::setupUI()
         saveConfig();
         accept();
     });
-    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 }
 
 int SettingsDialog::resolutionX() const
@@ -146,7 +144,7 @@ QString SettingsDialog::outputPath() const
 
 void SettingsDialog::loadConfig()
 {
-    QFile file(kConfigFile);
+    QFile file(ConfigPath);
     if (!file.open(QIODevice::ReadOnly))
         return;
 
@@ -173,8 +171,8 @@ void SettingsDialog::loadConfig()
     // <ICC ProofFile="..." ICCFile="..."/>
     QDomElement iccEl = root.firstChildElement(QLatin1String("ICC"));
     if (!iccEl.isNull()) {
-        m_dotCurveEdit->setText(iccEl.attribute(QLatin1String("ProofFile")));
-        m_colorCurveEdit->setText(iccEl.attribute(QLatin1String("ICCFile")));
+        m_dotCurveEdit->setText(iccEl.attribute(QLatin1String("ICCFile")));
+        m_colorCurveEdit->setText(iccEl.attribute(QLatin1String("ProofFile")));
     }
 
     // <OutInfo OutPath="..."/>
@@ -185,7 +183,7 @@ void SettingsDialog::loadConfig()
 
 void SettingsDialog::saveConfig()
 {
-    QFile file(kConfigFile);
+    QFile file(ConfigPath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
         return;
 
@@ -204,8 +202,8 @@ void SettingsDialog::saveConfig()
 
     // <ICC ProofFile="..." ICCFile="..."/>
     QDomElement iccEl = doc.createElement(QStringLiteral("ICC"));
-    iccEl.setAttribute(QStringLiteral("ProofFile"), m_dotCurveEdit->text());
-    iccEl.setAttribute(QStringLiteral("ICCFile"), m_colorCurveEdit->text());
+    iccEl.setAttribute(QStringLiteral("ICCFile"), m_dotCurveEdit->text());
+    iccEl.setAttribute(QStringLiteral("ProofFile"), m_colorCurveEdit->text());
     root.appendChild(iccEl);
 
     // <OutInfo OutPath="..."/>

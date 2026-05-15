@@ -10,6 +10,8 @@
 #include <QVector>
 #include <QWeakPointer>
 
+typedef QMap<QString, QString> QStringMap;
+
 #define Q_CLASS_TYPEDEFS(_name_) \
     class _name_;                \
     typedef QSharedPointer<_name_> _name_##Ptr;

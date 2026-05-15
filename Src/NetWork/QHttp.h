@@ -8,7 +8,6 @@
 #include <QVariant>
 #include <functional>
 
-#include "../CommonDefs.h"
 #include "../QCommonDefs.h"
 
 class QNetworkAccessManager;
@@ -40,7 +39,7 @@ enum class HttpMethod
 };
 
 #define ClassWrapper(cls, type)                    \
-    CLASS_TYPEDEFS(cls)                            \
+    Q_CLASS_TYPEDEFS(cls)                          \
     class cls                                      \
     {                                              \
     public:                                        \
@@ -54,7 +53,7 @@ enum class HttpMethod
     };
 
 #define FieldWrapper(cls)                                     \
-    CLASS_TYPEDEFS(cls)                                       \
+    Q_CLASS_TYPEDEFS(cls)                                     \
     class cls                                                 \
     {                                                         \
     public:                                                   \
@@ -185,16 +184,16 @@ public:
 
     void setStatusCode(int nStatusCode) { m_nStatusCode = nStatusCode; }
 
-    QString body();
+    QByteArray body();
 
-    void setBody(const QString &strBody) { m_strBody = strBody; }
+    void setBody(const QByteArray &strBody) { m_strBody = strBody; }
 
     bool success(QString &strError);
 
 private:
     Headers m_headers;
     int m_nStatusCode;
-    QString m_strBody;
+    QByteArray m_strBody;
 };
 
 ClassWrapper(ResponseFunc, std::function<void(QResponsePtr ptrResp)>);

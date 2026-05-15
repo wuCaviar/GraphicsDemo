@@ -24,6 +24,8 @@
         <file>icons/edit-select-all.svg</file>
         <file>icons/bring-front.svg</file>
         <file>icons/send-back.svg</file>
+        <file>icons/group.svg</file>
+        <file>icons/ungroup.svg</file>
         <file>icons/view-fit.svg</file>
         <file>icons/view-zoom-reset.svg</file>
         <file>icons/view-grid.svg</file>

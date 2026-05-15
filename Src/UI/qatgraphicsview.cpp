@@ -5,6 +5,7 @@
 #include "Commands.h"
 #include "EllipseItem.h"
 #include "FreehandItem.h"
+#include "GraphicsItemGroup.h"
 #include "ImageItem.h"
 #include "ImageUtils.h"
 #include "LineItem.h"
@@ -41,7 +42,7 @@ QAtGraphicsView::QAtGraphicsView(QWidget *parent) : QGraphicsView(parent)
     setRenderHint(QPainter::Antialiasing);
     setViewportUpdateMode(FullViewportUpdate);
     setTransformationAnchor(AnchorUnderMouse);
-    setResizeAnchor(AnchorViewCenter);
+    setResizeAnchor(AnchorUnderMouse);
 
     // 默认样式
     m_defaultPen = QPen(Qt::black, 1.0);
@@ -130,14 +131,14 @@ void QAtGraphicsView::setZoomLevel(qreal level)
         return;
 
     // 计算当前视口中心对应的场景坐标，缩放后仍保持居中
-    QPointF center = mapToScene(viewport()->rect().center());
+    // QPointF center = mapToScene(viewport()->rect().center());
 
     qreal factor = level / m_zoomLevel;
     scale(factor, factor);
     m_zoomLevel = level;
 
     // 恢复视口中心
-    centerOn(center);
+    // centerOn(center);
 
     emit zoomChanged(m_zoomLevel);
 }
@@ -609,6 +610,24 @@ void QAtGraphicsView::contextMenuEvent(QContextMenuEvent *event)
                    this, &QAtGraphicsView::bringToFrontRequested);
     menu.addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send to Back"),
                    this, &QAtGraphicsView::sendToBackRequested);
+
+    menu.addSeparator();
+
+    // 成组：需要 2 个以上顶级可选图元
+    auto filtered = ::filterSelectableItems(selectedItems);
+    int topLevelCount = 0;
+    bool hasGroup = false;
+    for (auto *item : filtered) {
+        if (qgraphicsitem_cast<GraphicsItemGroup *>(item))
+            hasGroup = true;
+        if (!item->parentItem())
+            topLevelCount++;
+    }
+
+    if (topLevelCount >= 2)
+        menu.addAction(QIcon(":/icons/icons/group.svg"), tr("Group"), this, &QAtGraphicsView::groupRequested);
+    if (hasGroup)
+        menu.addAction(QIcon(":/icons/icons/ungroup.svg"), tr("Ungroup"), this, &QAtGraphicsView::ungroupRequested);
 
     menu.exec(event->globalPos());
 }

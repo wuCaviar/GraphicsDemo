@@ -5,9 +5,12 @@
 #include "ImageUtils.h"
 #include "qatgraphicsview.h"
 #include "AlignmentUtils.h"
+#include "NetWorkUtils.h"
 #include <QMainWindow>
 #include <QMap>
 #include <QUndoStack>
+#include <QProgressBar>
+#include <QTimer>
 
 
 class QLabel;
@@ -45,6 +48,8 @@ private slots:
     void onSelectAll();
     void onBringToFront();
     void onSendToBack();
+    void onGroup();
+    void onUngroup();
     void onAlignLayoutDialog();
     void onSettings();
     void onAlignLeft();
@@ -68,6 +73,8 @@ private slots:
     void onCornerRadiusChanged(QGraphicsItem *item, qreal oldR, qreal newR);
     void onPositionChanged(QGraphicsItem *item, const QPointF &oldPos, const QPointF &newPos);
     void onRotationChanged(QGraphicsItem *item, qreal oldRotation, qreal newRotation);
+    void onRequestFinished(const QJsonDocument &json);
+    void onUpdateInfo();
 
 private:
     void _initWidget();
@@ -77,6 +84,7 @@ private:
     void _initRulers();
     void _initConnections();
     void _initStatusBar();
+    void _initNetWork();
     void _updateUndoRedoActions();
     void loadStyleSheet();
 
@@ -100,6 +108,8 @@ private:
     PropertyPanel *m_pPropertyPanel = nullptr;
     QUndoStack *m_undoStack = nullptr;
 
+    NetWorkUtils* m_pNetWorkUtils = nullptr;
+
     QAction *m_undoAction = nullptr;
     QAction *m_redoAction = nullptr;
 
@@ -122,6 +132,11 @@ private:
 
     // 刻度尺单位切换
     QAction *m_rulerUnitAction = nullptr;
+
+    // Rip进度控件
+    QLabel *m_pRipLabel = nullptr;
+    QProgressBar* m_pProgress = nullptr;
+    QTimer* m_pTimer = nullptr;
 
     // 状态栏控件
     QLabel *m_posLabel = nullptr;

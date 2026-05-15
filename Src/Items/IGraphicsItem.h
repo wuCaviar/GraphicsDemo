@@ -25,6 +25,7 @@ public:
         TextItemType       = 5,
         ImageItemType      = 6,
         FreehandItemType   = 7,
+        GroupItemType      = 8,
     };
 
     enum PropertyFlag {

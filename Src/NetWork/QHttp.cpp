@@ -38,7 +38,7 @@ int QResponse::statusCode()
     return m_nStatusCode;
 }
 
-QString QResponse::body()
+QByteArray QResponse::body()
 {
     return m_strBody;
 }
@@ -421,7 +421,7 @@ void QHttp::_afterRequest(HttpMethod method)
 
 void QHttp::_handleResponse()
 {
-    ptrResp = QResponsePtr(new QResponse(this));
+    ptrResp = qmake_shared(QResponse, this);
 
     if (!m_pReply) {
         ptrResp->setStatusCode(0);
@@ -436,7 +436,7 @@ void QHttp::_handleResponse()
         ptrResp->setStatusCode(
             m_pReply->attribute(QNetworkRequest::HttpStatusCodeAttribute)
                 .toInt());
-        ptrResp->setBody(m_pReply->errorString());
+        ptrResp->setBody(m_pReply->errorString().toUtf8());
         if (ptrReq->responseFunc().value()) {
             ptrReq->responseFunc().value()(ptrResp);
         }
@@ -453,9 +453,9 @@ void QHttp::_handleResponse()
             ptrReq->file()->write(m_pReply->readAll());
             ptrReq->file()->close();
         }
-        ptrResp->setBody(ptrReq->file()->fileName());
+        ptrResp->setBody( ptrReq->file()->fileName().toUtf8());
     } else {
-        ptrResp->setBody(QString::fromUtf8(m_pReply->readAll()));
+        ptrResp->setBody(m_pReply->readAll());
     }
 
     // 处理响应头
