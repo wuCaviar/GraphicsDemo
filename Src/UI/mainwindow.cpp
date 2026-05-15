@@ -123,6 +123,7 @@ void MainWindow::_initWidget()
 {
     m_pView = new QAtGraphicsView(this);
     m_pView->setUndoStack(m_undoStack);
+    m_pView->setEnabled(false);  // 没有画板前禁止操作
     setCentralWidget(m_pView);
 }
 
@@ -752,6 +753,7 @@ void MainWindow::onNew()
 
     // 安全清空场景并重建画布
     m_pView->resetCanvas(canvasSize);
+    m_pView->setEnabled(true);  // 画板就绪，允许操作
 
     // 设置画布 PPI
     if (m_pView->canvasItem())

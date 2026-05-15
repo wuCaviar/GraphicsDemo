@@ -451,34 +451,20 @@ void PropertyPanel::updatePanel()
 
     // ---- 位置/尺寸 ----
     m_geomGroup->setVisible(true);
-    m_xSpin->setValue(m_currentItem->pos().x());
-    m_ySpin->setValue(m_currentItem->pos().y());
 
-    // 判断 W/H 是否可编辑：支持 setRect() 的图元
-    bool canResizeRect = (qgraphicsitem_cast<RectItem *>(m_currentItem)
-                          || qgraphicsitem_cast<EllipseItem *>(m_currentItem)
-                          || qgraphicsitem_cast<TextItem *>(m_currentItem)
-                          || qgraphicsitem_cast<ImageItem *>(m_currentItem));
+    // 显示图元在画板上的视觉坐标（mapToScene 处理旋转和父级偏移）
+    QRectF geomRect = (gi->supportsGeometryRect()) ? gi->geometryRect() : m_currentItem->boundingRect();
+    QPointF canvasTopLeft = m_currentItem->mapToScene(geomRect.topLeft());
+    m_xSpin->setValue(canvasTopLeft.x());
+    m_ySpin->setValue(canvasTopLeft.y());
+
+    // 判断 W/H 是否可编辑：支持 setGeometryRect 的图元
+    bool canResizeRect = gi->supportsSetGeometryRect();
     m_wSpin->setReadOnly(!canResizeRect);
     m_hSpin->setReadOnly(!canResizeRect);
 
-    // 尺寸（根据图元类型）
-    QRectF rect;
-    if (auto *ri = qgraphicsitem_cast<RectItem *>(m_currentItem))
-        rect = ri->rect();
-    else if (auto *ei = qgraphicsitem_cast<EllipseItem *>(m_currentItem))
-        rect = ei->rect();
-    else if (auto *li = qgraphicsitem_cast<LineItem *>(m_currentItem)) {
-        rect = li->boundingRect();
-    } else if (auto *bi = qgraphicsitem_cast<BezierCurveItem *>(m_currentItem)) {
-        rect = bi->boundingRect();
-    } else if (auto *ti = qgraphicsitem_cast<TextItem *>(m_currentItem)) {
-        rect = ti->boundingRect();
-    } else if (auto *ii = qgraphicsitem_cast<ImageItem *>(m_currentItem)) {
-        rect = ii->boundingRect();
-    }
-    m_wSpin->setValue(rect.width());
-    m_hSpin->setValue(rect.height());
+    m_wSpin->setValue(geomRect.width());
+    m_hSpin->setValue(geomRect.height());
 
     // ---- 边框 ----
     m_penGroup->setVisible(flags & IGraphicsItem::HasPen);
@@ -756,24 +742,19 @@ void PropertyPanel::onGeometryChanged()
     qreal w = m_wSpin->value();
     qreal h = m_hSpin->value();
 
-    // 位置变更：通过 positionChanged 信号走 undo 系统
-    QPointF oldPos = m_currentItem->pos();
-    QPointF newPos(x, y);
-    if (oldPos != newPos)
-        emit positionChanged(m_currentItem, oldPos, newPos);
+    // 位置变更：用户输入的 X/Y 是画板坐标（视觉 top-left），需转为 item 的 pos
+    QRectF currentGeom = (gi->supportsGeometryRect()) ? gi->geometryRect() : m_currentItem->boundingRect();
+    QPointF currentCanvasPos = m_currentItem->mapToScene(currentGeom.topLeft());
+    QPointF newCanvasPos(x, y);
+    if (currentCanvasPos != newCanvasPos) {
+        QPointF sceneDelta = newCanvasPos - currentCanvasPos;
+        QPointF newPos = m_currentItem->pos() + sceneDelta;
+        emit positionChanged(m_currentItem, m_currentItem->pos(), newPos);
+    }
 
-    // 尺寸变更：通过 geometryChanged 信号走 undo 系统
-    QRectF oldRect;
-    if (auto *ri = qgraphicsitem_cast<RectItem *>(m_currentItem))
-        oldRect = ri->rect();
-    else if (auto *ei = qgraphicsitem_cast<EllipseItem *>(m_currentItem))
-        oldRect = ei->rect();
-    else if (auto *ti = qgraphicsitem_cast<TextItem *>(m_currentItem))
-        oldRect = ti->rect();
-    else if (auto *ii = qgraphicsitem_cast<ImageItem *>(m_currentItem))
-        oldRect = ii->rect();
-
-    QRectF newRect(0, 0, w, h);
+    // 尺寸变更
+    QRectF oldRect = currentGeom;
+    QRectF newRect(currentGeom.topLeft(), QSizeF(w, h));
 
     if (oldRect.isValid() && oldRect != newRect)
         emit geometryChanged(m_currentItem, oldRect, newRect);

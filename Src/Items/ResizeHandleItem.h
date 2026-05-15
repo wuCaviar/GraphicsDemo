@@ -2,14 +2,13 @@
 #define RESIZEHANDLEITEM_H
 
 #include <QGraphicsItem>
-#include <QHash>
 #include <QMap>
-#include <QSet>
+#include <QPolygon>
 
 class QUndoStack;
 
-// 缩放手柄装饰器 — 包裹在选中图元周围，提供8个缩放手柄
-// 支持单目标模式和组模式（多选包围框）
+// 缩放手柄装饰器 — 在选中图元周围提供8个缩放手柄
+// 始终位于场景原点 (0,0)，rotation=0 — 统一使用场景坐标
 class ResizeHandleItem : public QGraphicsItem
 {
 public:
@@ -22,7 +21,7 @@ public:
 
     enum { Type = UserType + 200 };
 
-    explicit ResizeHandleItem(QGraphicsItem *target = nullptr, QGraphicsItem *parent = nullptr);
+    explicit ResizeHandleItem(QGraphicsItem *parent = nullptr);
     ~ResizeHandleItem();
 
     int type() const override { return Type; }
@@ -30,11 +29,9 @@ public:
     QRectF boundingRect() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
 
-    // 单目标模式
     void setTargetItem(QGraphicsItem *target);
     QGraphicsItem *targetItem() const { return m_target; }
 
-    // 组模式
     void setTargetItems(const QList<QGraphicsItem *> &items);
     QList<QGraphicsItem *> targetItems() const { return m_targetItems; }
     bool isGroupMode() const { return !m_targetItems.isEmpty(); }
@@ -42,8 +39,10 @@ public:
     void updateHandlePositions();
     void setUndoStack(QUndoStack *stack) { m_undoStack = stack; }
 
-    // 粘贴样式（区分复制图元）
     void setPastedStyle(bool pasted);
+
+    bool isResizing() const { return m_activeRole != NoHandle; }
+    bool isTargetValid() const;
 
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
@@ -58,18 +57,22 @@ private:
         HandleRole role;
     };
 
+    // 几何工具
     HandleRole handleAtPos(const QPointF &scenePos) const;
     Qt::CursorShape cursorForRole(HandleRole role) const;
     void applyResize(HandleRole role, const QPointF &scenePos);
     void applyGroupResize(HandleRole role, const QPointF &scenePos);
+    QPolygonF computeSelectionPolygon() const;
     QRectF computeGroupBoundingRect() const;
 
-    // 单目标模式
+    // 目标
     QGraphicsItem *m_target = nullptr;
-
-    // 组模式
     QList<QGraphicsItem *> m_targetItems;
-    QRectF m_groupRect;
+
+    // 选中框多边形（场景坐标，可能为旋转矩形的4个顶点）
+    QPolygonF m_selectionPolygon;
+
+    // 组缩放 undo 状态
     QMap<QGraphicsItem *, QRectF> m_originalItemRects;
     QMap<QGraphicsItem *, QPointF> m_originalItemPositions;
     QRectF m_originalGroupRect;
@@ -84,7 +87,7 @@ private:
     QUndoStack *m_undoStack = nullptr;
     bool m_pastedStyle = false;
 
-    // 记录 resize 前的几何状态，用于 undo
+    // 单目标 resize undo 状态
     QRectF m_preResizeRect;
     QPointF m_preResizePos;
 

@@ -19,6 +19,7 @@ QMAKE_CXXFLAGS += -Wall
 HEADERS += \
     UI/mainwindow.h \
     UI/qatgraphicsview.h \
+    UI/GraphicsScene.h \
     UI/PropertyPanel.h \
     UI/NewFileDialog.h \
     UI/RulerBar.h \
@@ -53,6 +54,7 @@ SOURCES += \
     App/main.cpp \
     UI/mainwindow.cpp \
     UI/qatgraphicsview.cpp \
+    UI/GraphicsScene.cpp \
     UI/PropertyPanel.cpp \
     UI/NewFileDialog.cpp \
     UI/RulerBar.cpp \

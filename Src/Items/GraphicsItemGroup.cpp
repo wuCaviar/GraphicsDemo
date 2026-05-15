@@ -133,12 +133,9 @@ QList<QGraphicsItem *> GraphicsItemGroup::childGraphicsItems() const
 
 void GraphicsItemGroup::extractChildren()
 {
-    // 提取所有子图元到场景坐标，并从组中移除
+    // removeFromGroup 自动将子图元坐标从组本地转为场景坐标（保持视觉位置不变）
+    // 无需手动 setPos/mapToScene
     auto children = childItems();
-    for (auto *child : children) {
-        // mapToScene 将组本地坐标转为场景坐标
-        QPointF scenePos = child->mapToScene(child->pos());
-        child->setPos(scenePos);
+    for (auto *child : children)
         removeFromGroup(child);
-    }
 }

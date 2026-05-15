@@ -3,13 +3,11 @@
 
 #include <QGraphicsView>
 #include <QMap>
-#include <QSet>
 
-class QGraphicsScene;
 class QGraphicsItem;
 class QUndoStack;
 class CanvasItem;
-class ResizeHandleItem;
+class GraphicsScene;
 
 // 绘图工具类型
 enum class Tool {
@@ -36,7 +34,7 @@ public:
     void setTool(Tool tool);
     Tool currentTool() const { return m_tool; }
 
-    void setUndoStack(QUndoStack *stack) { m_undoStack = stack; }
+    void setUndoStack(QUndoStack *stack);
 
     CanvasItem *canvasItem() const { return m_pCanvas; }
     void setCanvasSize(const QSizeF &size);
@@ -51,13 +49,12 @@ public:
     bool isGridVisible() const { return m_gridVisible; }
     void setGridVisible(bool visible);
 
-    // 粘贴图元追踪（用于区分选中框样式）
+    // 粘贴图元追踪（委托给 GraphicsScene）
     void setPastedItems(const QList<QGraphicsItem *> &items);
     void clearPastedItems();
 
-    // 手动触发 ResizeHandle 更新（旋转等操作后调用）
+    // ResizeHandle 更新（委托给 GraphicsScene）
     void scheduleResizeHandleUpdate();
-    // 原地刷新选中框位置（不移除重建），适用于 Z 序等几何不变的操作
     void refreshResizeHandle();
 
 signals:
@@ -83,27 +80,15 @@ protected:
     void wheelEvent(QWheelEvent *event) override;
     void drawBackground(QPainter *painter, const QRectF &rect) override;
 
-private slots:
-    void onSceneSelectionChanged();
-
 private:
     void finishDrawing();
     void cancelDrawing();
     void initCanvas(const QSizeF &size);
     void scrollToCanvasOrigin();
-    void updateResizeHandle();
-    void removeResizeHandle();
 
-    QGraphicsScene *m_pMainScene = nullptr;
+    GraphicsScene *m_scene = nullptr;
     QUndoStack *m_undoStack = nullptr;
     CanvasItem *m_pCanvas = nullptr;
-
-    // 缩放手柄
-    ResizeHandleItem *m_resizeHandle = nullptr;
-    bool m_resizeHandleUpdatePending = false;  // 延迟更新去重标志
-
-    // 粘贴图元追踪
-    QSet<QGraphicsItem *> m_pastedItems;
 
     Tool m_tool = Tool::Select;
 
