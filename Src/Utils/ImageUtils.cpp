@@ -115,11 +115,16 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
         }
 
         // 保留原始 CMYK 像素数据
-        cv::Mat cmykMat;
-        if (result)
-            cmykMat = cv::Mat(height, width, CV_8UC4);
+        RawPixelBuffer cmykMat;
+        if (result) {
+            cmykMat.width = width;
+            cmykMat.height = height;
+            cmykMat.data.resize(width * height * 4);
+        }
 
-        QVector<uint8_t> cmykLine(width * 4);
+        tsize_t scanlineSize = TIFFScanlineSize(tif); // 一行数据的字节数
+
+        QVector<uint8_t> cmykLine(scanlineSize);
         for (uint32_t y = 0; y < height; ++y) {
             if (TIFFReadScanline(tif, cmykLine.data(), y) < 0) {
                 qWarning("TIFFReadScanline failed at row %u", y);
@@ -181,8 +186,9 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
 
         // 保留原始 TIFF 像素数据
         if (result) {
-            cv::Mat rawMat(height, width, CV_8UC4, raster);
-            result->rawTiffMat = rawMat.clone();
+            result->rawTiffMat.width = width;
+            result->rawTiffMat.height = height;
+            result->rawTiffMat.data = QByteArray(reinterpret_cast<const char *>(raster), width * height * 4);
         }
 
         _TIFFfree(raster);
@@ -805,9 +811,9 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
             // ImageItem with raw CMYK source: composite raw CMYK pixels directly
             auto *imgItem = dynamic_cast<ImageItem *>(gi);
             if (imgItem && imgItem->isCmykSource()) {
-                const cv::Mat &cmykMat = imgItem->rawCmykPixels();
-                int srcW = cmykMat.cols;
-                int srcH = cmykMat.rows;
+                const RawPixelBuffer &cmykMat = imgItem->rawCmykPixels();
+                int srcW = cmykMat.width;
+                int srcH = cmykMat.height;
                 QRectF sceneRect = gi->sceneBoundingRect();
                 QRectF pixelRect((sceneRect.x() - exportRect.x()),
                                  (sceneRect.y() - exportRect.y()),
@@ -818,7 +824,7 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
                     double scaleX = static_cast<double>(srcW) / pixelRect.width();
                     double scaleY = static_cast<double>(srcH) / pixelRect.height();
                     int srcY = qBound(0, static_cast<int>((y - pixelRect.top()) * scaleY), srcH - 1);
-                    const uint8_t *srcRow = cmykMat.ptr<uint8_t>(srcY);
+                    const uint8_t *srcRow = cmykMat.ptr(srcY);
                     for (int x = x0; x <= x1; ++x) {
                         int srcX = qBound(0, static_cast<int>((x - pixelRect.left()) * scaleX), srcW - 1);
                         int srcOff = srcX * 4;

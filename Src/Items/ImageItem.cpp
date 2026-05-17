@@ -77,39 +77,32 @@ void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
     }
 }
 
-static void writeCvMat(QDataStream &out, const cv::Mat &m)
+static void writePixelBuffer(QDataStream &out, const ImageUtils::RawPixelBuffer &buf)
 {
-    out << m.rows << m.cols << static_cast<int>(m.type());
-    if (m.isContinuous() && !m.empty()) {
-        QByteArray data(reinterpret_cast<const char *>(m.data),
-                        static_cast<int>(m.total() * m.elemSize()));
-        out << data;
-    } else {
-        out << QByteArray();
-    }
+    out << buf.width << buf.height << buf.data;
 }
 
-static cv::Mat readCvMat(QDataStream &in)
+static ImageUtils::RawPixelBuffer readPixelBuffer(QDataStream &in)
 {
-    int rows, cols, type;
-    QByteArray data;
-    in >> rows >> cols >> type >> data;
-    if (rows > 0 && cols > 0 && !data.isEmpty()) {
-        cv::Mat m(rows, cols, type, data.data());
-        return m.clone();
+    ImageUtils::RawPixelBuffer buf;
+    in >> buf.width >> buf.height >> buf.data;
+    if (buf.width <= 0 || buf.height <= 0 || buf.data.isEmpty()) {
+        buf.width = 0;
+        buf.height = 0;
+        buf.data.clear();
     }
-    return cv::Mat();
+    return buf;
 }
 
 void ImageItem::serialize(QDataStream &out) const
 {
     QImage img = pixmap().toImage();
     out << img << m_pen << pos() << rotation() << m_filePath;
-    writeCvMat(out, m_rawTiffMat);
+    writePixelBuffer(out, m_rawTiffMat);
     out << m_rect;
     out << m_isCmykSource;
     if (m_isCmykSource)
-        writeCvMat(out, m_rawCmykMat);
+        writePixelBuffer(out, m_rawCmykMat);
 }
 
 bool ImageItem::deserialize(QDataStream &in)
@@ -118,7 +111,7 @@ bool ImageItem::deserialize(QDataStream &in)
     qreal rot;
     QPointF pos_;
     in >> img >> m_pen >> pos_ >> rot >> m_filePath;
-    m_rawTiffMat = readCvMat(in);
+    m_rawTiffMat = readPixelBuffer(in);
     in >> m_rect;
     if (in.status() != QDataStream::Ok)
         return false;
@@ -127,7 +120,7 @@ bool ImageItem::deserialize(QDataStream &in)
     if (!in.atEnd()) {
         in >> m_isCmykSource;
         if (m_isCmykSource)
-            m_rawCmykMat = readCvMat(in);
+            m_rawCmykMat = readPixelBuffer(in);
     }
 
     setPixmap(QPixmap::fromImage(img));
@@ -136,8 +129,8 @@ bool ImageItem::deserialize(QDataStream &in)
     return true;
 }
 
-void ImageItem::setCmykSourceData(const cv::Mat &data)
+void ImageItem::setCmykSourceData(const ImageUtils::RawPixelBuffer &data)
 {
-    m_rawCmykMat = data.clone();
+    m_rawCmykMat = data;
     m_isCmykSource = true;
 }

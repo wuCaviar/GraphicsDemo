@@ -3,14 +3,24 @@
 
 #include <QByteArray>
 #include <QGraphicsItem>
+#include <cstdint>
 #include <QImage>
 #include <QMap>
 #include <QVariant>
 #include <QString>
 
-#include <opencv2/opencv.hpp>
-
 namespace ImageUtils {
+
+// 4-channel 8-bit raw pixel buffer, replaces cv::Mat (CV_8UC4)
+struct RawPixelBuffer {
+    int width = 0;
+    int height = 0;
+    QByteArray data;
+
+    bool isEmpty() const { return data.isEmpty(); }
+    uint8_t *ptr(int y) { return reinterpret_cast<uint8_t *>(data.data()) + y * width * 4; }
+    const uint8_t *ptr(int y) const { return reinterpret_cast<const uint8_t *>(data.data()) + y * width * 4; }
+};
 
 // 导入参数
 struct ImportParameters {
@@ -112,7 +122,7 @@ bool isTiffFile(const QString &path);
 // 图像导入结果
 struct ImportResult {
     QImage image;              // 解码后的图像
-    cv::Mat rawTiffMat;    // 原始 TIFF 数据（仅 TIFF 文件有值）
+    RawPixelBuffer rawTiffMat;    // 原始 TIFF 数据（仅 TIFF 文件有值）
     QString filePath;          // 文件路径
     QMap<QString, QVariant> metadata; // 元数据（EXIF、XMP等）
     int dpiX = 72;            // 水平 DPI
@@ -120,7 +130,7 @@ struct ImportResult {
     bool isValid() const { return !image.isNull(); }
 
     // CMYK 源数据（仅 CMYK TIFF 导入时有值）
-    cv::Mat rawCmykMat;  // 原始 CMYK 像素（4 bytes/pixel, 0-255/通道, libtiff 顺序）
+    RawPixelBuffer rawCmykMat;  // 原始 CMYK 像素（4 bytes/pixel, 0-255/通道, libtiff 顺序）
     bool isCmykSource = false;
 };
 

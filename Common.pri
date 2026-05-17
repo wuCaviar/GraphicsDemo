@@ -6,7 +6,9 @@ MOC_DIR = $$PROJECT_PATH/Build/$$TARGET/moc
 RCC_DIR = $$PROJECT_PATH/Build/$$TARGET/rcc
 UI_DIR = $$PROJECT_PATH/Build/$$TARGET/ui
 
-INCLUDEPATH += /opt/homebrew/include
+INCLUDEPATH += \
+    /opt/homebrew/include \
+
 LIBS += -L/opt/homebrew/lib \
     -ltiff \
-    -llcms2
+    -llcms2 \
