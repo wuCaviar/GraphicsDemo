@@ -156,6 +156,33 @@ private:
 };
 
 // ============================================================
+// 拉伸对齐（同时变更位置和几何大小）
+// ============================================================
+class StretchAlignItemsCommand : public QUndoCommand
+{
+public:
+    StretchAlignItemsCommand(const QList<QGraphicsItem *> &items,
+                             const QList<QPointF> &oldPositions,
+                             const QList<QPointF> &newPositions,
+                             const QList<QRectF> &oldGeometries,
+                             const QList<QRectF> &newGeometries,
+                             const QString &description = QString(),
+                             QGraphicsScene *scene = nullptr,
+                             QUndoCommand *parent = nullptr);
+
+    void undo() override;
+    void redo() override;
+
+private:
+    QList<QGraphicsItem *> m_items;
+    QList<QPointF> m_oldPos;
+    QList<QPointF> m_newPos;
+    QList<QRectF> m_oldGeom;
+    QList<QRectF> m_newGeom;
+    QPointer<QGraphicsScene> m_scene;
+};
+
+// ============================================================
 // 位置变更（单个图元，由属性面板触发）
 // ============================================================
 class PositionChangeCommand : public QUndoCommand

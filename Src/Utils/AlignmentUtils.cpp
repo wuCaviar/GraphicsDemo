@@ -2,6 +2,7 @@
 #include "IGraphicsItem.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace AlignmentUtils {
 
@@ -27,18 +28,36 @@ qreal itemGeomHeight(const QGraphicsItem *item)
     return itemGeometryRect(item).height();
 }
 
+QRectF overallGeometryRect(const QList<QGraphicsItem *> &items)
+{
+    if (items.isEmpty()) return {};
+    QRectF r;
+    for (auto *item : items) {
+        QRectF ir = itemGeometryRect(item);
+        ir.translate(item->pos());
+        r = r.isNull() ? ir : r.united(ir);
+    }
+    return r;
+}
+
 // ============================================================
 // 对齐方向名称
 // ============================================================
 QString alignDirectionName(AlignDirection dir)
 {
     switch (dir) {
-    case AlignLeft:    return QStringLiteral("Left");
-    case AlignHCenter: return QStringLiteral("HCenter");
-    case AlignRight:   return QStringLiteral("Right");
-    case AlignTop:     return QStringLiteral("Top");
-    case AlignVCenter: return QStringLiteral("VCenter");
-    case AlignBottom:  return QStringLiteral("Bottom");
+    case AlignLeft:         return QStringLiteral("Align Left");
+    case AlignHCenter:      return QStringLiteral("Align H-Center");
+    case AlignRight:        return QStringLiteral("Align Right");
+    case AlignTop:          return QStringLiteral("Align Top");
+    case AlignVCenter:      return QStringLiteral("Align V-Center");
+    case AlignBottom:       return QStringLiteral("Align Bottom");
+    case AlignLeftRight:    return QStringLiteral("Align Left-Right");
+    case AlignTopBottom:    return QStringLiteral("Align Top-Bottom");
+    case AlignHProportional:return QStringLiteral("Align H-Proportional");
+    case AlignVProportional:return QStringLiteral("Align V-Proportional");
+    case AlignHCenterOnPage:return QStringLiteral("Center H on Page");
+    case AlignVCenterOnPage:return QStringLiteral("Center V on Page");
     }
     return QStringLiteral("Unknown");
 }
@@ -46,10 +65,55 @@ QString alignDirectionName(AlignDirection dir)
 QString distributeDirectionName(DistributeDirection dir)
 {
     switch (dir) {
-    case DistributeH: return QStringLiteral("Horizontally");
-    case DistributeV: return QStringLiteral("Vertically");
+    case DistributeH:       return QStringLiteral("Distribute H");
+    case DistributeV:       return QStringLiteral("Distribute V");
+    case DistributeHLeft:   return QStringLiteral("Distribute H-Left");
+    case DistributeHCenter: return QStringLiteral("Distribute H-Center");
+    case DistributeHRight:  return QStringLiteral("Distribute H-Right");
+    case DistributeVTop:    return QStringLiteral("Distribute V-Top");
+    case DistributeVCenter: return QStringLiteral("Distribute V-Center");
+    case DistributeVBottom: return QStringLiteral("Distribute V-Bottom");
     }
     return QStringLiteral("Unknown");
+}
+
+bool isStretchAlign(AlignDirection dir)
+{
+    return dir == AlignLeftRight || dir == AlignTopBottom
+           || dir == AlignHProportional || dir == AlignVProportional;
+}
+
+bool isPageCenter(AlignDirection dir)
+{
+    return dir == AlignHCenterOnPage || dir == AlignVCenterOnPage;
+}
+
+bool isHorizontal(AlignDirection dir)
+{
+    switch (dir) {
+    case AlignLeft:
+    case AlignHCenter:
+    case AlignRight:
+    case AlignLeftRight:
+    case AlignHProportional:
+    case AlignHCenterOnPage:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool isHorizontal(DistributeDirection dir)
+{
+    switch (dir) {
+    case DistributeH:
+    case DistributeHLeft:
+    case DistributeHCenter:
+    case DistributeHRight:
+        return true;
+    default:
+        return false;
+    }
 }
 
 // ============================================================
@@ -60,7 +124,6 @@ AlignResult computeAlign(const QList<QGraphicsItem *> &items, AlignDirection dir
     AlignResult result;
     if (items.size() < 2) return result;
 
-    // 保存旧位置
     for (auto *item : items)
         result.oldPositions << item->pos();
 
@@ -135,10 +198,201 @@ AlignResult computeAlign(const QList<QGraphicsItem *> &items, AlignDirection dir
         }
         break;
     }
+    default:
+        break; // 其他类型由 computeStretchAlign / computePageCenter 处理
     }
 
     result.valid = !result.newPositions.isEmpty();
     return result;
+}
+
+// ============================================================
+// 拉伸对齐算法 — 同时改变位置和大小
+// ============================================================
+StretchAlignResult computeStretchAlign(const QList<QGraphicsItem *> &items,
+                                       AlignDirection direction)
+{
+    StretchAlignResult result;
+    if (items.size() < 2) return result;
+
+    for (auto *item : items) {
+        result.oldPositions << item->pos();
+        result.oldGeometries << itemGeometryRect(item);
+    }
+
+    QRectF overall = overallGeometryRect(items);
+
+    switch (direction) {
+    case AlignLeftRight: {
+        // 所有图元拉伸至与整体包围盒同宽，左、右边缘分别对齐
+        for (auto *item : items) {
+            QRectF geom = itemGeometryRect(item);
+            QRectF newGeom = geom;
+            newGeom.setLeft(0);
+            newGeom.setWidth(overall.width());
+            qreal newX = overall.left();
+            result.newPositions << QPointF(newX, item->pos().y());
+            result.newGeometries << newGeom;
+        }
+        break;
+    }
+    case AlignTopBottom: {
+        // 所有图元拉伸至与整体包围盒同高，上、下边缘分别对齐
+        for (auto *item : items) {
+            QRectF geom = itemGeometryRect(item);
+            QRectF newGeom = geom;
+            newGeom.setTop(0);
+            newGeom.setHeight(overall.height());
+            qreal newY = overall.top();
+            result.newPositions << QPointF(item->pos().x(), newY);
+            result.newGeometries << newGeom;
+        }
+        break;
+    }
+    case AlignHProportional: {
+        // 横向撑满并等比缩放高度
+        for (auto *item : items) {
+            QRectF geom = itemGeometryRect(item);
+            if (geom.width() <= 0) {
+                result.newPositions << item->pos();
+                result.newGeometries << geom;
+                continue;
+            }
+            qreal scale = overall.width() / geom.width();
+            QRectF newGeom(0, 0, overall.width(), geom.height() * scale);
+            result.newPositions << QPointF(overall.left(),
+                                           item->pos().y() + geom.top() - newGeom.top());
+            result.newGeometries << newGeom;
+        }
+        break;
+    }
+    case AlignVProportional: {
+        // 纵向撑齐并等比缩放宽度
+        for (auto *item : items) {
+            QRectF geom = itemGeometryRect(item);
+            if (geom.height() <= 0) {
+                result.newPositions << item->pos();
+                result.newGeometries << geom;
+                continue;
+            }
+            qreal scale = overall.height() / geom.height();
+            QRectF newGeom(0, 0, geom.width() * scale, overall.height());
+            result.newPositions << QPointF(item->pos().x() + geom.left() - newGeom.left(),
+                                           overall.top());
+            result.newGeometries << newGeom;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    result.valid = !result.newPositions.isEmpty();
+    return result;
+}
+
+// ============================================================
+// 页内居中算法
+// ============================================================
+AlignResult computePageCenter(const QList<QGraphicsItem *> &items,
+                              AlignDirection direction, const QRectF &pageRect)
+{
+    AlignResult result;
+    if (items.isEmpty() || pageRect.isNull()) return result;
+
+    for (auto *item : items)
+        result.oldPositions << item->pos();
+
+    if (direction == AlignHCenterOnPage) {
+        qreal pageCenterX = pageRect.center().x();
+        for (auto *item : items) {
+            qreal itemCenterX = item->pos().x() + itemGeometryRect(item).center().x();
+            result.newPositions << QPointF(item->pos().x() + (pageCenterX - itemCenterX),
+                                           item->pos().y());
+        }
+    } else if (direction == AlignVCenterOnPage) {
+        qreal pageCenterY = pageRect.center().y();
+        for (auto *item : items) {
+            qreal itemCenterY = item->pos().y() + itemGeometryRect(item).center().y();
+            result.newPositions << QPointF(item->pos().x(),
+                                           item->pos().y() + (pageCenterY - itemCenterY));
+        }
+    }
+
+    result.valid = !result.newPositions.isEmpty();
+    return result;
+}
+
+// ============================================================
+// 按边缘排序辅助
+// ============================================================
+static QList<QGraphicsItem *> sortByEdge(const QList<QGraphicsItem *> &items, DistributeDirection dir)
+{
+    QList<QGraphicsItem *> sorted = items;
+    switch (dir) {
+    case DistributeH:
+    case DistributeHLeft:
+        std::sort(sorted.begin(), sorted.end(), [](QGraphicsItem *a, QGraphicsItem *b) {
+            return (a->pos().x() + itemGeometryRect(a).left())
+                   < (b->pos().x() + itemGeometryRect(b).left());
+        });
+        break;
+    case DistributeHCenter:
+        std::sort(sorted.begin(), sorted.end(), [](QGraphicsItem *a, QGraphicsItem *b) {
+            return (a->pos().x() + itemGeometryRect(a).center().x())
+                   < (b->pos().x() + itemGeometryRect(b).center().x());
+        });
+        break;
+    case DistributeHRight:
+        std::sort(sorted.begin(), sorted.end(), [](QGraphicsItem *a, QGraphicsItem *b) {
+            return (a->pos().x() + itemGeometryRect(a).right())
+                   < (b->pos().x() + itemGeometryRect(b).right());
+        });
+        break;
+    case DistributeV:
+    case DistributeVTop:
+        std::sort(sorted.begin(), sorted.end(), [](QGraphicsItem *a, QGraphicsItem *b) {
+            return (a->pos().y() + itemGeometryRect(a).top())
+                   < (b->pos().y() + itemGeometryRect(b).top());
+        });
+        break;
+    case DistributeVCenter:
+        std::sort(sorted.begin(), sorted.end(), [](QGraphicsItem *a, QGraphicsItem *b) {
+            return (a->pos().y() + itemGeometryRect(a).center().y())
+                   < (b->pos().y() + itemGeometryRect(b).center().y());
+        });
+        break;
+    case DistributeVBottom:
+        std::sort(sorted.begin(), sorted.end(), [](QGraphicsItem *a, QGraphicsItem *b) {
+            return (a->pos().y() + itemGeometryRect(a).bottom())
+                   < (b->pos().y() + itemGeometryRect(b).bottom());
+        });
+        break;
+    }
+    return sorted;
+}
+
+// 获取图元在分布方向上的参考坐标（排序用）
+static qreal refCoord(QGraphicsItem *item, DistributeDirection dir)
+{
+    QRectF g = itemGeometryRect(item);
+    switch (dir) {
+    case DistributeH:
+    case DistributeHLeft:   return item->pos().x() + g.left();
+    case DistributeHCenter: return item->pos().x() + g.center().x();
+    case DistributeHRight:  return item->pos().x() + g.right();
+    case DistributeV:
+    case DistributeVTop:    return item->pos().y() + g.top();
+    case DistributeVCenter: return item->pos().y() + g.center().y();
+    case DistributeVBottom: return item->pos().y() + g.bottom();
+    }
+    return 0;
+}
+
+// 获取图元的几何尺寸（分布方向上的跨度）
+static qreal geomSpan(QGraphicsItem *item, DistributeDirection dir)
+{
+    return isHorizontal(dir) ? itemGeomWidth(item) : itemGeomHeight(item);
 }
 
 // ============================================================
@@ -151,103 +405,75 @@ DistributeResult computeDistribute(const QList<QGraphicsItem *> &items,
     DistributeResult result;
     if (items.size() < 2) return result;
 
-    // 保存旧位置
     for (auto *item : items)
         result.oldPositions << item->pos();
 
-    // 判断是否使用自定义间距（只有当非自动且间距>0时才走自定义路径）
-    // 注意：autoSpacing=false + customSpacing=0 意味着间距为0（紧密排列），
-    //       也走自定义路径，间距值为0
+    QList<QGraphicsItem *> sortedItems = sortByEdge(items, direction);
     bool useCustomSpacing = !params.autoSpacing;
+    bool isH = isHorizontal(direction);
 
-    if (direction == DistributeH) {
-        // 按左边缘排序
-        QList<QGraphicsItem *> sortedItems = items;
-        std::sort(sortedItems.begin(), sortedItems.end(), [](QGraphicsItem *a, QGraphicsItem *b) {
-            return (a->pos().x() + itemGeometryRect(a).left())
-                   < (b->pos().x() + itemGeometryRect(b).left());
-        });
+    QMap<QGraphicsItem *, QPointF> newPosMap;
 
-        QMap<QGraphicsItem *, QPointF> newPosMap;
+    if (useCustomSpacing) {
+        // 自定义间距：首图元保持原位，后续图元按指定间距依次排列
+        qreal current = refCoord(sortedItems.first(), direction);
+        for (int i = 0; i < sortedItems.size(); ++i) {
+            auto *item = sortedItems[i];
+            qreal itemRef = refCoord(item, direction);
+            qreal offset = current - itemRef;
+            if (isH)
+                newPosMap[item] = QPointF(item->pos().x() + offset, item->pos().y());
+            else
+                newPosMap[item] = QPointF(item->pos().x(), item->pos().y() + offset);
+            current += geomSpan(item, direction) + params.customSpacing;
+        }
+    } else {
+        // 自动间距：等间距分布（首末图元保持原位）
+        qreal firstRef = refCoord(sortedItems.first(), direction);
+        qreal lastRef = refCoord(sortedItems.last(), direction);
+        int n = sortedItems.size();
 
-        if (useCustomSpacing) {
-            // 自定义间距：首图元保持原位，后续图元按指定间距依次排列
-            qreal currentLeft = sortedItems.first()->pos().x() + itemGeometryRect(sortedItems.first()).left();
-            for (int i = 0; i < sortedItems.size(); ++i) {
-                qreal itemLeft = sortedItems[i]->pos().x() + itemGeometryRect(sortedItems[i]).left();
-                qreal offsetX = currentLeft - itemLeft;
-                newPosMap[sortedItems[i]] = QPointF(sortedItems[i]->pos().x() + offsetX,
-                                                     sortedItems[i]->pos().y());
-                qreal itemWidth = itemGeomWidth(sortedItems[i]);
-                currentLeft += itemWidth + params.customSpacing;
+        if (direction == DistributeH || direction == DistributeV) {
+            // 等间隙分布：间隙 = (末边缘 - 首起始 - 总宽度) / (n-1)
+            qreal totalSpan = 0;
+            for (auto *item : sortedItems)
+                totalSpan += geomSpan(item, direction);
+            qreal lastEnd = lastRef + geomSpan(sortedItems.last(), direction);
+            qreal gap0 = (lastEnd - firstRef - totalSpan) / (n - 1);
+
+            qreal current = firstRef;
+            for (int i = 0; i < n; ++i) {
+                auto *item = sortedItems[i];
+                qreal itemRef = refCoord(item, direction);
+                qreal offset = current - itemRef;
+                if (isH)
+                    newPosMap[item] = QPointF(item->pos().x() + offset, item->pos().y());
+                else
+                    newPosMap[item] = QPointF(item->pos().x(), item->pos().y() + offset);
+                current += geomSpan(item, direction) + gap0;
             }
         } else {
-            // 自动间距：等间隙分布（首末图元保持原位，中间图元按等间隙排列）
-            qreal minLeft = sortedItems.first()->pos().x() + itemGeometryRect(sortedItems.first()).left();
-            qreal maxRight = sortedItems.last()->pos().x() + itemGeometryRect(sortedItems.last()).right();
-            qreal totalWidth = 0;
-            for (auto *item : sortedItems)
-                totalWidth += itemGeomWidth(item);
-            qreal gap = (maxRight - minLeft - totalWidth) / (sortedItems.size() - 1);
+            // 边缘/中线等距分布：参考点间距相等
+            qreal totalRefSpan = lastRef - firstRef;
+            qreal step = totalRefSpan / (n - 1);
 
-            qreal currentLeft = minLeft;
-            for (int i = 0; i < sortedItems.size(); ++i) {
-                qreal itemLeft = sortedItems[i]->pos().x() + itemGeometryRect(sortedItems[i]).left();
-                qreal offsetX = currentLeft - itemLeft;
-                newPosMap[sortedItems[i]] = QPointF(sortedItems[i]->pos().x() + offsetX,
-                                                     sortedItems[i]->pos().y());
-                currentLeft += itemGeomWidth(sortedItems[i]) + gap;
+            qreal current = firstRef;
+            for (int i = 0; i < n; ++i) {
+                auto *item = sortedItems[i];
+                qreal itemRef = refCoord(item, direction);
+                qreal offset = current - itemRef;
+                if (isH)
+                    newPosMap[item] = QPointF(item->pos().x() + offset, item->pos().y());
+                else
+                    newPosMap[item] = QPointF(item->pos().x(), item->pos().y() + offset);
+                current += step;
             }
         }
-
-        // 按原始 items 顺序输出结果
-        for (auto *item : items)
-            result.newPositions << newPosMap.value(item, item->pos());
-
-    } else { // DistributeV
-        // 按顶边缘排序
-        QList<QGraphicsItem *> sortedItems = items;
-        std::sort(sortedItems.begin(), sortedItems.end(), [](QGraphicsItem *a, QGraphicsItem *b) {
-            return (a->pos().y() + itemGeometryRect(a).top())
-                   < (b->pos().y() + itemGeometryRect(b).top());
-        });
-
-        QMap<QGraphicsItem *, QPointF> newPosMap;
-
-        if (useCustomSpacing) {
-            // 自定义间距：首图元保持原位，后续图元按指定间距依次排列
-            qreal currentTop = sortedItems.first()->pos().y() + itemGeometryRect(sortedItems.first()).top();
-            for (int i = 0; i < sortedItems.size(); ++i) {
-                qreal itemTop = sortedItems[i]->pos().y() + itemGeometryRect(sortedItems[i]).top();
-                qreal offsetY = currentTop - itemTop;
-                newPosMap[sortedItems[i]] = QPointF(sortedItems[i]->pos().x(),
-                                                     sortedItems[i]->pos().y() + offsetY);
-                qreal itemHeight = itemGeomHeight(sortedItems[i]);
-                currentTop += itemHeight + params.customSpacing;
-            }
-        } else {
-            // 自动间距：等间隙分布（首末图元保持原位，中间图元按等间隙排列）
-            qreal minTop = sortedItems.first()->pos().y() + itemGeometryRect(sortedItems.first()).top();
-            qreal maxBottom = sortedItems.last()->pos().y() + itemGeometryRect(sortedItems.last()).bottom();
-            qreal totalHeight = 0;
-            for (auto *item : sortedItems)
-                totalHeight += itemGeomHeight(item);
-            qreal gap = (maxBottom - minTop - totalHeight) / (sortedItems.size() - 1);
-
-            qreal currentTop = minTop;
-            for (int i = 0; i < sortedItems.size(); ++i) {
-                qreal itemTop = sortedItems[i]->pos().y() + itemGeometryRect(sortedItems[i]).top();
-                qreal offsetY = currentTop - itemTop;
-                newPosMap[sortedItems[i]] = QPointF(sortedItems[i]->pos().x(),
-                                                     sortedItems[i]->pos().y() + offsetY);
-                currentTop += itemGeomHeight(sortedItems[i]) + gap;
-            }
-        }
-
-        // 按原始 items 顺序输出结果
-        for (auto *item : items)
-            result.newPositions << newPosMap.value(item, item->pos());
     }
+
+    // 按原始 items 顺序输出结果
+    for (auto *item : items)
+        result.newPositions << newPosMap.value(item, item->pos());
 
     result.valid = !result.newPositions.isEmpty();
     return result;

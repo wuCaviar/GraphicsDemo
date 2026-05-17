@@ -29,6 +29,28 @@
         <file>icons/view-fit.svg</file>
         <file>icons/view-zoom-reset.svg</file>
         <file>icons/view-grid.svg</file>
+        <file>icons/align-left.svg</file>
+        <file>icons/align-hcenter.svg</file>
+        <file>icons/align-right.svg</file>
+        <file>icons/align-stretch-h.svg</file>
+        <file>icons/align-prop-h.svg</file>
+        <file>icons/align-top.svg</file>
+        <file>icons/align-vcenter.svg</file>
+        <file>icons/align-bottom.svg</file>
+        <file>icons/align-stretch-v.svg</file>
+        <file>icons/align-prop-v.svg</file>
+        <file>icons/dist-left.svg</file>
+        <file>icons/dist-hcenter.svg</file>
+        <file>icons/dist-right.svg</file>
+        <file>icons/dist-hequal.svg</file>
+        <file>icons/dist-hcustom.svg</file>
+        <file>icons/dist-top.svg</file>
+        <file>icons/dist-vcenter.svg</file>
+        <file>icons/dist-bottom.svg</file>
+        <file>icons/dist-vequal.svg</file>
+        <file>icons/dist-vcustom.svg</file>
+        <file>icons/page-hcenter.svg</file>
+        <file>icons/page-vcenter.svg</file>
     </qresource>
     <qresource prefix="/style">
         <file>style.qss</file>

@@ -4,7 +4,6 @@
 #include <QDialog>
 #include <QPointer>
 #include <QGraphicsItem>
-#include <QMap>
 
 #include "AlignmentUtils.h"
 
@@ -14,10 +13,6 @@ class QDoubleSpinBox;
 class QPushButton;
 class QLabel;
 
-// 对齐与布局对话框
-// - 对齐/分布/间距均用按钮，点击立即生效（对话框不关闭）
-// - 无选中图元时只记录设置
-// - 关闭后再次弹出时保持上次设置
 class AlignLayoutDialog : public QDialog
 {
     Q_OBJECT
@@ -27,55 +22,74 @@ public:
                                QWidget *parent = nullptr);
 
     void refreshSelectionInfo();
+    void setDockReferenceWidget(QWidget *ref);
 
 protected:
     void showEvent(QShowEvent *event) override;
 
 private slots:
-    void onAlignButtonClicked();
-    void onDistributeButtonClicked();
-    void onAutoSpacingToggled();
+    void onAlignClicked();
+    void onDistributeClicked();
+    void onPageCenterClicked();
     void onSelectionChanged();
 
 private:
     void setupUI();
-    void updateAutoBtnText(QPushButton *btn);
     QList<QGraphicsItem *> filterSelectableItems() const;
+    void positionAboveDockRef();
 
-    // 执行对齐，返回是否成功
     bool applyAlign(AlignmentUtils::AlignDirection direction);
-    // 执行分布，返回是否成功
-    bool applyDistribute(AlignmentUtils::DistributeDirection direction);
+    bool applyDistribute(AlignmentUtils::DistributeDirection direction,
+                         const AlignmentUtils::DistributeParams &params);
+    bool applyPageCenter(AlignmentUtils::AlignDirection direction);
+    bool applyStretchAlign(AlignmentUtils::AlignDirection direction);
 
     QPointer<QGraphicsScene> m_scene;
     QUndoStack *m_undoStack = nullptr;
+    QWidget *m_dockRef = nullptr;
 
-    // ---- Align buttons ----
-    QPushButton *m_alignLeftBtn     = nullptr;
-    QPushButton *m_alignHCenterBtn  = nullptr;
-    QPushButton *m_alignRightBtn    = nullptr;
-    QPushButton *m_alignTopBtn       = nullptr;
-    QPushButton *m_alignVCenterBtn  = nullptr;
-    QPushButton *m_alignBottomBtn   = nullptr;
+    // Horizontal align
+    QPushButton *m_hAlignLeft      = nullptr;
+    QPushButton *m_hAlignCenter    = nullptr;
+    QPushButton *m_hAlignRight     = nullptr;
+    QPushButton *m_hAlignStretch   = nullptr;
+    QPushButton *m_hAlignProp      = nullptr;
 
-    // ---- Distribute buttons ----
-    QPushButton *m_distHBtn = nullptr;
-    QPushButton *m_distVBtn = nullptr;
+    // Horizontal distribute
+    QPushButton *m_hDistLeft       = nullptr;
+    QPushButton *m_hDistCenter     = nullptr;
+    QPushButton *m_hDistRight      = nullptr;
+    QPushButton *m_hDistEqualGap   = nullptr;
+    QPushButton *m_hDistCustom     = nullptr;
 
-    // ---- Spacing ----
+    // Vertical align
+    QPushButton *m_vAlignTop       = nullptr;
+    QPushButton *m_vAlignCenter    = nullptr;
+    QPushButton *m_vAlignBottom    = nullptr;
+    QPushButton *m_vAlignStretch   = nullptr;
+    QPushButton *m_vAlignProp      = nullptr;
+
+    // Vertical distribute
+    QPushButton *m_vDistTop        = nullptr;
+    QPushButton *m_vDistCenter     = nullptr;
+    QPushButton *m_vDistBottom     = nullptr;
+    QPushButton *m_vDistEqualGap   = nullptr;
+    QPushButton *m_vDistCustom     = nullptr;
+
+    // Page center
+    QPushButton *m_pageHCenter = nullptr;
+    QPushButton *m_pageVCenter = nullptr;
+
+    // Spacing
     QDoubleSpinBox *m_hSpacingSpin = nullptr;
     QDoubleSpinBox *m_vSpacingSpin = nullptr;
-    QPushButton *m_hAutoBtn = nullptr;   // toggle button: Auto / Manual
-    QPushButton *m_vAutoBtn = nullptr;
 
-    // ---- Info ----
+    // Info
     QLabel *m_selectionInfoLabel = nullptr;
 
-    // ---- Persisted state (跨弹出保持) ----
+    // Persisted spacing values
     static qreal s_hSpacing;
     static qreal s_vSpacing;
-    static bool s_hAuto;
-    static bool s_vAuto;
 };
 
 #endif // ALIGNLAYOUTDIALOG_H

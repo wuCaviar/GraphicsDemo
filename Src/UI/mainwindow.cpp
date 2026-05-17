@@ -1106,6 +1106,7 @@ void MainWindow::onAlignLayoutDialog()
         m_alignLayoutDlg =
             new AlignLayoutDialog(m_pView->scene(), m_undoStack, this);
         m_alignLayoutDlg->setAttribute(Qt::WA_DeleteOnClose);
+        m_alignLayoutDlg->setDockReferenceWidget(m_pPropertyPanel);
         // 关闭后清空指针，下次重新创建
         connect(m_alignLayoutDlg, &QObject::destroyed, this,
                 [this]() { m_alignLayoutDlg = nullptr; });

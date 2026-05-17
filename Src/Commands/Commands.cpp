@@ -316,6 +316,54 @@ void AlignItemsCommand::redo()
 }
 
 // ============================================================
+// StretchAlignItemsCommand（拉伸对齐：位置 + 几何同时变更）
+// ============================================================
+StretchAlignItemsCommand::StretchAlignItemsCommand(const QList<QGraphicsItem *> &items,
+                                                   const QList<QPointF> &oldPositions,
+                                                   const QList<QPointF> &newPositions,
+                                                   const QList<QRectF> &oldGeometries,
+                                                   const QList<QRectF> &newGeometries,
+                                                   const QString &description,
+                                                   QGraphicsScene *scene,
+                                                   QUndoCommand *parent)
+    : QUndoCommand(parent)
+    , m_items(items)
+    , m_oldPos(oldPositions)
+    , m_newPos(newPositions)
+    , m_oldGeom(oldGeometries)
+    , m_newGeom(newGeometries)
+    , m_scene(scene)
+{
+    setText(description.isEmpty() ? QObject::tr("Stretch Align Items") : description);
+}
+
+void StretchAlignItemsCommand::undo()
+{
+    if (!m_scene)
+        return;
+    for (int i = 0; i < m_items.size(); ++i) {
+        if (!m_items[i]) continue;
+        m_items[i]->setPos(m_oldPos[i]);
+        auto *gi = dynamic_cast<IGraphicsItem *>(m_items[i]);
+        if (gi && gi->supportsSetGeometryRect())
+            gi->setGeometryRect(m_oldGeom[i]);
+    }
+}
+
+void StretchAlignItemsCommand::redo()
+{
+    if (!m_scene)
+        return;
+    for (int i = 0; i < m_items.size(); ++i) {
+        if (!m_items[i]) continue;
+        m_items[i]->setPos(m_newPos[i]);
+        auto *gi = dynamic_cast<IGraphicsItem *>(m_items[i]);
+        if (gi && gi->supportsSetGeometryRect())
+            gi->setGeometryRect(m_newGeom[i]);
+    }
+}
+
+// ============================================================
 // PositionChangeCommand（单图元位置变更，由属性面板触发）
 // ============================================================
 PositionChangeCommand::PositionChangeCommand(QGraphicsItem *item, const QPointF &oldPos,
