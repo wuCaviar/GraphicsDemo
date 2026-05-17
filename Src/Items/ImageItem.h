@@ -3,6 +3,7 @@
 
 #include "IGraphicsItem.h"
 #include <QGraphicsPixmapItem>
+#include <opencv2/core/mat.hpp>
 
 class ImageItem : public QGraphicsPixmapItem, public IGraphicsItem
 {
@@ -48,15 +49,15 @@ public:
     bool supportsSetGeometryRect() const override { return true; }
 
     // 原始 TIFF 数据，用于无损导出
-    QByteArray rawTiffData() const { return m_rawTiffData; }
-    void setRawTiffData(const QByteArray &data) { m_rawTiffData = data; }
+    cv::Mat rawTiffData() const { return m_rawTiffMat; }
+    void setRawTiffData(const cv::Mat &data) { m_rawTiffMat = data; }
 
     // CMYK 源数据（导入 CMYK TIFF 时保留原始像素）
     bool isCmykSource() const { return m_isCmykSource; }
-    void setCmykSourceData(const QByteArray &data, int w, int h);
-    const QByteArray &rawCmykPixels() const { return m_rawCmykPixels; }
-    int cmykSourceWidth() const { return m_cmykWidth; }
-    int cmykSourceHeight() const { return m_cmykHeight; }
+    void setCmykSourceData(const cv::Mat &data);
+    const cv::Mat &rawCmykPixels() const { return m_rawCmykMat; }
+    int cmykSourceWidth() const { return m_rawCmykMat.cols; }
+    int cmykSourceHeight() const { return m_rawCmykMat.rows; }
 
     void serialize(QDataStream &out) const override;
     bool deserialize(QDataStream &in) override;
@@ -70,12 +71,10 @@ private:
     CmykColor m_penCmyk;
     QRectF m_rect;       // 自定义包围矩形（由缩放手柄设置）
     QString m_filePath;
-    QByteArray m_rawTiffData;  // 保留原始 TIFF 数据用于无损导出
+    cv::Mat m_rawTiffMat;  // 原始 TIFF 像素数据用于无损导出
 
     // CMYK 源像素数据
-    QByteArray m_rawCmykPixels;  // 原始 CMYK 像素（4 bytes/pixel, libtiff 0-255 顺序）
-    int m_cmykWidth = 0;
-    int m_cmykHeight = 0;
+    cv::Mat m_rawCmykMat;  // 原始 CMYK 像素（4 bytes/pixel, libtiff 0-255 顺序）
     bool m_isCmykSource = false;
 };
 

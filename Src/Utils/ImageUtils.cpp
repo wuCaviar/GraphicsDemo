@@ -82,6 +82,12 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
     uint16_t samplesPerPixel = 1;
     TIFFGetField(tif, TIFFTAG_PHOTOMETRIC, &photometric);
     TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &samplesPerPixel);
+
+    uint16_t bitsPerSample, planarConfig, inkSet;
+    TIFFGetField(tif, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
+    TIFFGetField(tif, TIFFTAG_PLANARCONFIG, &planarConfig);
+    TIFFGetField(tif, TIFFTAG_INKSET, &inkSet);
+
     bool isCmyk = (photometric == PHOTOMETRIC_SEPARATED && samplesPerPixel >= 4);
 
     // 读取 DPI 信息
@@ -109,9 +115,9 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
         }
 
         // 保留原始 CMYK 像素数据
-        QByteArray cmykBuf;
+        cv::Mat cmykMat;
         if (result)
-            cmykBuf.resize(width * height * 4);
+            cmykMat = cv::Mat(height, width, CV_8UC4);
 
         QVector<uint8_t> cmykLine(width * 4);
         for (uint32_t y = 0; y < height; ++y) {
@@ -123,7 +129,7 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
 
             // 保存原始 CMYK 数据
             if (result)
-                memcpy(cmykBuf.data() + y * width * 4, cmykLine.data(), width * 4);
+                memcpy(cmykMat.ptr(y), cmykLine.data(), width * 4);
 
             // 转换为 RGB 用于显示
             QRgb *scanLine = reinterpret_cast<QRgb *>(image.scanLine(y));
@@ -131,28 +137,18 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
                 int off = x * 4;
                 // libtiff CMYK: 0 = max ink, 255 = no ink
                 // QATColorManager::toRgb 期望 0-100 范围
-                double c = (255 - cmykLine[off + 0]) / 255.0 * 100.0;
-                double m = (255 - cmykLine[off + 1]) / 255.0 * 100.0;
-                double yv = (255 - cmykLine[off + 2]) / 255.0 * 100.0;
-                double k = (255 - cmykLine[off + 3]) / 255.0 * 100.0;
+                double c = cmykLine[off + 0] / 255.0 * 100.0;
+                double m = cmykLine[off + 1] / 255.0 * 100.0;
+                double yv = cmykLine[off + 2] / 255.0 * 100.0;
+                double k = cmykLine[off + 3] / 255.0 * 100.0;
 
-                if (useLcms2) {
-                    QColor rgb = cm.toRgb(QATColorManager::Cmyk{c, m, yv, k});
-                    scanLine[x] = rgb.rgba();
-                } else {
-                    // Fallback: naive CMYK→RGB
-                    int ri = qBound(0, static_cast<int>((100 - c) * 2.55), 255);
-                    int gi = qBound(0, static_cast<int>((100 - m) * 2.55), 255);
-                    int bi = qBound(0, static_cast<int>((100 - yv) * 2.55), 255);
-                    scanLine[x] = qRgba(ri, gi, bi, 255);
-                }
+                QColor rgb = cm.toRgb(QATColorManager::Cmyk{c, m, yv, k});
+                scanLine[x] = rgb.rgba();
             }
         }
 
         if (result && !readError) {
-            result->rawCmykPixels = cmykBuf;
-            result->cmykWidth = width;
-            result->cmykHeight = height;
+            result->rawCmykMat = cmykMat;
             result->isCmykSource = true;
         }
     } else {
@@ -181,6 +177,12 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
             int g = (abgr >> 8) & 0xFF;
             int r = abgr & 0xFF;
             scanLine[i] = qRgba(r, g, b, a);
+        }
+
+        // 保留原始 TIFF 像素数据
+        if (result) {
+            cv::Mat rawMat(height, width, CV_8UC4, raster);
+            result->rawTiffMat = rawMat.clone();
         }
 
         _TIFFfree(raster);
@@ -244,13 +246,7 @@ ImportResult loadImageFromFile(const QString &path, const ImportParameters &para
     result.filePath = path;
 
     if (isTiffFile(path)) {
-        // 导入 TIFF 并读取元数据
         result.image = importTiffWithLibtiff(path, params, &result);
-
-        // 保留原始 TIFF 数据用于无损导出
-        QFile f(path);
-        if (f.open(QIODevice::ReadOnly))
-            result.rawTiffData = f.readAll();
     } else {
         // 使用 QImageReader 读取非 TIFF 图像
         QImageReader reader(path);
@@ -809,30 +805,30 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
             // ImageItem with raw CMYK source: composite raw CMYK pixels directly
             auto *imgItem = dynamic_cast<ImageItem *>(gi);
             if (imgItem && imgItem->isCmykSource()) {
+                const cv::Mat &cmykMat = imgItem->rawCmykPixels();
+                int srcW = cmykMat.cols;
+                int srcH = cmykMat.rows;
                 QRectF sceneRect = gi->sceneBoundingRect();
                 QRectF pixelRect((sceneRect.x() - exportRect.x()),
                                  (sceneRect.y() - exportRect.y()),
                                  sceneRect.width(), sceneRect.height());
-                int srcW = imgItem->cmykSourceWidth();
-                int srcH = imgItem->cmykSourceHeight();
                 if (srcW > 0 && srcH > 0 && y >= pixelRect.top() && y <= pixelRect.bottom()) {
                     int x0 = qBound(0, static_cast<int>(pixelRect.left()), width - 1);
                     int x1 = qBound(0, static_cast<int>(pixelRect.right()), width - 1);
                     double scaleX = static_cast<double>(srcW) / pixelRect.width();
                     double scaleY = static_cast<double>(srcH) / pixelRect.height();
                     int srcY = qBound(0, static_cast<int>((y - pixelRect.top()) * scaleY), srcH - 1);
-                    const uint8_t *srcRow = reinterpret_cast<const uint8_t *>(
-                        imgItem->rawCmykPixels().constData() + srcY * srcW * 4);
+                    const uint8_t *srcRow = cmykMat.ptr<uint8_t>(srcY);
                     for (int x = x0; x <= x1; ++x) {
                         int srcX = qBound(0, static_cast<int>((x - pixelRect.left()) * scaleX), srcW - 1);
                         int srcOff = srcX * 4;
                         int dstOff = x * 4;
                         // libtiff: 0 = max ink, 255 = no ink
                         // export:  0 = no ink,  255 = max ink → invert
-                        rowBuf[dstOff + 0] = 255 - srcRow[srcOff + 0];
-                        rowBuf[dstOff + 1] = 255 - srcRow[srcOff + 1];
-                        rowBuf[dstOff + 2] = 255 - srcRow[srcOff + 2];
-                        rowBuf[dstOff + 3] = 255 - srcRow[srcOff + 3];
+                        rowBuf[dstOff + 0] = srcRow[srcOff + 0];
+                        rowBuf[dstOff + 1] = srcRow[srcOff + 1];
+                        rowBuf[dstOff + 2] = srcRow[srcOff + 2];
+                        rowBuf[dstOff + 3] = srcRow[srcOff + 3];
                     }
                 }
             }

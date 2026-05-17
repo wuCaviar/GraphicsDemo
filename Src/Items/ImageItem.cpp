@@ -12,7 +12,6 @@ ImageItem::ImageItem(const QPixmap &pixmap, QGraphicsItem *parent)
 {
     setFlag(ItemIsSelectable, true);
     setFlag(ItemIsMovable, true);
-    // 初始化 m_rect 为原始图片尺寸
     if (!pixmap.isNull())
         m_rect = QRectF(QPointF(0, 0), pixmap.size());
 }
@@ -28,9 +27,9 @@ QGraphicsItem *ImageItem::cloneItem() const
     if (m_rect.isValid())
         item->setRect(m_rect);
     item->setFilePath(m_filePath);
-    item->setRawTiffData(m_rawTiffData);
+    item->setRawTiffData(m_rawTiffMat);
     if (m_isCmykSource)
-        item->setCmykSourceData(m_rawCmykPixels, m_cmykWidth, m_cmykHeight);
+        item->setCmykSourceData(m_rawCmykMat);
     return item;
 }
 
@@ -40,7 +39,6 @@ void ImageItem::setItemImage(const QImage &img)
 {
     prepareGeometryChange();
     setPixmap(QPixmap::fromImage(img));
-    // 更新 m_rect
     if (!img.isNull())
         m_rect = QRectF(QPointF(0, 0), img.size());
     else
@@ -67,27 +65,51 @@ QRectF ImageItem::boundingRect() const
 
 QRectF ImageItem::geometryRect() const
 {
-    // ImageItem 没有画笔边距问题，geometryRect 与 boundingRect 一致
     return boundingRect();
 }
 
 void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
     if (m_rect.isValid() && !pixmap().isNull()) {
-        // 按 m_rect 缩放绘制图片
         painter->drawPixmap(m_rect, pixmap(), QRectF(pixmap().rect()));
     } else {
         QGraphicsPixmapItem::paint(painter, option, widget);
     }
 }
 
+static void writeCvMat(QDataStream &out, const cv::Mat &m)
+{
+    out << m.rows << m.cols << static_cast<int>(m.type());
+    if (m.isContinuous() && !m.empty()) {
+        QByteArray data(reinterpret_cast<const char *>(m.data),
+                        static_cast<int>(m.total() * m.elemSize()));
+        out << data;
+    } else {
+        out << QByteArray();
+    }
+}
+
+static cv::Mat readCvMat(QDataStream &in)
+{
+    int rows, cols, type;
+    QByteArray data;
+    in >> rows >> cols >> type >> data;
+    if (rows > 0 && cols > 0 && !data.isEmpty()) {
+        cv::Mat m(rows, cols, type, data.data());
+        return m.clone();
+    }
+    return cv::Mat();
+}
+
 void ImageItem::serialize(QDataStream &out) const
 {
     QImage img = pixmap().toImage();
-    out << img << m_pen << pos() << rotation() << m_filePath << m_rawTiffData << m_rect;
+    out << img << m_pen << pos() << rotation() << m_filePath;
+    writeCvMat(out, m_rawTiffMat);
+    out << m_rect;
     out << m_isCmykSource;
     if (m_isCmykSource)
-        out << m_rawCmykPixels << m_cmykWidth << m_cmykHeight;
+        writeCvMat(out, m_rawCmykMat);
 }
 
 bool ImageItem::deserialize(QDataStream &in)
@@ -95,16 +117,17 @@ bool ImageItem::deserialize(QDataStream &in)
     QImage img;
     qreal rot;
     QPointF pos_;
-    in >> img >> m_pen >> pos_ >> rot >> m_filePath >> m_rawTiffData >> m_rect;
+    in >> img >> m_pen >> pos_ >> rot >> m_filePath;
+    m_rawTiffMat = readCvMat(in);
+    in >> m_rect;
     if (in.status() != QDataStream::Ok)
         return false;
 
-    // 读取 CMYK 源数据（版本兼容：如果没有则跳过）
     m_isCmykSource = false;
     if (!in.atEnd()) {
         in >> m_isCmykSource;
         if (m_isCmykSource)
-            in >> m_rawCmykPixels >> m_cmykWidth >> m_cmykHeight;
+            m_rawCmykMat = readCvMat(in);
     }
 
     setPixmap(QPixmap::fromImage(img));
@@ -113,10 +136,8 @@ bool ImageItem::deserialize(QDataStream &in)
     return true;
 }
 
-void ImageItem::setCmykSourceData(const QByteArray &data, int w, int h)
+void ImageItem::setCmykSourceData(const cv::Mat &data)
 {
-    m_rawCmykPixels = data;
-    m_cmykWidth = w;
-    m_cmykHeight = h;
+    m_rawCmykMat = data.clone();
     m_isCmykSource = true;
 }

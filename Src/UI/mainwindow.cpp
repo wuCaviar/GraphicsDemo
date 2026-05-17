@@ -38,6 +38,7 @@
 #include <QMap>
 #include <QMimeData>
 #include <QPainter>
+#include <QPushButton>
 #include <QScrollBar>
 #include <QSettings>
 #include <QShortcut>
@@ -66,7 +67,6 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-
     m_undoStack = new QUndoStack(this);
 
     _initWidget();
@@ -81,7 +81,7 @@ MainWindow::MainWindow(QWidget *parent)
     // 加载 QSS 样式表
     loadStyleSheet();
 
-    setWindowTitle(tr("GraphicsDemo"));
+    setWindowTitle(tr("AT Drawing Tools"));
     resize(1200, 800);
 
     // 加载窗口状态（工具栏位置、可见性等）
@@ -99,10 +99,9 @@ void MainWindow::loadStyleSheet()
 
 MainWindow::~MainWindow()
 {
-    // 先断开场景信号，防止析构期间信号触发访问半销毁状态的对象
-    if (m_pView && m_pView->scene())
-        disconnect(m_pView->scene(), &QGraphicsScene::selectionChanged, this,
-                   &MainWindow::onSelectionChanged);
+    // 断开 view 信号，防止析构期间信号触发访问半销毁状态的对象
+    if (m_pView)
+        m_pView->disconnect();
 
     // 清空属性面板引用，避免悬空指针
     if (m_pPropertyPanel)
@@ -123,7 +122,7 @@ void MainWindow::_initWidget()
 {
     m_pView = new QAtGraphicsView(this);
     m_pView->setUndoStack(m_undoStack);
-    m_pView->setEnabled(false);  // 没有画板前禁止操作
+    m_pView->setEnabled(false); // 没有画板前禁止操作
     setCentralWidget(m_pView);
 }
 
@@ -165,6 +164,7 @@ void MainWindow::_initMenuBar()
     QAction *newAct =
         fileMenu->addAction(QIcon(":/icons/icons/file-new.svg"), tr("&New..."));
     newAct->setShortcut(QKeySequence::New);
+    newAct->setToolTip(tr("Create a new canvas"));
     connect(newAct, &QAction::triggered, this, &MainWindow::onNew);
 
     fileMenu->addSeparator();
@@ -172,17 +172,20 @@ void MainWindow::_initMenuBar()
     QAction *importAct = fileMenu->addAction(
         QIcon(":/icons/icons/file-import.svg"), tr("&Import Image..."));
     importAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_I));
+    importAct->setToolTip(tr("Import an image onto the canvas"));
     connect(importAct, &QAction::triggered, this, &MainWindow::onImportImage);
 
     QAction *exportAct = fileMenu->addAction(
         QIcon(":/icons/icons/file-export.svg"), tr("&Export Image..."));
     exportAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
+    exportAct->setToolTip(tr("Export the canvas to an image file"));
     connect(exportAct, &QAction::triggered, this, &MainWindow::onExportImage);
 
     fileMenu->addSeparator();
 
     QAction *exitAct = fileMenu->addAction(tr("E&xit"));
     exitAct->setShortcut(QKeySequence::Quit);
+    exitAct->setToolTip(tr("Exit the application"));
     connect(exitAct, &QAction::triggered, this, &QWidget::close);
 
     // ---- 编辑 ----
@@ -191,11 +194,13 @@ void MainWindow::_initMenuBar()
     m_undoAction =
         editMenu->addAction(QIcon(":/icons/icons/edit-undo.svg"), tr("&Undo"));
     m_undoAction->setShortcut(QKeySequence::Undo);
+    m_undoAction->setToolTip(tr("Undo the last action"));
     connect(m_undoAction, &QAction::triggered, this, &MainWindow::onUndo);
 
     m_redoAction =
         editMenu->addAction(QIcon(":/icons/icons/edit-redo.svg"), tr("&Redo"));
     m_redoAction->setShortcut(QKeySequence::Redo);
+    m_redoAction->setToolTip(tr("Redo the last undone action"));
     connect(m_redoAction, &QAction::triggered, this, &MainWindow::onRedo);
 
     editMenu->addSeparator();
@@ -203,16 +208,19 @@ void MainWindow::_initMenuBar()
     QAction *cutAct =
         editMenu->addAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cu&t"));
     cutAct->setShortcut(QKeySequence::Cut);
+    cutAct->setToolTip(tr("Cut the selected items to clipboard"));
     connect(cutAct, &QAction::triggered, this, &MainWindow::onCut);
 
     QAction *copyAct =
         editMenu->addAction(QIcon(":/icons/icons/edit-copy.svg"), tr("&Copy"));
     copyAct->setShortcut(QKeySequence::Copy);
+    copyAct->setToolTip(tr("Copy the selected items to clipboard"));
     connect(copyAct, &QAction::triggered, this, &MainWindow::onCopy);
 
     QAction *pasteAct = editMenu->addAction(
         QIcon(":/icons/icons/edit-paste.svg"), tr("&Paste"));
     pasteAct->setShortcut(QKeySequence::Paste);
+    pasteAct->setToolTip(tr("Paste items from clipboard"));
     connect(pasteAct, &QAction::triggered, this, &MainWindow::onPaste);
 
     editMenu->addSeparator();
@@ -220,56 +228,81 @@ void MainWindow::_initMenuBar()
     QAction *deleteAct = editMenu->addAction(
         QIcon(":/icons/icons/edit-delete.svg"), tr("&Delete"));
     deleteAct->setShortcut(QKeySequence::Delete);
+    deleteAct->setToolTip(tr("Delete the selected items"));
     connect(deleteAct, &QAction::triggered, this, &MainWindow::onDelete);
 
     QAction *selectAllAct = editMenu->addAction(
         QIcon(":/icons/icons/edit-select-all.svg"), tr("Select &All"));
     selectAllAct->setShortcut(QKeySequence::SelectAll);
+    selectAllAct->setToolTip(tr("Select all items on the canvas"));
     connect(selectAllAct, &QAction::triggered, this, &MainWindow::onSelectAll);
 
     // ---- 排列 ----
     QMenu *arrMenu = menu->addMenu(tr("&Arrange"));
-    arrMenu->addAction(QIcon(":/icons/icons/bring-front.svg"),
-                       tr("Bring to Front"), this, &MainWindow::onBringToFront);
-    arrMenu->addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send to Back"),
-                       this, &MainWindow::onSendToBack);
+    arrMenu
+        ->addAction(QIcon(":/icons/icons/bring-front.svg"),
+                    tr("Bring to Front"), this, &MainWindow::onBringToFront)
+        ->setToolTip(tr("Bring selected items to the front"));
+    arrMenu
+        ->addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send to Back"),
+                    this, &MainWindow::onSendToBack)
+        ->setToolTip(tr("Send selected items to the back"));
     arrMenu->addSeparator();
     QAction *groupAct =
         arrMenu->addAction(QIcon(":/icons/icons/group.svg"), tr("&Group"));
     groupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
+    groupAct->setToolTip(tr("Group selected items together"));
     connect(groupAct, &QAction::triggered, this, &MainWindow::onGroup);
     QAction *ungroupAct =
         arrMenu->addAction(QIcon(":/icons/icons/ungroup.svg"), tr("&Ungroup"));
     ungroupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
+    ungroupAct->setToolTip(tr("Ungroup selected items"));
     connect(ungroupAct, &QAction::triggered, this, &MainWindow::onUngroup);
     arrMenu->addSeparator();
     QMenu *alignMenu = arrMenu->addMenu(tr("Align"));
-    alignMenu->addAction(tr("Left"), this, &MainWindow::onAlignLeft);
-    alignMenu->addAction(tr("Right"), this, &MainWindow::onAlignRight);
-    alignMenu->addAction(tr("Top"), this, &MainWindow::onAlignTop);
-    alignMenu->addAction(tr("Bottom"), this, &MainWindow::onAlignBottom);
-    alignMenu->addAction(tr("Center H"), this, &MainWindow::onAlignHCenter);
-    alignMenu->addAction(tr("Center V"), this, &MainWindow::onAlignVCenter);
+    alignMenu->addAction(tr("Left"), this, &MainWindow::onAlignLeft)
+        ->setToolTip(tr("Align selected items to the left edge"));
+    alignMenu->addAction(tr("Right"), this, &MainWindow::onAlignRight)
+        ->setToolTip(tr("Align selected items to the right edge"));
+    alignMenu->addAction(tr("Top"), this, &MainWindow::onAlignTop)
+        ->setToolTip(tr("Align selected items to the top edge"));
+    alignMenu->addAction(tr("Bottom"), this, &MainWindow::onAlignBottom)
+        ->setToolTip(tr("Align selected items to the bottom edge"));
+    alignMenu->addAction(tr("Center H"), this, &MainWindow::onAlignHCenter)
+        ->setToolTip(tr("Align selected items to the horizontal center"));
+    alignMenu->addAction(tr("Center V"), this, &MainWindow::onAlignVCenter)
+        ->setToolTip(tr("Align selected items to the vertical center"));
     QMenu *distMenu = arrMenu->addMenu(tr("Distribute"));
-    distMenu->addAction(tr("Horizontally"), this, &MainWindow::onDistributeH);
-    distMenu->addAction(tr("Vertically"), this, &MainWindow::onDistributeV);
+    distMenu->addAction(tr("Horizontally"), this, &MainWindow::onDistributeH)
+        ->setToolTip(tr("Distribute selected items evenly horizontally"));
+    distMenu->addAction(tr("Vertically"), this, &MainWindow::onDistributeV)
+        ->setToolTip(tr("Distribute selected items evenly vertically"));
     distMenu->addSeparator();
-    distMenu->addAction(tr("Align && Layout..."), this,
-                        &MainWindow::onAlignLayoutDialog);
+    distMenu
+        ->addAction(tr("Align && Layout..."), this,
+                    &MainWindow::onAlignLayoutDialog)
+        ->setToolTip(tr("Open the Align & Layout dialog"));
     arrMenu->addSeparator();
     QMenu *rotateMenu = arrMenu->addMenu(tr("Rotate"));
-    rotateMenu->addAction(QIcon(":/icons/icons/rotate-cw.svg"),
-                          tr("90\u00b0 Clockwise"), this,
-                          [this]() { rotateSelectedItems(90.0); });
-    rotateMenu->addAction(QIcon(":/icons/icons/rotate-ccw.svg"),
-                          tr("90\u00b0 Counter-clockwise"), this,
-                          [this]() { rotateSelectedItems(-90.0); });
-    rotateMenu->addAction(tr("180\u00b0"), this,
-                          [this]() { rotateSelectedItems(180.0); });
+    rotateMenu
+        ->addAction(QIcon(":/icons/icons/rotate-cw.svg"),
+                    tr("90\u00b0 Clockwise"), this,
+                    [this]() { rotateSelectedItems(90.0); })
+        ->setToolTip(tr("Rotate selected items 90 degrees clockwise"));
+    rotateMenu
+        ->addAction(QIcon(":/icons/icons/rotate-ccw.svg"),
+                    tr("90\u00b0 Counter-clockwise"), this,
+                    [this]() { rotateSelectedItems(-90.0); })
+        ->setToolTip(tr("Rotate selected items 90 degrees counter-clockwise"));
+    rotateMenu
+        ->addAction(tr("180\u00b0"), this,
+                    [this]() { rotateSelectedItems(180.0); })
+        ->setToolTip(tr("Rotate selected items 180 degrees"));
 
     // ---- 设置 ----
     QMenu *settingsMenu = menu->addMenu(tr("&Settings"));
-    settingsMenu->addAction(tr("设置..."), this, &MainWindow::onSettings);
+    settingsMenu->addAction(tr("设置..."), this, &MainWindow::onSettings)
+        ->setToolTip(tr("Open application settings"));
 
     // ---- 视图 ----
     QMenu *viewMenu = menu->addMenu(tr("&View"));
@@ -281,12 +314,15 @@ void MainWindow::_initMenuBar()
                                        tr("Show Grid"));
     m_gridAction->setCheckable(true);
     m_gridAction->setChecked(true);
+    m_gridAction->setToolTip(tr("Show or hide the grid"));
     connect(m_gridAction, &QAction::toggled, this,
             [this](bool checked) { m_pView->setGridVisible(checked); });
 
     // 刻度尺单位切换（px ↔ mm）
     m_rulerUnitAction = viewMenu->addAction(tr("Ruler Unit: mm"));
     m_rulerUnitAction->setCheckable(true);
+    m_rulerUnitAction->setToolTip(
+        tr("Toggle ruler unit between millimeters and pixels"));
     connect(m_rulerUnitAction, &QAction::toggled, this, [this](bool checked) {
         auto unit = checked ? RulerBar::Millimeter : RulerBar::Pixel;
         m_hRuler->setUnit(unit);
@@ -302,14 +338,15 @@ void MainWindow::_initMenuBar()
     // 缩放适配
     QAction *fitAct = new QAction(QIcon(":/icons/icons/view-fit.svg"),
                                   tr("Fit to Canvas"), this);
+    fitAct->setToolTip(tr("Fit the view to the canvas"));
     connect(fitAct, &QAction::triggered, this,
             [this]() { m_pView->fitToCanvas(); });
     viewMenu->addAction(fitAct);
 
-    QAction *resetZoomAct =
-        new QAction(QIcon(":/icons/icons/view-zoom-reset.svg"),
-                    tr("Reset Zoom (Ctrl+0)"), this);
+    QAction *resetZoomAct = new QAction(
+        QIcon(":/icons/icons/view-zoom-reset.svg"), tr("Reset Zoom (0)"), this);
     resetZoomAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
+    resetZoomAct->setToolTip(tr("Reset zoom to 100%"));
     connect(resetZoomAct, &QAction::triggered, this,
             [this]() { m_pView->setZoomLevel(1.0); });
     viewMenu->addAction(resetZoomAct);
@@ -330,18 +367,21 @@ void MainWindow::_initToolBar()
     // New 按钮
     QAction *newAct =
         new QAction(QIcon(":/icons/icons/file-new.svg"), tr("New"), this);
+    newAct->setToolTip(tr("Create a new canvas"));
     connect(newAct, &QAction::triggered, this, &MainWindow::onNew);
     fileEditBar->addAction(newAct);
 
     // Import 按钮
     QAction *importAct = new QAction(QIcon(":/icons/icons/file-import.svg"),
                                      tr("Import Image"), this);
+    importAct->setToolTip(tr("Import an image onto the canvas"));
     connect(importAct, &QAction::triggered, this, &MainWindow::onImportImage);
     fileEditBar->addAction(importAct);
 
     // Export 按钮
     QAction *exportAct = new QAction(QIcon(":/icons/icons/file-export.svg"),
                                      tr("Export Image"), this);
+    exportAct->setToolTip(tr("Export the canvas to an image file"));
     connect(exportAct, &QAction::triggered, this, &MainWindow::onExportImage);
     fileEditBar->addAction(exportAct);
 
@@ -356,6 +396,7 @@ void MainWindow::_initToolBar()
     QAction *cutAct =
         new QAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cut"), this);
     cutAct->setShortcut(QKeySequence::Cut);
+    cutAct->setToolTip(tr("Cut the selected items to clipboard"));
     connect(cutAct, &QAction::triggered, this, &MainWindow::onCut);
     fileEditBar->addAction(cutAct);
 
@@ -363,6 +404,7 @@ void MainWindow::_initToolBar()
     QAction *copyAct =
         new QAction(QIcon(":/icons/icons/edit-copy.svg"), tr("Copy"), this);
     copyAct->setShortcut(QKeySequence::Copy);
+    copyAct->setToolTip(tr("Copy the selected items to clipboard"));
     connect(copyAct, &QAction::triggered, this, &MainWindow::onCopy);
     fileEditBar->addAction(copyAct);
 
@@ -370,6 +412,7 @@ void MainWindow::_initToolBar()
     QAction *pasteAct =
         new QAction(QIcon(":/icons/icons/edit-paste.svg"), tr("Paste"), this);
     pasteAct->setShortcut(QKeySequence::Paste);
+    pasteAct->setToolTip(tr("Paste items from clipboard"));
     connect(pasteAct, &QAction::triggered, this, &MainWindow::onPaste);
     fileEditBar->addAction(pasteAct);
 
@@ -588,6 +631,7 @@ void MainWindow::_initStatusBar()
     m_zoomSlider->setFixedWidth(120);
     m_zoomSlider->setTickPosition(QSlider::TicksBelow);
     m_zoomSlider->setTickInterval(50);
+    m_zoomSlider->setToolTip(tr("Adjust zoom level"));
     connect(m_zoomSlider, &QSlider::valueChanged, this, [this](int value) {
         qreal targetZoom = value / 100.0;
         m_pView->setZoomLevel(targetZoom);
@@ -733,6 +777,16 @@ void MainWindow::resizeEvent(QResizeEvent *event)
         m_vRuler->updateRuler();
 }
 
+void MainWindow::setMainWindowVisibility(bool state)
+{
+    if (state) {
+        show();
+        raise();
+        activateWindow();
+    } else {
+        hide();
+    }
+}
 // ============================================================
 // 文件操作
 // ============================================================
@@ -753,7 +807,7 @@ void MainWindow::onNew()
 
     // 安全清空场景并重建画布
     m_pView->resetCanvas(canvasSize);
-    m_pView->setEnabled(true);  // 画板就绪，允许操作
+    m_pView->setEnabled(true); // 画板就绪，允许操作
 
     // 设置画布 PPI
     if (m_pView->canvasItem())
@@ -779,10 +833,9 @@ void MainWindow::onImportImage()
     auto *item = new ImageItem(QPixmap::fromImage(result.image));
     item->setItemPen(QPen(Qt::NoPen));
     item->setFilePath(result.filePath);
-    item->setRawTiffData(result.rawTiffData);
+    item->setRawTiffData(result.rawTiffMat);
     if (result.isCmykSource)
-        item->setCmykSourceData(result.rawCmykPixels, result.cmykWidth,
-                                result.cmykHeight);
+        item->setCmykSourceData(result.rawCmykMat);
 
     m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
 }
@@ -805,7 +858,8 @@ void MainWindow::onExportImage()
     // exportParams = dialog.getParameters();
 
     // 不再显示参数设置对话框，直接设置参数
-    exportParams.colorSpace = ImageUtils::ExportParameters::ColorSpace::ConvertToCMYK;
+    exportParams.colorSpace =
+        ImageUtils::ExportParameters::ColorSpace::ConvertToCMYK;
 
     // 第三步：根据画布或场景内容创建图像
     QRectF exportRect;
@@ -1277,14 +1331,15 @@ void MainWindow::onRequestFinished(const QJsonDocument &json)
             m_pProgress->setValue(progress);
             if (progress == m_pProgress->maximum()) {
                 m_pTimer->stop();
-                m_pTimer->disconnect();
+                m_pTimer->disconnect(this);
             }
         } else {
             // 定时获取Rip进度并更新进度条
             if (m_pTimer) {
                 m_pTimer->stop();
+                m_pTimer->disconnect(this);
                 connect(m_pTimer, &QTimer::timeout, this,
-                        [&]() { m_pNetWorkUtils->doRipStatus(); });
+                        [this]() { m_pNetWorkUtils->doRipStatus(); });
 
                 m_pTimer->start(1000);
             }
@@ -1574,10 +1629,9 @@ void MainWindow::closeEvent(QCloseEvent *event)
     // 保存窗口状态
     saveWindowState();
 
-    // 先断开场景信号，防止析构期间信号触发访问半销毁状态的对象
-    if (m_pView && m_pView->scene())
-        disconnect(m_pView->scene(), &QGraphicsScene::selectionChanged, this,
-                   &MainWindow::onSelectionChanged);
+    // 断开 view 信号，防止析构期间信号触发访问半销毁状态的对象
+    if (m_pView)
+        disconnect(m_pView, nullptr, this, nullptr);
 
     // 清空属性面板引用，避免悬空指针
     if (m_pPropertyPanel)

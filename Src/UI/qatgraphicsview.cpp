@@ -60,8 +60,8 @@ QAtGraphicsView::QAtGraphicsView(QWidget *parent) : QGraphicsView(parent)
 
 QAtGraphicsView::~QAtGraphicsView()
 {
-    // m_scene is a child QObject, cleaned up by Qt object tree
-    // GraphicsScene destructor handles ResizeHandle cleanup and signal disconnection
+    if (m_scene)
+        m_scene->disconnect();
 }
 
 void QAtGraphicsView::initCanvas(const QSizeF &size)
@@ -246,7 +246,9 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
             auto *item = new ImageItem(QPixmap::fromImage(result.image));
             item->setItemPen(QPen(Qt::NoPen));
             item->setFilePath(result.filePath);
-            item->setRawTiffData(result.rawTiffData);
+            item->setRawTiffData(result.rawTiffMat);
+            if (result.isCmykSource)
+                item->setCmykSourceData(result.rawCmykMat);
             item->setPos(scenePos);
 
             if (m_undoStack)
@@ -465,9 +467,11 @@ void QAtGraphicsView::contextMenuEvent(QContextMenuEvent *event)
 
     QMenu menu;
     menu.addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring to Front"),
-                   this, &QAtGraphicsView::bringToFrontRequested);
+                   this, &QAtGraphicsView::bringToFrontRequested)
+        ->setToolTip(tr("Bring selected items to the front"));
     menu.addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send to Back"),
-                   this, &QAtGraphicsView::sendToBackRequested);
+                   this, &QAtGraphicsView::sendToBackRequested)
+        ->setToolTip(tr("Send selected items to the back"));
 
     menu.addSeparator();
 
@@ -482,9 +486,13 @@ void QAtGraphicsView::contextMenuEvent(QContextMenuEvent *event)
     }
 
     if (topLevelCount >= 2)
-        menu.addAction(QIcon(":/icons/icons/group.svg"), tr("Group"), this, &QAtGraphicsView::groupRequested);
+        menu.addAction(QIcon(":/icons/icons/group.svg"), tr("Group"), this,
+                       &QAtGraphicsView::groupRequested)
+            ->setToolTip(tr("Group selected items together"));
     if (hasGroup)
-        menu.addAction(QIcon(":/icons/icons/ungroup.svg"), tr("Ungroup"), this, &QAtGraphicsView::ungroupRequested);
+        menu.addAction(QIcon(":/icons/icons/ungroup.svg"), tr("Ungroup"), this,
+                       &QAtGraphicsView::ungroupRequested)
+            ->setToolTip(tr("Ungroup selected items"));
 
     menu.exec(event->globalPos());
 }

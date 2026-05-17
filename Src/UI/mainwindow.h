@@ -12,8 +12,8 @@
 #include <QProgressBar>
 #include <QTimer>
 
-
 class QLabel;
+class QPushButton;
 class QSlider;
 class QToolBar;
 class AlignLayoutDialog;
@@ -29,6 +29,8 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+    void setMainWindowVisibility(bool state);
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -65,14 +67,21 @@ private slots:
     void onItemAdded(QGraphicsItem *item);
 
     // 属性变更槽
-    void onPenChanged(QGraphicsItem *item, const QPen &oldPen, const QPen &newPen);
-    void onBrushChanged(QGraphicsItem *item, const QBrush &oldBrush, const QBrush &newBrush);
-    void onFontChanged(QGraphicsItem *item, const QFont &oldFont, const QFont &newFont);
-    void onTextChanged(QGraphicsItem *item, const QString &oldText, const QString &newText);
-    void onGeometryChanged(QGraphicsItem *item, const QRectF &oldRect, const QRectF &newRect);
+    void onPenChanged(QGraphicsItem *item, const QPen &oldPen,
+                      const QPen &newPen);
+    void onBrushChanged(QGraphicsItem *item, const QBrush &oldBrush,
+                        const QBrush &newBrush);
+    void onFontChanged(QGraphicsItem *item, const QFont &oldFont,
+                       const QFont &newFont);
+    void onTextChanged(QGraphicsItem *item, const QString &oldText,
+                       const QString &newText);
+    void onGeometryChanged(QGraphicsItem *item, const QRectF &oldRect,
+                           const QRectF &newRect);
     void onCornerRadiusChanged(QGraphicsItem *item, qreal oldR, qreal newR);
-    void onPositionChanged(QGraphicsItem *item, const QPointF &oldPos, const QPointF &newPos);
-    void onRotationChanged(QGraphicsItem *item, qreal oldRotation, qreal newRotation);
+    void onPositionChanged(QGraphicsItem *item, const QPointF &oldPos,
+                           const QPointF &newPos);
+    void onRotationChanged(QGraphicsItem *item, qreal oldRotation,
+                           qreal newRotation);
     void onRequestFinished(const QJsonDocument &json);
     void onUpdateInfo();
 
@@ -100,7 +109,8 @@ private:
     // 对齐/分布辅助方法
     void applyAlign(AlignmentUtils::AlignDirection direction);
     void applyDistribute(AlignmentUtils::DistributeDirection direction,
-                         const AlignmentUtils::DistributeParams &params = AlignmentUtils::DistributeParams());
+                         const AlignmentUtils::DistributeParams &params =
+                             AlignmentUtils::DistributeParams());
 
     Ui::MainWindow *ui;
 
@@ -108,7 +118,7 @@ private:
     PropertyPanel *m_pPropertyPanel = nullptr;
     QUndoStack *m_undoStack = nullptr;
 
-    NetWorkUtils* m_pNetWorkUtils = nullptr;
+    NetWorkUtils *m_pNetWorkUtils = nullptr;
 
     QAction *m_undoAction = nullptr;
     QAction *m_redoAction = nullptr;
@@ -135,8 +145,8 @@ private:
 
     // Rip进度控件
     QLabel *m_pRipLabel = nullptr;
-    QProgressBar* m_pProgress = nullptr;
-    QTimer* m_pTimer = nullptr;
+    QProgressBar *m_pProgress = nullptr;
+    QTimer *m_pTimer = nullptr;
 
     // 状态栏控件
     QLabel *m_posLabel = nullptr;
@@ -146,10 +156,10 @@ private:
     QSlider *m_zoomSlider = nullptr;
 
     // 状态栏辅助
-    QPointF m_lastScenePos;                           // 最近一次鼠标场景坐标
-    void _updatePosLabel(const QPointF &scenePos);    // 根据单位模式更新坐标标签
-    void _updateCanvasLabel();                        // 根据单位模式更新画布尺寸标签
-    void _updateToolLabel();                          // 根据当前工具更新工具标签
+    QPointF m_lastScenePos; // 最近一次鼠标场景坐标
+    void _updatePosLabel(const QPointF &scenePos); // 根据单位模式更新坐标标签
+    void _updateCanvasLabel(); // 根据单位模式更新画布尺寸标签
+    void _updateToolLabel(); // 根据当前工具更新工具标签
 };
 
 #endif // MAINWINDOW_H

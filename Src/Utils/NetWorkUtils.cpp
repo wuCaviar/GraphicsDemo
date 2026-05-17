@@ -7,7 +7,7 @@ NetWorkUtils::~NetWorkUtils()
 {
     stop();
 
-    if (m_pExeProcess->state() != QProcess::NotRunning) {
+    if (m_pExeProcess && m_pExeProcess->state() != QProcess::NotRunning) {
         qDebug() << "正在结束外部程序...";
         m_pExeProcess->terminate();
         if (!m_pExeProcess->waitForFinished(3000)) {
@@ -17,8 +17,8 @@ NetWorkUtils::~NetWorkUtils()
         }
     }
 
-    m_pExeProcess = nullptr;
     delete m_pExeProcess;
+    m_pExeProcess = nullptr;
 }
 
 void NetWorkUtils::start()
@@ -44,7 +44,7 @@ void NetWorkUtils::stop()
 void NetWorkUtils::doHelpAbout()
 {
     Http::Get(Http::URL(NETWORK_ROOT_HELPABOUT),
-              Http::ResponseFunc([&](Http::QResponsePtr ptrResp) {
+              Http::ResponseFunc([this](Http::QResponsePtr ptrResp) {
                   Q_EMIT requestRecv(ptrResp);
               }));
 }
@@ -63,7 +63,7 @@ void NetWorkUtils::doAddRip(int x, int y, const QString &path)
 
     Http::Get(Http::URL(NETWORK_ROOT_ADDRIP),
               Http::Parameters({ Http::Parameter("param", jsonString) }),
-              Http::ResponseFunc([&](Http::QResponsePtr ptrResp) {
+              Http::ResponseFunc([this](Http::QResponsePtr ptrResp) {
                   Q_EMIT requestRecv(ptrResp);
               }));
 }
@@ -71,7 +71,7 @@ void NetWorkUtils::doAddRip(int x, int y, const QString &path)
 void NetWorkUtils::doRipStatus()
 {
     Http::Get(Http::URL(NETWORK_ROOT_RIPSTATUS),
-              Http::ResponseFunc([&](Http::QResponsePtr ptrResp) {
+              Http::ResponseFunc([this](Http::QResponsePtr ptrResp) {
                   Q_EMIT requestRecv(ptrResp);
               }));
 }
@@ -79,7 +79,7 @@ void NetWorkUtils::doRipStatus()
 void NetWorkUtils::doRipVersion()
 {
     Http::Get(Http::URL(NETWORK_ROOT_RIPVERSION),
-              Http::ResponseFunc([&](Http::QResponsePtr ptrResp) {
+              Http::ResponseFunc([this](Http::QResponsePtr ptrResp) {
                   Q_EMIT requestRecv(ptrResp);
               }));
 }

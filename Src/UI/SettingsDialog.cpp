@@ -61,6 +61,7 @@ void SettingsDialog::setupUI()
     m_dotCurveEdit->setPlaceholderText(tr("网点曲线文件路径"));
     dotCurveRow->addWidget(m_dotCurveEdit);
     auto *dotCurveBtn = new QPushButton(tr("选择文件..."));
+    dotCurveBtn->setToolTip(tr("Select dot curve file (*.p)"));
     dotCurveRow->addWidget(dotCurveBtn);
     curveLayout->addRow(tr("网点曲线:"), dotCurveRow);
 
@@ -69,6 +70,7 @@ void SettingsDialog::setupUI()
     m_colorCurveEdit->setPlaceholderText(tr("色彩曲线文件路径"));
     colorCurveRow->addWidget(m_colorCurveEdit);
     auto *colorCurveBtn = new QPushButton(tr("选择文件..."));
+    colorCurveBtn->setToolTip(tr("Select color curve file (*.icm)"));
     colorCurveRow->addWidget(colorCurveBtn);
     curveLayout->addRow(tr("色彩曲线:"), colorCurveRow);
 
@@ -83,6 +85,7 @@ void SettingsDialog::setupUI()
     m_outputPathEdit->setPlaceholderText(tr("输出路径"));
     outputRow->addWidget(m_outputPathEdit);
     auto *outputBtn = new QPushButton(tr("选择路径..."));
+    outputBtn->setToolTip(tr("Select output directory"));
     outputRow->addWidget(outputBtn);
     outputLayout->addRow(tr("输出路径:"), outputRow);
 
@@ -91,6 +94,7 @@ void SettingsDialog::setupUI()
     // ---- 按钮 ----
     auto *buttonBox =
         new QDialogButtonBox(QDialogButtonBox::Ok);
+    buttonBox->button(QDialogButtonBox::Ok)->setToolTip(tr("Save settings and close"));
     mainLayout->addWidget(buttonBox);
 
     connect(dotCurveBtn, &QPushButton::clicked, this, [this]() {

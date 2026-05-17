@@ -114,6 +114,7 @@ void AlignLayoutDialog::setupUI()
     m_hAutoBtn->setCheckable(true);
     m_hAutoBtn->setChecked(s_hAuto);
     m_hAutoBtn->setFixedWidth(60);
+    m_hAutoBtn->setToolTip(tr("Toggle auto spacing"));
     updateAutoBtnText(m_hAutoBtn);
     m_hSpacingSpin->setEnabled(!s_hAuto);
 
@@ -132,6 +133,7 @@ void AlignLayoutDialog::setupUI()
 
     m_vAutoBtn = new QPushButton(this);
     m_vAutoBtn->setCheckable(true);
+    m_vAutoBtn->setToolTip(tr("Toggle auto spacing"));
     m_vAutoBtn->setChecked(s_vAuto);
     m_vAutoBtn->setFixedWidth(60);
     updateAutoBtnText(m_vAutoBtn);
@@ -155,6 +157,7 @@ void AlignLayoutDialog::setupUI()
     auto *closeBtn = new QPushButton(tr("Close"), this);
     closeBtn->setDefault(false);
     closeBtn->setAutoDefault(false);
+    closeBtn->setToolTip(tr("Close the dialog"));
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::close);
     mainLayout->addWidget(closeBtn, 0, Qt::AlignRight);
 

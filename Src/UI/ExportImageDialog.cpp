@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QSlider>
 #include <QSpinBox>
+#include <QPushButton>
 #include <QDialogButtonBox>
 
 namespace ImageUtils {
@@ -69,6 +70,7 @@ ExportImageDialog::ExportImageDialog(QWidget *parent,
     // ===== 按钮 =====
     auto *buttonBox = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    buttonBox->button(QDialogButtonBox::Ok)->setToolTip(tr("Export the image with the selected settings"));
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
     mainLayout->addRow(buttonBox);

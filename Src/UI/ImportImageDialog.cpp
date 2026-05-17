@@ -6,6 +6,7 @@
 #include <QSlider>
 #include <QLabel>
 #include <QDialogButtonBox>
+#include <QPushButton>
 #include <QComboBox>
 
 namespace ImageUtils {
@@ -70,6 +71,7 @@ ImportImageDialog::ImportImageDialog(QWidget *parent, const ImportParameters &pa
     // 按钮
     auto *buttonBox = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    buttonBox->button(QDialogButtonBox::Ok)->setToolTip(tr("Import the image with the selected settings"));
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
     layout->addRow(buttonBox);

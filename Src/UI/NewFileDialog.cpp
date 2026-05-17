@@ -90,7 +90,7 @@ void NewFileDialog::setupUI()
     m_ppiSpin->setRange(1, 9999);
     m_ppiSpin->setDecimals(0);
     m_ppiSpin->setSuffix(tr(" PPI"));
-    m_ppiSpin->setValue(96);
+    m_ppiSpin->setValue(300);
     m_ppiSpin->setToolTip(tr("Pixels Per Inch — affects mm↔px conversion"));
     formLayout->addRow(tr("Resolution:"), m_ppiSpin);
 
@@ -99,7 +99,9 @@ void NewFileDialog::setupUI()
     // 按钮
     auto *btnLayout = new QHBoxLayout;
     auto *okBtn = new QPushButton(tr("OK"));
+    okBtn->setToolTip(tr("Create a new canvas"));
     auto *cancelBtn = new QPushButton(tr("Cancel"));
+    cancelBtn->setToolTip(tr("Cancel and close the dialog"));
     btnLayout->addStretch();
     btnLayout->addWidget(okBtn);
     btnLayout->addWidget(cancelBtn);

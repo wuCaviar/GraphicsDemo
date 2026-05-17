@@ -109,9 +109,11 @@ void PropertyPanel::setupUI()
     m_boldBtn = new QPushButton(tr("B"));
     m_boldBtn->setCheckable(true);
     m_boldBtn->setFixedSize(30, 24);
+    m_boldBtn->setToolTip(tr("Toggle bold"));
     m_italicBtn = new QPushButton(tr("I"));
     m_italicBtn->setCheckable(true);
     m_italicBtn->setFixedSize(30, 24);
+    m_italicBtn->setToolTip(tr("Toggle italic"));
     auto *styleLayout = new QHBoxLayout;
     styleLayout->addWidget(m_boldBtn);
     styleLayout->addWidget(m_italicBtn);

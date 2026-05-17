@@ -8,6 +8,8 @@
 #include <QVariant>
 #include <QString>
 
+#include <opencv2/opencv.hpp>
+
 namespace ImageUtils {
 
 // 导入参数
@@ -110,7 +112,7 @@ bool isTiffFile(const QString &path);
 // 图像导入结果
 struct ImportResult {
     QImage image;              // 解码后的图像
-    QByteArray rawTiffData;    // 原始 TIFF 数据（仅 TIFF 文件有值）
+    cv::Mat rawTiffMat;    // 原始 TIFF 数据（仅 TIFF 文件有值）
     QString filePath;          // 文件路径
     QMap<QString, QVariant> metadata; // 元数据（EXIF、XMP等）
     int dpiX = 72;            // 水平 DPI
@@ -118,9 +120,7 @@ struct ImportResult {
     bool isValid() const { return !image.isNull(); }
 
     // CMYK 源数据（仅 CMYK TIFF 导入时有值）
-    QByteArray rawCmykPixels;  // 原始 CMYK 像素（4 bytes/pixel, 0-255/通道, libtiff 顺序）
-    int cmykWidth = 0;
-    int cmykHeight = 0;
+    cv::Mat rawCmykMat;  // 原始 CMYK 像素（4 bytes/pixel, 0-255/通道, libtiff 顺序）
     bool isCmykSource = false;
 };
 

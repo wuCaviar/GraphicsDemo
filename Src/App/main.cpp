@@ -3,6 +3,7 @@
 #include <QLocale>
 
 #include "mainwindow.h"
+#include "SingleInstance.h"
 
 int main(int argc, char *argv[])
 {
@@ -19,8 +20,21 @@ int main(int argc, char *argv[])
         }
     }
 
+    QString name = "com.athc.darwingtools";
+    SingleInstance instance;
+    if (SingleInstance::hasPrevious(name)) {
+        return EXIT_SUCCESS;
+    }
+
+    instance.listen(name);
+
+    // Create and Show the app
     MainWindow window;
-    window.showFullScreen();
+    window.showMaximized();
+
+    // Bring the Notes window to the front
+    QObject::connect(&instance, &SingleInstance::newInstance, &window,
+                     [&]() { (&window)->setMainWindowVisibility(true); });
 
     return a.exec();
 }

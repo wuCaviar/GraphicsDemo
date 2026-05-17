@@ -17,6 +17,7 @@ CONFIG += rtti c++17
 QMAKE_CXXFLAGS += -Wall
 
 HEADERS += \
+    App/SingleInstance.h \
     UI/mainwindow.h \
     UI/qatgraphicsview.h \
     UI/GraphicsScene.h \
@@ -51,6 +52,7 @@ HEADERS += \
     Utils/NetWorkUtils.h
 
 SOURCES += \
+    App/SingleInstance.cpp \
     App/main.cpp \
     UI/mainwindow.cpp \
     UI/qatgraphicsview.cpp \

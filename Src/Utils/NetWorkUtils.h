@@ -56,7 +56,7 @@ protected:
 
 private:
     QThread m_workerThread;
-    QProcess *m_pExeProcess;
+    QProcess *m_pExeProcess = nullptr;
 };
 
 template<typename... Ts>
