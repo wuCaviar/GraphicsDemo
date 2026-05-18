@@ -1,5 +1,4 @@
 #include "ImageUtils.h"
-#include "ImportImageDialog.h"
 #include "IGraphicsItem.h"
 #include "ImageItem.h"
 #include "colortransform.h"
@@ -15,6 +14,7 @@
 #include <QColorSpace>
 #include <QVariant>
 #include <QDateTime>
+#include <QMessageBox>
 #include <QPainter>
 
 #include <tiff.h>
@@ -24,9 +24,12 @@ namespace ImageUtils {
 
 // ========== 辅助函数声明 ==========
 static void readTiffMetadata(TIFF *tif, QMap<QString, QVariant> &metadata);
-static void applyDpiPolicy(ImportResult &result, const ImportParameters &params);
-static void applyColorSpaceConversion(QImage &image, ImportParameters::ColorSpace colorSpace);
-static void applyAlphaHandling(QImage &image, ImportParameters::AlphaHandling alphaHandling);
+static void applyDpiPolicy(ImportResult &result,
+                           const ImportParameters &params);
+static void applyColorSpaceConversion(QImage &image,
+                                      ImportParameters::ColorSpace colorSpace);
+static void applyAlphaHandling(QImage &image,
+                               ImportParameters::AlphaHandling alphaHandling);
 
 bool isTiffFile(const QString &path)
 {
@@ -53,7 +56,9 @@ static QPair<int, int> getTiffDpi(TIFF *tif)
     return qMakePair(72, 72);
 }
 
-QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params, ImportResult *result)
+QImage importTiffWithLibtiff(const QString &path,
+                             const ImportParameters &params,
+                             ImportResult *result)
 {
     TIFF *tif = TIFFOpen(path.toUtf8().constData(), "r");
     if (!tif)
@@ -88,7 +93,8 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
     TIFFGetField(tif, TIFFTAG_PLANARCONFIG, &planarConfig);
     TIFFGetField(tif, TIFFTAG_INKSET, &inkSet);
 
-    bool isCmyk = (photometric == PHOTOMETRIC_SEPARATED && samplesPerPixel >= 4);
+    bool isCmyk =
+        (photometric == PHOTOMETRIC_SEPARATED && samplesPerPixel >= 4);
 
     // 读取 DPI 信息
     if (result) {
@@ -111,7 +117,8 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
         bool useLcms2 = cm.isValid();
         if (useLcms2) {
             cm.buildCMYK2RGBTransforms(INTENT_PERCEPTUAL,
-                                       cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
+                                       cmsFLAGS_BLACKPOINTCOMPENSATION
+                                           | cmsFLAGS_HIGHRESPRECALC);
         }
 
         // 保留原始 CMYK 像素数据
@@ -147,7 +154,7 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
                 double yv = cmykLine[off + 2] / 255.0 * 100.0;
                 double k = cmykLine[off + 3] / 255.0 * 100.0;
 
-                QColor rgb = cm.toRgb(QATColorManager::Cmyk{c, m, yv, k});
+                QColor rgb = cm.toRgb(QATColorManager::Cmyk{ c, m, yv, k });
                 scanLine[x] = rgb.rgba();
             }
         }
@@ -159,7 +166,8 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
     } else {
         // 非 CMYK TIFF：使用 TIFFReadRGBAImage 自动处理各种格式
         // （RGB/RGBA/灰度/调色板/16-bit/压缩/tiled 等）
-        uint32_t *raster = static_cast<uint32_t *>(_TIFFmalloc(width * height * sizeof(uint32_t)));
+        uint32_t *raster = static_cast<uint32_t *>(
+            _TIFFmalloc(width * height * sizeof(uint32_t)));
         if (!raster) {
             qWarning("Failed to allocate raster buffer for TIFF import");
             TIFFClose(tif);
@@ -188,7 +196,8 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
         if (result) {
             result->rawTiffMat.width = width;
             result->rawTiffMat.height = height;
-            result->rawTiffMat.data = QByteArray(reinterpret_cast<const char *>(raster), width * height * 4);
+            result->rawTiffMat.data = QByteArray(
+                reinterpret_cast<const char *>(raster), width * height * 4);
         }
 
         _TIFFfree(raster);
@@ -246,7 +255,65 @@ static void readTiffMetadata(TIFF *tif, QMap<QString, QVariant> &metadata)
     }
 }
 
-ImportResult loadImageFromFile(const QString &path, const ImportParameters &params)
+// 将 QImage 的 RGB 像素逐像素转换为 CMYK RawPixelBuffer（libtiff 格式：0 = 最大油墨, 255 = 无油墨）
+static RawPixelBuffer imageToCmykBuffer(const QImage &image)
+{
+    QATColorManager &cm = QATColorManager::instance();
+    bool useLcms2 = cm.isValid();
+    if (useLcms2) {
+        cm.buildRGB2CMYKTransforms(INTENT_PERCEPTUAL,
+                                   cmsFLAGS_BLACKPOINTCOMPENSATION
+                                       | cmsFLAGS_HIGHRESPRECALC);
+    }
+
+    int w = image.width();
+    int h = image.height();
+    RawPixelBuffer buf;
+    buf.width = w;
+    buf.height = h;
+    buf.data.resize(w * h * 4);
+
+    QImage img32 = image.convertToFormat(QImage::Format_ARGB32);
+    for (int y = 0; y < h; ++y) {
+        const QRgb *scanLine =
+            reinterpret_cast<const QRgb *>(img32.constScanLine(y));
+        uint8_t *dst = buf.ptr(y);
+        for (int x = 0; x < w; ++x) {
+            QRgb c = scanLine[x];
+            double cd = 0.0, md = 0.0, yd = 0.0, kd = 0.0;
+            if (useLcms2) {
+                QATColorManager::Cmyk cmyk = cm.toCmyk(QColor(c));
+                cd = cmyk.c;
+                md = cmyk.m;
+                yd = cmyk.y;
+                kd = cmyk.k;
+            } else {
+                double r = qRed(c) / 255.0, g = qGreen(c) / 255.0,
+                       b = qBlue(c) / 255.0;
+                kd = qMin(1.0 - r, qMin(1.0 - g, 1.0 - b));
+                if (kd < 1.0) {
+                    cd = (1.0 - r - kd) / (1.0 - kd) * 100.0;
+                    md = (1.0 - g - kd) / (1.0 - kd) * 100.0;
+                    yd = (1.0 - b - kd) / (1.0 - kd) * 100.0;
+                }
+                kd *= 100.0;
+            }
+            int off = x * 4;
+            dst[off + 0] =
+                static_cast<uint8_t>(qBound(0.0, 255.0 - cd * 2.55, 255.0));
+            dst[off + 1] =
+                static_cast<uint8_t>(qBound(0.0, 255.0 - md * 2.55, 255.0));
+            dst[off + 2] =
+                static_cast<uint8_t>(qBound(0.0, 255.0 - yd * 2.55, 255.0));
+            dst[off + 3] =
+                static_cast<uint8_t>(qBound(0.0, 255.0 - kd * 2.55, 255.0));
+        }
+    }
+    return buf;
+}
+
+ImportResult loadImageFromFile(const QString &path,
+                               const ImportParameters &params)
 {
     ImportResult result;
     result.filePath = path;
@@ -262,7 +329,7 @@ ImportResult loadImageFromFile(const QString &path, const ImportParameters &para
         if (!result.image.isNull()) {
             int dpmX = result.image.dotsPerMeterX();
             int dpmY = result.image.dotsPerMeterY();
-            result.dpiX = qRound(dpmX / 39.3701);  // DPM to DPI
+            result.dpiX = qRound(dpmX / 39.3701); // DPM to DPI
             result.dpiY = qRound(dpmY / 39.3701);
         }
 
@@ -294,7 +361,15 @@ ImportResult loadImageFromFile(const QString &path, const ImportParameters &para
     if (params.enableScaling && params.scaleFactor != 1.0) {
         int newWidth = qRound(result.image.width() * params.scaleFactor);
         int newHeight = qRound(result.image.height() * params.scaleFactor);
-        result.image = result.image.scaled(QSize(newWidth, newHeight), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        result.image = result.image.scaled(QSize(newWidth, newHeight),
+                                           Qt::IgnoreAspectRatio,
+                                           Qt::SmoothTransformation);
+    }
+
+    // 对于非 CMYK 源的图像（PNG、JPG、RGB TIFF 等），将每个像素的 RGB 转为 CMYK 存储
+    if (!result.isCmykSource && !result.image.isNull()) {
+        result.rawCmykMat = imageToCmykBuffer(result.image);
+        result.isCmykSource = true;
     }
 
     return result;
@@ -319,7 +394,8 @@ static void applyDpiPolicy(ImportResult &result, const ImportParameters &params)
 }
 
 // 应用颜色空间转换
-static void applyColorSpaceConversion(QImage &image, ImportParameters::ColorSpace colorSpace)
+static void applyColorSpaceConversion(QImage &image,
+                                      ImportParameters::ColorSpace colorSpace)
 {
     if (colorSpace == ImportParameters::ColorSpace::KeepOriginal)
         return;
@@ -332,7 +408,8 @@ static void applyColorSpaceConversion(QImage &image, ImportParameters::ColorSpac
         break;
     case ImportParameters::ColorSpace::ConvertToAdobeRGB:
         // Adobe RGB 需要定义或使用预定义值
-        targetSpace = QColorSpace(QColorSpace::Primaries::AdobeRgb, QColorSpace::TransferFunction::Gamma, 2.2);
+        targetSpace = QColorSpace(QColorSpace::Primaries::AdobeRgb,
+                                  QColorSpace::TransferFunction::Gamma, 2.2);
         break;
     default:
         return;
@@ -344,7 +421,8 @@ static void applyColorSpaceConversion(QImage &image, ImportParameters::ColorSpac
 }
 
 // 应用 Alpha 通道处理
-static void applyAlphaHandling(QImage &image, ImportParameters::AlphaHandling alphaHandling)
+static void applyAlphaHandling(QImage &image,
+                               ImportParameters::AlphaHandling alphaHandling)
 {
     switch (alphaHandling) {
     case ImportParameters::AlphaHandling::Keep:
@@ -371,33 +449,62 @@ static void applyAlphaHandling(QImage &image, ImportParameters::AlphaHandling al
 
 // ========== 导出功能辅助函数 ==========
 
-ImportResult importImageWithDialog(QWidget *parent, ImportParameters *params)
+ImportResult importImageWithDialog(QWidget *parent, const QSizeF &canvasSize)
 {
     // 第一步：选择文件
     QString path = QFileDialog::getOpenFileName(
-            parent, QObject::tr("Import Image"), QString(),
-            QObject::tr("Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;"
-                        "TIFF (*.tif *.tiff);;"
-                        "PNG (*.png);;"
-                        "JPEG (*.jpg *.jpeg);;"
-                        "BMP (*.bmp);;"
-                        "All Files (*)"));
+        parent, QObject::tr("Import Image"), QString(),
+        QObject::tr("Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;"
+                    "TIFF (*.tif *.tiff);;"
+                    "PNG (*.png);;"
+                    "JPEG (*.jpg *.jpeg);;"
+                    "BMP (*.bmp);;"
+                    "All Files (*)"));
     if (path.isEmpty())
         return ImportResult();
 
-    // 第二步：显示参数对话框（如果 params 为 nullptr，使用默认参数）
-    ImportParameters importParams;
-    if (params) {
-        importParams = *params;
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+
+    ImportResult result = loadImageFromFile(path);
+    if (!result.isValid())
+        return result;
+
+    QApplication::restoreOverrideCursor();
+
+    // 第二步：对比图像尺寸与画布尺寸，询问是否缩放以适配
+    if (!canvasSize.isEmpty()) {
+        int iw = result.image.width();
+        int ih = result.image.height();
+        int cw = static_cast<int>(canvasSize.width());
+        int ch = static_cast<int>(canvasSize.height());
+
+        if (iw > cw || ih > ch) {
+            auto answer = QMessageBox::question(
+                parent, QObject::tr("Import Image"),
+                QObject::tr("Image size (%1 x %2) exceeds canvas size (%3 x "
+                            "%4).\nScale to fit canvas?")
+                    .arg(iw)
+                    .arg(ih)
+                    .arg(cw)
+                    .arg(ch),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+
+            if (answer == QMessageBox::Yes) {
+                double scale = qMin(static_cast<double>(cw) / iw,
+                                    static_cast<double>(ch) / ih);
+                int newW = qRound(iw * scale);
+                int newH = qRound(ih * scale);
+                result.image =
+                    result.image.scaled(newW, newH, Qt::IgnoreAspectRatio,
+                                        Qt::SmoothTransformation);
+                // 缩放后重新生成 CMYK 数据
+                result.rawCmykMat = imageToCmykBuffer(result.image);
+                result.isCmykSource = true;
+            }
+        }
     }
 
-    ImportImageDialog dialog(parent, importParams);
-    if (dialog.exec() == QDialog::Accepted) {
-        importParams = dialog.getParameters();
-    }
-
-    // 第三步：加载图像并应用参数
-    return loadImageFromFile(path, importParams);
+    return result;
 }
 
 // ========== TIFF 导出 ==========
@@ -407,7 +514,8 @@ static void writeTiffMetadata(TIFF *tif, const ExportParameters &params)
 {
     // 始终写入软件和时间戳
     TIFFSetField(tif, TIFFTAG_SOFTWARE, "GraphicsDemo");
-    QString dateTime = QDateTime::currentDateTime().toString("yyyy:MM:dd HH:mm:ss");
+    QString dateTime =
+        QDateTime::currentDateTime().toString("yyyy:MM:dd HH:mm:ss");
     TIFFSetField(tif, TIFFTAG_DATETIME, dateTime.toUtf8().constData());
 
     if (!params.tiff.preserveMetadata)
@@ -418,7 +526,8 @@ static void writeTiffMetadata(TIFF *tif, const ExportParameters &params)
 }
 
 // 应用颜色空间转换（导出时）
-static void applyColorSpaceForExport(QImage &image, ExportParameters::ColorSpace colorSpace)
+static void applyColorSpaceForExport(QImage &image,
+                                     ExportParameters::ColorSpace colorSpace)
 {
     if (colorSpace == ExportParameters::ColorSpace::KeepOriginal)
         return;
@@ -441,7 +550,8 @@ static void applyColorSpaceForExport(QImage &image, ExportParameters::ColorSpace
     }
 }
 
-bool exportTiffLossless(const QString &path, const QImage &image, const ExportParameters &params)
+bool exportTiffLossless(const QString &path, const QImage &image,
+                        const ExportParameters &params)
 {
     // 1. 颜色空间转换
     QImage img = image;
@@ -449,7 +559,8 @@ bool exportTiffLossless(const QString &path, const QImage &image, const ExportPa
 
     // 2. 透明度处理
     bool hasAlpha = true;
-    if (params.transparency == ExportParameters::TransparencyHandling::FlattenOnWhite) {
+    if (params.transparency
+        == ExportParameters::TransparencyHandling::FlattenOnWhite) {
         QImage flattened(img.size(), QImage::Format_ARGB32);
         flattened.fill(Qt::white);
         QPainter painter(&flattened);
@@ -460,12 +571,15 @@ bool exportTiffLossless(const QString &path, const QImage &image, const ExportPa
     }
 
     // 3. 位深度与格式转换
-    int bitsPerSample = (params.tiff.bitDepth == ExportParameters::BitDepth::Bits16) ? 16 : 8;
+    int bitsPerSample =
+        (params.tiff.bitDepth == ExportParameters::BitDepth::Bits16) ? 16 : 8;
     int samplesPerPixel = hasAlpha ? 4 : 3;
 
     // 4. 字节序控制
-    const char *mode = (params.tiff.byteOrder == ExportParameters::ByteOrder::LittleEndian)
-                           ? "wl" : "wb";
+    const char *mode =
+        (params.tiff.byteOrder == ExportParameters::ByteOrder::LittleEndian)
+            ? "wl"
+            : "wb";
     TIFF *tif = TIFFOpen(path.toUtf8().constData(), mode);
     if (!tif)
         return false;
@@ -481,8 +595,10 @@ bool exportTiffLossless(const QString &path, const QImage &image, const ExportPa
     TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
     TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
     TIFFSetField(tif, TIFFTAG_PLANARCONFIG,
-                 params.tiff.planarConfig == ExportParameters::PlanarConfig::Separate
-                     ? PLANARCONFIG_SEPARATE : PLANARCONFIG_CONTIG);
+                 params.tiff.planarConfig
+                         == ExportParameters::PlanarConfig::Separate
+                     ? PLANARCONFIG_SEPARATE
+                     : PLANARCONFIG_CONTIG);
 
     // 6. 压缩
     uint16_t compression = COMPRESSION_NONE;
@@ -507,9 +623,10 @@ bool exportTiffLossless(const QString &path, const QImage &image, const ExportPa
     TIFFSetField(tif, TIFFTAG_COMPRESSION, compression);
 
     // 7. 预测器（LZW 和 ZIP 均支持水平差分）
-    if (params.tiff.predictor == ExportParameters::Predictor::Horizontal &&
-        (params.tiff.compression == ExportParameters::CompressionType::LZW ||
-         params.tiff.compression == ExportParameters::CompressionType::ZIP)) {
+    if (params.tiff.predictor == ExportParameters::Predictor::Horizontal
+        && (params.tiff.compression == ExportParameters::CompressionType::LZW
+            || params.tiff.compression
+                   == ExportParameters::CompressionType::ZIP)) {
         TIFFSetField(tif, TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL);
     }
 
@@ -542,16 +659,18 @@ bool exportTiffLossless(const QString &path, const QImage &image, const ExportPa
 
     // 13. 写入像素数据
     bool writeError = false;
-    bool isContig = (params.tiff.planarConfig == ExportParameters::PlanarConfig::Contig);
+    bool isContig =
+        (params.tiff.planarConfig == ExportParameters::PlanarConfig::Contig);
 
     if (bitsPerSample == 8) {
         // ---- 8-bit ----
         QImage img32 = img.convertToFormat(hasAlpha ? QImage::Format_ARGB32
-                                                     : QImage::Format_RGB32);
+                                                    : QImage::Format_RGB32);
         QVector<uint8_t> rowBuf(width * samplesPerPixel);
 
         for (int y = 0; y < height; ++y) {
-            const QRgb *scanLine = reinterpret_cast<const QRgb *>(img32.constScanLine(y));
+            const QRgb *scanLine =
+                reinterpret_cast<const QRgb *>(img32.constScanLine(y));
 
             if (isContig) {
                 // 交错模式：RGBA 或 RGB
@@ -574,10 +693,18 @@ bool exportTiffLossless(const QString &path, const QImage &image, const ExportPa
                     for (int x = 0; x < width; ++x) {
                         QRgb c = scanLine[x];
                         switch (plane) {
-                        case 0: rowBuf[x] = qRed(c); break;
-                        case 1: rowBuf[x] = qGreen(c); break;
-                        case 2: rowBuf[x] = qBlue(c); break;
-                        case 3: rowBuf[x] = qAlpha(c); break;
+                        case 0:
+                            rowBuf[x] = qRed(c);
+                            break;
+                        case 1:
+                            rowBuf[x] = qGreen(c);
+                            break;
+                        case 2:
+                            rowBuf[x] = qBlue(c);
+                            break;
+                        case 3:
+                            rowBuf[x] = qAlpha(c);
+                            break;
                         }
                     }
                     if (TIFFWriteScanline(tif, rowBuf.data(), y, plane) < 0) {
@@ -585,17 +712,19 @@ bool exportTiffLossless(const QString &path, const QImage &image, const ExportPa
                         break;
                     }
                 }
-                if (writeError) break;
+                if (writeError)
+                    break;
             }
         }
     } else {
         // ---- 16-bit ----
         QImage img64 = img.convertToFormat(hasAlpha ? QImage::Format_RGBA64
-                                                     : QImage::Format_RGBX64);
+                                                    : QImage::Format_RGBX64);
         QVector<uint16_t> rowBuf(width * samplesPerPixel);
 
         for (int y = 0; y < height; ++y) {
-            const QRgba64 *scanLine = reinterpret_cast<const QRgba64 *>(img64.constScanLine(y));
+            const QRgba64 *scanLine =
+                reinterpret_cast<const QRgba64 *>(img64.constScanLine(y));
 
             if (isContig) {
                 for (int x = 0; x < width; ++x) {
@@ -616,10 +745,18 @@ bool exportTiffLossless(const QString &path, const QImage &image, const ExportPa
                     for (int x = 0; x < width; ++x) {
                         QRgba64 c = scanLine[x];
                         switch (plane) {
-                        case 0: rowBuf[x] = c.red(); break;
-                        case 1: rowBuf[x] = c.green(); break;
-                        case 2: rowBuf[x] = c.blue(); break;
-                        case 3: rowBuf[x] = c.alpha(); break;
+                        case 0:
+                            rowBuf[x] = c.red();
+                            break;
+                        case 1:
+                            rowBuf[x] = c.green();
+                            break;
+                        case 2:
+                            rowBuf[x] = c.blue();
+                            break;
+                        case 3:
+                            rowBuf[x] = c.alpha();
+                            break;
                         }
                     }
                     if (TIFFWriteScanline(tif, rowBuf.data(), y, plane) < 0) {
@@ -627,7 +764,8 @@ bool exportTiffLossless(const QString &path, const QImage &image, const ExportPa
                         break;
                     }
                 }
-                if (writeError) break;
+                if (writeError)
+                    break;
             }
         }
     }
@@ -637,8 +775,8 @@ bool exportTiffLossless(const QString &path, const QImage &image, const ExportPa
 }
 
 bool exportTiffCmyk(const QString &path, const QImage &image,
-                    const QList<QGraphicsItem *> &items, const QRectF &exportRect,
-                    const ExportParameters &params)
+                    const QList<QGraphicsItem *> &items,
+                    const QRectF &exportRect, const ExportParameters &params)
 {
     // 1. Flatten transparency on white
     QImage img(image.size(), QImage::Format_ARGB32);
@@ -653,8 +791,10 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
     int height = img.height();
 
     // 2. Open TIFF
-    const char *mode = (params.tiff.byteOrder == ExportParameters::ByteOrder::LittleEndian)
-                           ? "wl" : "wb";
+    const char *mode =
+        (params.tiff.byteOrder == ExportParameters::ByteOrder::LittleEndian)
+            ? "wl"
+            : "wb";
     TIFF *tif = TIFFOpen(path.toUtf8().constData(), mode);
     if (!tif)
         return false;
@@ -670,18 +810,29 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
 
     uint16_t compression = COMPRESSION_NONE;
     switch (params.tiff.compression) {
-    case ExportParameters::CompressionType::None:    compression = COMPRESSION_NONE; break;
-    case ExportParameters::CompressionType::LZW:     compression = COMPRESSION_LZW; break;
-    case ExportParameters::CompressionType::ZIP:     compression = COMPRESSION_ADOBE_DEFLATE; break;
-    case ExportParameters::CompressionType::JPEG:    compression = COMPRESSION_JPEG;
-        TIFFSetField(tif, TIFFTAG_JPEGQUALITY, params.tiff.jpegQuality); break;
-    case ExportParameters::CompressionType::PackBits: compression = COMPRESSION_PACKBITS; break;
+    case ExportParameters::CompressionType::None:
+        compression = COMPRESSION_NONE;
+        break;
+    case ExportParameters::CompressionType::LZW:
+        compression = COMPRESSION_LZW;
+        break;
+    case ExportParameters::CompressionType::ZIP:
+        compression = COMPRESSION_ADOBE_DEFLATE;
+        break;
+    case ExportParameters::CompressionType::JPEG:
+        compression = COMPRESSION_JPEG;
+        TIFFSetField(tif, TIFFTAG_JPEGQUALITY, params.tiff.jpegQuality);
+        break;
+    case ExportParameters::CompressionType::PackBits:
+        compression = COMPRESSION_PACKBITS;
+        break;
     }
     TIFFSetField(tif, TIFFTAG_COMPRESSION, compression);
 
-    if (params.tiff.predictor == ExportParameters::Predictor::Horizontal &&
-        (params.tiff.compression == ExportParameters::CompressionType::LZW ||
-         params.tiff.compression == ExportParameters::CompressionType::ZIP))
+    if (params.tiff.predictor == ExportParameters::Predictor::Horizontal
+        && (params.tiff.compression == ExportParameters::CompressionType::LZW
+            || params.tiff.compression
+                   == ExportParameters::CompressionType::ZIP))
         TIFFSetField(tif, TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL);
 
     TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, TIFFDefaultStripSize(tif, 0));
@@ -695,20 +846,24 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
     bool useLcms2 = cm.isValid();
     if (useLcms2) {
         cm.buildRGB2CMYKTransforms(INTENT_PERCEPTUAL,
-                                   cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
+                                   cmsFLAGS_BLACKPOINTCOMPENSATION
+                                       | cmsFLAGS_HIGHRESPRECALC);
     }
     // Always embed the CMYK ICC profile (same path as QATColorManager)
 #if defined(Q_OS_WIN)
-    QString iccPath = QCoreApplication::applicationDirPath() + "/../ICC Profile/CMYK/JapanColor2001Coated.icc";
+    QString iccPath = QCoreApplication::applicationDirPath()
+                      + "/../ICC Profile/CMYK/JapanColor2001Coated.icc";
 #elif defined(Q_OS_MACOS)
-    QString iccPath = "/Volumes/Caviar/Test/GraphicsDemo/Bin/../ICC Profile/CMYK/JapanColor2001Coated.icc";
+    QString iccPath = "/Volumes/Caviar/Test/GraphicsDemo/Bin/../ICC "
+                      "Profile/CMYK/JapanColor2001Coated.icc";
 #endif
     {
         QFile iccFile(iccPath);
         if (iccFile.open(QIODevice::ReadOnly)) {
             QByteArray iccData = iccFile.readAll();
             TIFFSetField(tif, TIFFTAG_ICCPROFILE,
-                         static_cast<uint32_t>(iccData.size()), iccData.constData());
+                         static_cast<uint32_t>(iccData.size()),
+                         iccData.constData());
             iccFile.close();
         }
     }
@@ -718,18 +873,25 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
     QImage img32 = img.convertToFormat(QImage::Format_ARGB32);
 
     for (int y = 0; y < height; ++y) {
-        const QRgb *scanLine = reinterpret_cast<const QRgb *>(img32.constScanLine(y));
+        const QRgb *scanLine =
+            reinterpret_cast<const QRgb *>(img32.constScanLine(y));
 
         for (int x = 0; x < width; ++x) {
             QRgb c = scanLine[x];
             double cd, md, yd, kd;
             if (useLcms2) {
                 QATColorManager::Cmyk cmyk = cm.toCmyk(QColor(c));
-                cd = cmyk.c; md = cmyk.m; yd = cmyk.y; kd = cmyk.k;
+                cd = cmyk.c;
+                md = cmyk.m;
+                yd = cmyk.y;
+                kd = cmyk.k;
             } else {
                 // Fallback: naive conversion
-                double r = qRed(c) / 255.0, g = qGreen(c) / 255.0, b = qBlue(c) / 255.0;
-                cd = 1.0 - r; md = 1.0 - g; yd = 1.0 - b;
+                double r = qRed(c) / 255.0, g = qGreen(c) / 255.0,
+                       b = qBlue(c) / 255.0;
+                cd = 1.0 - r;
+                md = 1.0 - g;
+                yd = 1.0 - b;
                 kd = qMin(cd, qMin(md, yd));
                 cd = (cd - kd) / (1.0 - kd) * 100.0;
                 md = (md - kd) / (1.0 - kd) * 100.0;
@@ -737,16 +899,21 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
                 kd *= 100.0;
             }
             int off = x * 4;
-            rowBuf[off + 0] = static_cast<uint8_t>(qBound(0.0, cd * 2.55, 255.0));
-            rowBuf[off + 1] = static_cast<uint8_t>(qBound(0.0, md * 2.55, 255.0));
-            rowBuf[off + 2] = static_cast<uint8_t>(qBound(0.0, yd * 2.55, 255.0));
-            rowBuf[off + 3] = static_cast<uint8_t>(qBound(0.0, kd * 2.55, 255.0));
+            rowBuf[off + 0] =
+                static_cast<uint8_t>(qBound(0.0, cd * 2.55, 255.0));
+            rowBuf[off + 1] =
+                static_cast<uint8_t>(qBound(0.0, md * 2.55, 255.0));
+            rowBuf[off + 2] =
+                static_cast<uint8_t>(qBound(0.0, yd * 2.55, 255.0));
+            rowBuf[off + 3] =
+                static_cast<uint8_t>(qBound(0.0, kd * 2.55, 255.0));
         }
 
         // Overwrite with exact CMYK for items that have stored values
         for (QGraphicsItem *gi : items) {
             auto *ii = dynamic_cast<IGraphicsItem *>(gi);
-            if (!ii) continue;
+            if (!ii)
+                continue;
 
             // Brush (solid fill)
             if (ii->hasBrushCmyk() && ii->itemBrush().style() != Qt::NoBrush) {
@@ -756,13 +923,19 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
                 QRectF pixelRect((sceneRect.x() - exportRect.x()),
                                  (sceneRect.y() - exportRect.y()),
                                  sceneRect.width(), sceneRect.height());
-                int x0 = qBound(0, static_cast<int>(pixelRect.left()), width - 1);
-                int x1 = qBound(0, static_cast<int>(pixelRect.right()), width - 1);
+                int x0 =
+                    qBound(0, static_cast<int>(pixelRect.left()), width - 1);
+                int x1 =
+                    qBound(0, static_cast<int>(pixelRect.right()), width - 1);
                 if (y >= pixelRect.top() && y <= pixelRect.bottom()) {
-                    uint8_t c8 = static_cast<uint8_t>(qBound(0.0, bc * 2.55, 255.0));
-                    uint8_t m8 = static_cast<uint8_t>(qBound(0.0, bm * 2.55, 255.0));
-                    uint8_t y8 = static_cast<uint8_t>(qBound(0.0, by * 2.55, 255.0));
-                    uint8_t k8 = static_cast<uint8_t>(qBound(0.0, bk * 2.55, 255.0));
+                    uint8_t c8 =
+                        static_cast<uint8_t>(qBound(0.0, bc * 2.55, 255.0));
+                    uint8_t m8 =
+                        static_cast<uint8_t>(qBound(0.0, bm * 2.55, 255.0));
+                    uint8_t y8 =
+                        static_cast<uint8_t>(qBound(0.0, by * 2.55, 255.0));
+                    uint8_t k8 =
+                        static_cast<uint8_t>(qBound(0.0, bk * 2.55, 255.0));
                     for (int x = x0; x <= x1; ++x) {
                         int off = x * 4;
                         rowBuf[off + 0] = c8;
@@ -780,23 +953,30 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
                 qreal penWidth = ii->itemPen().widthF();
                 QRectF sceneRect = gi->sceneBoundingRect();
                 // Expand rect by half pen width to cover stroke area
-                QRectF strokeRect = sceneRect.adjusted(-penWidth/2, -penWidth/2,
-                                                       penWidth/2, penWidth/2);
+                QRectF strokeRect = sceneRect.adjusted(
+                    -penWidth / 2, -penWidth / 2, penWidth / 2, penWidth / 2);
                 QRectF pixelRect((strokeRect.x() - exportRect.x()),
                                  (strokeRect.y() - exportRect.y()),
                                  strokeRect.width(), strokeRect.height());
                 // Only overwrite border pixels (not interior, which is handled by brush)
-                if (ii->itemBrush().style() == Qt::NoBrush && ii->hasBrushCmyk()) {
+                if (ii->itemBrush().style() == Qt::NoBrush
+                    && ii->hasBrushCmyk()) {
                     // skip — brush already handled
                 } else if (ii->itemBrush().style() == Qt::NoBrush) {
                     // No brush — overwrite entire stroke area
-                    int x0 = qBound(0, static_cast<int>(pixelRect.left()), width - 1);
-                    int x1 = qBound(0, static_cast<int>(pixelRect.right()), width - 1);
+                    int x0 = qBound(0, static_cast<int>(pixelRect.left()),
+                                    width - 1);
+                    int x1 = qBound(0, static_cast<int>(pixelRect.right()),
+                                    width - 1);
                     if (y >= pixelRect.top() && y <= pixelRect.bottom()) {
-                        uint8_t c8 = static_cast<uint8_t>(qBound(0.0, pc * 2.55, 255.0));
-                        uint8_t m8 = static_cast<uint8_t>(qBound(0.0, pm * 2.55, 255.0));
-                        uint8_t y8 = static_cast<uint8_t>(qBound(0.0, py * 2.55, 255.0));
-                        uint8_t k8 = static_cast<uint8_t>(qBound(0.0, pk * 2.55, 255.0));
+                        uint8_t c8 =
+                            static_cast<uint8_t>(qBound(0.0, pc * 2.55, 255.0));
+                        uint8_t m8 =
+                            static_cast<uint8_t>(qBound(0.0, pm * 2.55, 255.0));
+                        uint8_t y8 =
+                            static_cast<uint8_t>(qBound(0.0, py * 2.55, 255.0));
+                        uint8_t k8 =
+                            static_cast<uint8_t>(qBound(0.0, pk * 2.55, 255.0));
                         for (int x = x0; x <= x1; ++x) {
                             int off = x * 4;
                             rowBuf[off + 0] = c8;
@@ -818,15 +998,25 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
                 QRectF pixelRect((sceneRect.x() - exportRect.x()),
                                  (sceneRect.y() - exportRect.y()),
                                  sceneRect.width(), sceneRect.height());
-                if (srcW > 0 && srcH > 0 && y >= pixelRect.top() && y <= pixelRect.bottom()) {
-                    int x0 = qBound(0, static_cast<int>(pixelRect.left()), width - 1);
-                    int x1 = qBound(0, static_cast<int>(pixelRect.right()), width - 1);
-                    double scaleX = static_cast<double>(srcW) / pixelRect.width();
-                    double scaleY = static_cast<double>(srcH) / pixelRect.height();
-                    int srcY = qBound(0, static_cast<int>((y - pixelRect.top()) * scaleY), srcH - 1);
+                if (srcW > 0 && srcH > 0 && y >= pixelRect.top()
+                    && y <= pixelRect.bottom()) {
+                    int x0 = qBound(0, static_cast<int>(pixelRect.left()),
+                                    width - 1);
+                    int x1 = qBound(0, static_cast<int>(pixelRect.right()),
+                                    width - 1);
+                    double scaleX =
+                        static_cast<double>(srcW) / pixelRect.width();
+                    double scaleY =
+                        static_cast<double>(srcH) / pixelRect.height();
+                    int srcY = qBound(
+                        0, static_cast<int>((y - pixelRect.top()) * scaleY),
+                        srcH - 1);
                     const uint8_t *srcRow = cmykMat.ptr(srcY);
                     for (int x = x0; x <= x1; ++x) {
-                        int srcX = qBound(0, static_cast<int>((x - pixelRect.left()) * scaleX), srcW - 1);
+                        int srcX = qBound(
+                            0,
+                            static_cast<int>((x - pixelRect.left()) * scaleX),
+                            srcW - 1);
                         int srcOff = srcX * 4;
                         int dstOff = x * 4;
                         // libtiff: 0 = max ink, 255 = no ink
@@ -850,12 +1040,14 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
     return true;
 }
 
-bool exportImageWithParams(const QString &path, const QImage &image, const ExportParameters &params)
+bool exportImageWithParams(const QString &path, const QImage &image,
+                           const ExportParameters &params)
 {
     QImage img = image;
 
     // 处理透明度
-    if (params.transparency == ExportParameters::TransparencyHandling::FlattenOnWhite) {
+    if (params.transparency
+        == ExportParameters::TransparencyHandling::FlattenOnWhite) {
         QImage flattened(img.size(), QImage::Format_ARGB32_Premultiplied);
         flattened.fill(Qt::white);
         QPainter painter(&flattened);

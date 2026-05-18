@@ -59,6 +59,9 @@ void MainWindow::readTiffByQt(const QString &path)
 
 void MainWindow::readTiffByLibTiff(const QString &path)
 {
+
+#if 0
+
     TIFF *tif = TIFFOpen(path.toStdString().c_str(), "r");
     if (!tif)
         qDebug() << "Cannot open " << path;
@@ -116,7 +119,9 @@ void MainWindow::readTiffByLibTiff(const QString &path)
         }
     }
 
-#if 0
+#endif
+
+#if 1
     TIFF *tif = TIFFOpen(path.toStdString().c_str(), "r");
     if (!tif)
         qDebug() << "Cannot open " << path;
@@ -146,7 +151,7 @@ void MainWindow::readTiffByLibTiff(const QString &path)
         tif); // 这个函数不依赖 StripByteCounts，它用 RowsPerStrip 和 height 计算
 
     // 获取 strip 偏移
-    uint64_t *stripOffsets;
+    uint64_t stripOffsets;
     if (!TIFFGetField(tif, TIFFTAG_STRIPOFFSETS, &stripOffsets)) {
         fprintf(stderr, "StripOffsets missing, impossible to recover.\n");
     }

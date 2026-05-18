@@ -141,8 +141,8 @@ QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params
 // 从文件加载图像（自动识别 TIFF 与普通格式，保留 TIFF 原始数据）
 ImportResult loadImageFromFile(const QString &path, const ImportParameters &params = ImportParameters());
 
-// 弹出文件对话框并加载所选图像
-ImportResult importImageWithDialog(QWidget *parent, ImportParameters *params = nullptr);
+// 弹出文件对话框并加载所选图像，对比画布尺寸询问是否缩放适配
+ImportResult importImageWithDialog(QWidget *parent, const QSizeF &canvasSize = QSizeF());
 
 // 使用 libtiff 导出 TIFF（支持压缩参数、DPI、元数据）
 bool exportTiffLossless(const QString &path, const QImage &image,

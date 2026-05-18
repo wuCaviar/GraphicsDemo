@@ -241,7 +241,8 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
     }
 
     if (m_tool == Tool::Image) {
-        auto result = ImageUtils::importImageWithDialog(this);
+        QSizeF canvasSize = m_pCanvas ? m_pCanvas->canvasSize() : QSizeF();
+        auto result = ImageUtils::importImageWithDialog(this, canvasSize);
         if (result.isValid()) {
             auto *item = new ImageItem(QPixmap::fromImage(result.image));
             item->setItemPen(QPen(Qt::NoPen));

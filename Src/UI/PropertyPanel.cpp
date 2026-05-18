@@ -456,17 +456,32 @@ void PropertyPanel::updatePanel()
 
     // 显示图元在画板上的视觉坐标（mapToScene 处理旋转和父级偏移）
     QRectF geomRect = (gi->supportsGeometryRect()) ? gi->geometryRect() : m_currentItem->boundingRect();
-    QPointF canvasTopLeft = m_currentItem->mapToScene(geomRect.topLeft());
-    m_xSpin->setValue(canvasTopLeft.x());
-    m_ySpin->setValue(canvasTopLeft.y());
+    // 映射四个角到场景空间，计算轴对齐包围盒得到视觉 W/H
+    QPointF corners[4] = {
+        m_currentItem->mapToScene(geomRect.topLeft()),
+        m_currentItem->mapToScene(geomRect.topRight()),
+        m_currentItem->mapToScene(geomRect.bottomRight()),
+        m_currentItem->mapToScene(geomRect.bottomLeft())
+    };
+    qreal minX = corners[0].x(), minY = corners[0].y();
+    qreal maxX = minX, maxY = minY;
+    for (int i = 1; i < 4; ++i) {
+        if (corners[i].x() < minX) minX = corners[i].x();
+        if (corners[i].y() < minY) minY = corners[i].y();
+        if (corners[i].x() > maxX) maxX = corners[i].x();
+        if (corners[i].y() > maxY) maxY = corners[i].y();
+    }
+
+    m_xSpin->setValue(minX);
+    m_ySpin->setValue(minY);
 
     // 判断 W/H 是否可编辑：支持 setGeometryRect 的图元
     bool canResizeRect = gi->supportsSetGeometryRect();
     m_wSpin->setReadOnly(!canResizeRect);
     m_hSpin->setReadOnly(!canResizeRect);
 
-    m_wSpin->setValue(geomRect.width());
-    m_hSpin->setValue(geomRect.height());
+    m_wSpin->setValue(maxX - minX);
+    m_hSpin->setValue(maxY - minY);
 
     // ---- 边框 ----
     m_penGroup->setVisible(flags & IGraphicsItem::HasPen);
@@ -744,9 +759,20 @@ void PropertyPanel::onGeometryChanged()
     qreal w = m_wSpin->value();
     qreal h = m_hSpin->value();
 
-    // 位置变更：用户输入的 X/Y 是画板坐标（视觉 top-left），需转为 item 的 pos
+    // 位置变更：X/Y 显示的是视觉包围盒的 minX/minY，需要转为 item 的 pos
     QRectF currentGeom = (gi->supportsGeometryRect()) ? gi->geometryRect() : m_currentItem->boundingRect();
-    QPointF currentCanvasPos = m_currentItem->mapToScene(currentGeom.topLeft());
+    QPointF corners[4] = {
+        m_currentItem->mapToScene(currentGeom.topLeft()),
+        m_currentItem->mapToScene(currentGeom.topRight()),
+        m_currentItem->mapToScene(currentGeom.bottomRight()),
+        m_currentItem->mapToScene(currentGeom.bottomLeft())
+    };
+    qreal currentMinX = corners[0].x(), currentMinY = corners[0].y();
+    for (int i = 1; i < 4; ++i) {
+        if (corners[i].x() < currentMinX) currentMinX = corners[i].x();
+        if (corners[i].y() < currentMinY) currentMinY = corners[i].y();
+    }
+    QPointF currentCanvasPos(currentMinX, currentMinY);
     QPointF newCanvasPos(x, y);
     if (currentCanvasPos != newCanvasPos) {
         QPointF sceneDelta = newCanvasPos - currentCanvasPos;
@@ -754,9 +780,14 @@ void PropertyPanel::onGeometryChanged()
         emit positionChanged(m_currentItem, m_currentItem->pos(), newPos);
     }
 
-    // 尺寸变更
+    // 尺寸变更：将用户输入的视觉 W/H 映射回图元本地坐标系
     QRectF oldRect = currentGeom;
-    QRectF newRect(currentGeom.topLeft(), QSizeF(w, h));
+    qreal localW = w, localH = h;
+    // 旋转 ±90°/±270° 时本地 W/H 与视觉 W/H 互换
+    qreal rot = fmod(qAbs(m_currentItem->rotation()), 180.0);
+    if (rot > 45.0 && rot < 135.0)
+        std::swap(localW, localH);
+    QRectF newRect(currentGeom.topLeft(), QSizeF(localW, localH));
 
     if (oldRect.isValid() && oldRect != newRect)
         emit geometryChanged(m_currentItem, oldRect, newRect);

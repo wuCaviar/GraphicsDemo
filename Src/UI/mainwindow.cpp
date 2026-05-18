@@ -429,7 +429,7 @@ void MainWindow::_initToolBar()
     actionGroup->setExclusive(true);
 
     auto addToolAction = [&](const QString &iconPath, const QString &text,
-                             Tool tool, const QString &shortcut = {}) {
+                             Tool tool, const QString &shortcut = { }) {
         QAction *act = drawBar->addAction(QIcon(iconPath), text);
         act->setCheckable(true);
         act->setToolTip(text);
@@ -510,7 +510,8 @@ void MainWindow::_initPropertyPanel()
     m_pPropertyPanel->setMinimumWidth(300);
     addDockWidget(Qt::RightDockWidgetArea, m_pPropertyPanel);
 
-    m_alignLayoutDlg = new AlignLayoutDialog(m_pView->scene(), m_undoStack, this);
+    m_alignLayoutDlg =
+        new AlignLayoutDialog(m_pView->scene(), m_undoStack, this);
     m_alignLayoutDlg->setObjectName("AlignLayoutDock");
     m_alignLayoutDlg->setMinimumWidth(300);
     splitDockWidget(m_pPropertyPanel, m_alignLayoutDlg, Qt::Vertical);
@@ -833,7 +834,8 @@ void MainWindow::onNew()
 
 void MainWindow::onImportImage()
 {
-    auto result = ImageUtils::importImageWithDialog(this);
+    QSizeF canvasSize = m_pView->canvasItem() ? m_pView->canvasItem()->canvasSize() : QSizeF();
+    auto result = ImageUtils::importImageWithDialog(this, canvasSize);
     if (!result.isValid())
         return;
 
@@ -850,6 +852,8 @@ void MainWindow::onImportImage()
 void MainWindow::onExportImage()
 {
     // 第一步：选择保存路径和格式
+
+    // TODO: 修改成prn保存路径，明天跟王工确认
     QString path = QFileDialog::getSaveFileName(
         this, tr("Export Image"), QString(),
         tr("TIFF (*.tif *.tiff);;PNG (*.png);;JPEG (*.jpg);;BMP (*.bmp)"));
@@ -860,6 +864,8 @@ void MainWindow::onExportImage()
     SettingsDialog dlg(this);
     if (dlg.exec() == QDialog::Accepted)
         bRip = true;
+
+    QApplication::setOverrideCursor(Qt::WaitCursor);
 
     // 不再显示参数设置对话框，直接设置参数
     ImageUtils::ExportParameters exportParams;
@@ -892,17 +898,10 @@ void MainWindow::onExportImage()
                 ::filterSelectableItems(m_pView->scene()->items());
             ImageUtils::exportTiffCmyk(path, image, items, exportRect,
                                        exportParams);
-        } else {
-            ImageUtils::exportTiffLossless(path, image, exportParams);
         }
-    } else if (path.endsWith(".png", Qt::CaseInsensitive)
-               || path.endsWith(".jpg", Qt::CaseInsensitive)
-               || path.endsWith(".jpeg", Qt::CaseInsensitive)) {
-        ImageUtils::exportImageWithParams(path, image, exportParams);
-    } else {
-        // BMP 等其他格式
-        image.save(path);
     }
+
+    QApplication::restoreOverrideCursor();
 
     // 判断当前路径下是否有tiff文件
     bool hasTiffFiles = QFileInfo::exists(path);
