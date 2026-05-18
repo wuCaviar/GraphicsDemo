@@ -293,6 +293,7 @@ StretchAlignResult computeStretchAlign(const QList<QGraphicsItem *> &items,
 
 // ============================================================
 // 页内居中算法
+// 多选时将所有图元视作一个整体居中，保持图元间相对位置不变
 // ============================================================
 AlignResult computePageCenter(const QList<QGraphicsItem *> &items,
                               AlignDirection direction, const QRectF &pageRect)
@@ -303,21 +304,21 @@ AlignResult computePageCenter(const QList<QGraphicsItem *> &items,
     for (auto *item : items)
         result.oldPositions << item->pos();
 
+    // 计算整体包围盒，将整体居中于页面
+    QRectF overall = overallGeometryRect(items);
+    qreal offsetX = 0;
+    qreal offsetY = 0;
+
     if (direction == AlignHCenterOnPage) {
         qreal pageCenterX = pageRect.center().x();
-        for (auto *item : items) {
-            qreal itemCenterX = item->pos().x() + itemGeometryRect(item).center().x();
-            result.newPositions << QPointF(item->pos().x() + (pageCenterX - itemCenterX),
-                                           item->pos().y());
-        }
+        offsetX = pageCenterX - overall.center().x();
     } else if (direction == AlignVCenterOnPage) {
         qreal pageCenterY = pageRect.center().y();
-        for (auto *item : items) {
-            qreal itemCenterY = item->pos().y() + itemGeometryRect(item).center().y();
-            result.newPositions << QPointF(item->pos().x(),
-                                           item->pos().y() + (pageCenterY - itemCenterY));
-        }
+        offsetY = pageCenterY - overall.center().y();
     }
+
+    for (auto *item : items)
+        result.newPositions << item->pos() + QPointF(offsetX, offsetY);
 
     result.valid = !result.newPositions.isEmpty();
     return result;

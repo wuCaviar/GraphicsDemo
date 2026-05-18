@@ -294,15 +294,13 @@ private:
 
 Q_CLASS_TYPEDEFS(QGlobalManager)
 
-class QGlobalManager : public QObject
+class QGlobalManager
 {
-    Q_OBJECT
-
 public:
     static QGlobalManagerPtr shared();
 
 public:
-    QGlobalManager(QObject *parent = nullptr);
+    QGlobalManager();
 
     ~QGlobalManager();
 

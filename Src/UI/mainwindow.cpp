@@ -307,6 +307,7 @@ void MainWindow::_initMenuBar()
     // ---- 视图 ----
     QMenu *viewMenu = menu->addMenu(tr("&View"));
     viewMenu->addAction(m_pPropertyPanel->toggleViewAction());
+    viewMenu->addAction(m_alignLayoutDlg->toggleViewAction());
     viewMenu->addSeparator();
 
     // 网格显示/隐藏
@@ -508,6 +509,12 @@ void MainWindow::_initPropertyPanel()
     m_pPropertyPanel = new PropertyPanel(this);
     m_pPropertyPanel->setMinimumWidth(300);
     addDockWidget(Qt::RightDockWidgetArea, m_pPropertyPanel);
+
+    m_alignLayoutDlg = new AlignLayoutDialog(m_pView->scene(), m_undoStack, this);
+    m_alignLayoutDlg->setObjectName("AlignLayoutDock");
+    m_alignLayoutDlg->setMinimumWidth(300);
+    splitDockWidget(m_pPropertyPanel, m_alignLayoutDlg, Qt::Vertical);
+    m_alignLayoutDlg->hide();
 }
 
 void MainWindow::_initConnections()
@@ -849,15 +856,13 @@ void MainWindow::onExportImage()
     if (path.isEmpty())
         return;
 
-    // 第二步：显示导出参数对话框
-    ImageUtils::ExportParameters exportParams;
-    // ImageUtils::ExportImageDialog dialog(this, exportParams,
-    //                                      QFileInfo(path).suffix());
-    // if (dialog.exec() != QDialog::Accepted)
-    //     return;
-    // exportParams = dialog.getParameters();
+    bool bRip = false;
+    SettingsDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted)
+        bRip = true;
 
     // 不再显示参数设置对话框，直接设置参数
+    ImageUtils::ExportParameters exportParams;
     exportParams.colorSpace =
         ImageUtils::ExportParameters::ColorSpace::ConvertToCMYK;
 
@@ -899,14 +904,11 @@ void MainWindow::onExportImage()
         image.save(path);
     }
 
-    // 设置Rip参数
-    SettingsDialog dlg(this);
-    if (dlg.exec() == QDialog::Accepted) {
-        // 网络请求
-        if (m_pNetWorkUtils) {
-            m_pNetWorkUtils->doAddRip(dlg.resolutionX(), dlg.resolutionY(),
-                                      path);
-        }
+    // 判断当前路径下是否有tiff文件
+    bool hasTiffFiles = QFileInfo::exists(path);
+    // 网络请求
+    if (bRip && hasTiffFiles && m_pNetWorkUtils) {
+        m_pNetWorkUtils->doAddRip(dlg.resolutionX(), dlg.resolutionY(), path);
     }
 }
 
@@ -1098,23 +1100,13 @@ void MainWindow::onUngroup()
 }
 
 // ============================================================
-// 对齐与布局对话框
+// 对齐与分布面板
 // ============================================================
 void MainWindow::onAlignLayoutDialog()
 {
-    if (!m_alignLayoutDlg) {
-        m_alignLayoutDlg =
-            new AlignLayoutDialog(m_pView->scene(), m_undoStack, this);
-        m_alignLayoutDlg->setAttribute(Qt::WA_DeleteOnClose);
-        m_alignLayoutDlg->setDockReferenceWidget(m_pPropertyPanel);
-        // 关闭后清空指针，下次重新创建
-        connect(m_alignLayoutDlg, &QObject::destroyed, this,
-                [this]() { m_alignLayoutDlg = nullptr; });
-    }
     m_alignLayoutDlg->refreshSelectionInfo();
     m_alignLayoutDlg->show();
     m_alignLayoutDlg->raise();
-    m_alignLayoutDlg->activateWindow();
 }
 
 // ============================================================
@@ -1313,38 +1305,41 @@ void MainWindow::onRotationChanged(QGraphicsItem *item, qreal oldRotation,
     m_pView->scheduleResizeHandleUpdate();
 }
 
-void MainWindow::onRequestFinished(const QJsonDocument &json)
+void MainWindow::onRequestFinished(const QJsonDocument &json,
+                                   NetworkRequestType type)
 {
     // 解析返回数据
     if (json.isEmpty())
         return;
 
-    // 获取状态
-    QJsonObject obj = json.object();
-    if (obj.isEmpty()) {
-        // QJsonArray处理
+    switch (type) {
+    case NetworkRequestType::RequestHelpAbout:
+        break;
+    case NetworkRequestType::RequestAddRip: {
+        if (m_pTimer) {
+            m_pTimer->stop();
+            m_pTimer->disconnect(this);
+            connect(m_pTimer, &QTimer::timeout, this,
+                    [this]() { m_pNetWorkUtils->doRipStatus(); });
 
-    } else {
-        if (obj.contains("rip_picture_progress")) {
-            QJsonValue value = obj.value("rip_picture_progress");
-            int progress = value.toInt();
-
-            m_pProgress->setValue(progress);
-            if (progress == m_pProgress->maximum()) {
-                m_pTimer->stop();
-                m_pTimer->disconnect(this);
-            }
-        } else {
-            // 定时获取Rip进度并更新进度条
-            if (m_pTimer) {
-                m_pTimer->stop();
-                m_pTimer->disconnect(this);
-                connect(m_pTimer, &QTimer::timeout, this,
-                        [this]() { m_pNetWorkUtils->doRipStatus(); });
-
-                m_pTimer->start(1000);
-            }
+            m_pProgress->setValue(0);
+            m_pTimer->start(1000);
         }
+    } break;
+    case NetworkRequestType::RequestRipStatus: {
+        QJsonValue value = json.object().value("rip_picture_progress");
+        int progress = value.toInt();
+        m_pProgress->setValue(progress);
+        if (progress == m_pProgress->maximum()) {
+            m_pTimer->stop();
+            m_pTimer->disconnect(this);
+        }
+    } break;
+    case NetworkRequestType::RequestRipVersion:
+        break;
+
+    default:
+        break;
     }
 }
 

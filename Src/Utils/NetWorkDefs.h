@@ -25,4 +25,11 @@ static const QString ConfigPath =
 #define NETWORK_ROOT_RIPSTATUS              NETWORK_ROOT "/ripstatus"
 #define NETWORK_ROOT_RIPVERSION             NETWORK_ROOT "/ripVersion"
 
+enum NetworkRequestType {
+    RequestHelpAbout,
+    RequestAddRip,
+    RequestRipStatus,
+    RequestRipVersion
+};
+
 #endif // NETWORKDEFS_H

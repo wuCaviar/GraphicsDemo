@@ -1,7 +1,7 @@
 #ifndef ALIGNLAYOUTDIALOG_H
 #define ALIGNLAYOUTDIALOG_H
 
-#include <QDialog>
+#include <QDockWidget>
 #include <QPointer>
 #include <QGraphicsItem>
 
@@ -13,7 +13,7 @@ class QDoubleSpinBox;
 class QPushButton;
 class QLabel;
 
-class AlignLayoutDialog : public QDialog
+class AlignLayoutDialog : public QDockWidget
 {
     Q_OBJECT
 
@@ -22,10 +22,6 @@ public:
                                QWidget *parent = nullptr);
 
     void refreshSelectionInfo();
-    void setDockReferenceWidget(QWidget *ref);
-
-protected:
-    void showEvent(QShowEvent *event) override;
 
 private slots:
     void onAlignClicked();
@@ -34,9 +30,8 @@ private slots:
     void onSelectionChanged();
 
 private:
-    void setupUI();
+    void setupUI(QWidget *container);
     QList<QGraphicsItem *> filterSelectableItems() const;
-    void positionAboveDockRef();
 
     bool applyAlign(AlignmentUtils::AlignDirection direction);
     bool applyDistribute(AlignmentUtils::DistributeDirection direction,
@@ -46,35 +41,34 @@ private:
 
     QPointer<QGraphicsScene> m_scene;
     QUndoStack *m_undoStack = nullptr;
-    QWidget *m_dockRef = nullptr;
 
     // Horizontal align
-    QPushButton *m_hAlignLeft      = nullptr;
-    QPushButton *m_hAlignCenter    = nullptr;
-    QPushButton *m_hAlignRight     = nullptr;
-    QPushButton *m_hAlignStretch   = nullptr;
-    QPushButton *m_hAlignProp      = nullptr;
+    QPushButton *m_hAlignLeft = nullptr;
+    QPushButton *m_hAlignCenter = nullptr;
+    QPushButton *m_hAlignRight = nullptr;
+    QPushButton *m_hAlignStretch = nullptr;
+    QPushButton *m_hAlignProp = nullptr;
 
     // Horizontal distribute
-    QPushButton *m_hDistLeft       = nullptr;
-    QPushButton *m_hDistCenter     = nullptr;
-    QPushButton *m_hDistRight      = nullptr;
-    QPushButton *m_hDistEqualGap   = nullptr;
-    QPushButton *m_hDistCustom     = nullptr;
+    QPushButton *m_hDistLeft = nullptr;
+    QPushButton *m_hDistCenter = nullptr;
+    QPushButton *m_hDistRight = nullptr;
+    QPushButton *m_hDistEqualGap = nullptr;
+    QPushButton *m_hDistCustom = nullptr;
 
     // Vertical align
-    QPushButton *m_vAlignTop       = nullptr;
-    QPushButton *m_vAlignCenter    = nullptr;
-    QPushButton *m_vAlignBottom    = nullptr;
-    QPushButton *m_vAlignStretch   = nullptr;
-    QPushButton *m_vAlignProp      = nullptr;
+    QPushButton *m_vAlignTop = nullptr;
+    QPushButton *m_vAlignCenter = nullptr;
+    QPushButton *m_vAlignBottom = nullptr;
+    QPushButton *m_vAlignStretch = nullptr;
+    QPushButton *m_vAlignProp = nullptr;
 
     // Vertical distribute
-    QPushButton *m_vDistTop        = nullptr;
-    QPushButton *m_vDistCenter     = nullptr;
-    QPushButton *m_vDistBottom     = nullptr;
-    QPushButton *m_vDistEqualGap   = nullptr;
-    QPushButton *m_vDistCustom     = nullptr;
+    QPushButton *m_vDistTop = nullptr;
+    QPushButton *m_vDistCenter = nullptr;
+    QPushButton *m_vDistBottom = nullptr;
+    QPushButton *m_vDistEqualGap = nullptr;
+    QPushButton *m_vDistCustom = nullptr;
 
     // Page center
     QPushButton *m_pageHCenter = nullptr;

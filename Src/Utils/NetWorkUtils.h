@@ -9,6 +9,7 @@
 #include <QJsonArray>
 
 #include "../NetWork/QHttp.h"
+#include "NetWorkDefs.h"
 
 // 独立线程用于专门跑网络接口
 class NetWorkUtils : public QObject
@@ -38,17 +39,17 @@ public:
 
 signals:
     // 请求成功信号（响应体数据）
-    void requestFinished(const QJsonDocument &json);
+    void requestFinished(const QJsonDocument &json, NetworkRequestType type);
     // 请求错误信号
     void requestError(const QString &errorString);
 
-    void requestRecv(Http::QResponsePtr ptrResp);
+    void requestRecv(Http::QResponsePtr ptrResp, NetworkRequestType type);
 
 private slots:
     // 在工作线程中初始化 manager（必须在正确线程中调用）
     void init();
 
-    void onReplyFinished(Http::QResponsePtr ptrResp);
+    void onReplyFinished(Http::QResponsePtr ptrResp, NetworkRequestType type);
 
 protected:
     template<typename... Ts>

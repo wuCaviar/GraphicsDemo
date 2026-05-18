@@ -1,5 +1,10 @@
 #include "NetWorkUtils.h"
-#include "NetWorkDefs.h"
+
+#define GET_AND_EMIT(url, type)                                    \
+    Http::Get(Http::URL(url),                                      \
+              Http::ResponseFunc([&](Http::QResponsePtr ptrResp) { \
+                  Q_EMIT requestRecv(ptrResp, type);               \
+              }));
 
 NetWorkUtils::NetWorkUtils(QObject *parent) : QObject(parent) { }
 
@@ -43,10 +48,7 @@ void NetWorkUtils::stop()
 
 void NetWorkUtils::doHelpAbout()
 {
-    Http::Get(Http::URL(NETWORK_ROOT_HELPABOUT),
-              Http::ResponseFunc([this](Http::QResponsePtr ptrResp) {
-                  Q_EMIT requestRecv(ptrResp);
-              }));
+    GET_AND_EMIT(NETWORK_ROOT_HELPABOUT, RequestHelpAbout);
 }
 
 void NetWorkUtils::doAddRip(int x, int y, const QString &path)
@@ -64,24 +66,18 @@ void NetWorkUtils::doAddRip(int x, int y, const QString &path)
     Http::Get(Http::URL(NETWORK_ROOT_ADDRIP),
               Http::Parameters({ Http::Parameter("param", jsonString) }),
               Http::ResponseFunc([this](Http::QResponsePtr ptrResp) {
-                  Q_EMIT requestRecv(ptrResp);
+                  Q_EMIT requestRecv(ptrResp, RequestAddRip);
               }));
 }
 
 void NetWorkUtils::doRipStatus()
 {
-    Http::Get(Http::URL(NETWORK_ROOT_RIPSTATUS),
-              Http::ResponseFunc([this](Http::QResponsePtr ptrResp) {
-                  Q_EMIT requestRecv(ptrResp);
-              }));
+    GET_AND_EMIT(NETWORK_ROOT_RIPSTATUS, RequestRipStatus);
 }
 
 void NetWorkUtils::doRipVersion()
 {
-    Http::Get(Http::URL(NETWORK_ROOT_RIPVERSION),
-              Http::ResponseFunc([this](Http::QResponsePtr ptrResp) {
-                  Q_EMIT requestRecv(ptrResp);
-              }));
+    GET_AND_EMIT(NETWORK_ROOT_RIPVERSION, RequestRipVersion);
 }
 
 void NetWorkUtils::init()
@@ -99,7 +95,8 @@ void NetWorkUtils::init()
     }
 }
 
-void NetWorkUtils::onReplyFinished(Http::QResponsePtr ptrResponse)
+void NetWorkUtils::onReplyFinished(Http::QResponsePtr ptrResponse,
+                                   NetworkRequestType type)
 {
     if (!ptrResponse)
         return;
@@ -109,7 +106,7 @@ void NetWorkUtils::onReplyFinished(Http::QResponsePtr ptrResponse)
     QString strError = "";
     if (ptrResponse->success(strError)) {
         QJsonDocument doc = QJsonDocument::fromJson(ptrResponse->body());
-        Q_EMIT requestFinished(doc);
+        Q_EMIT requestFinished(doc, type);
     } else {
         Q_EMIT requestError(strError);
     }

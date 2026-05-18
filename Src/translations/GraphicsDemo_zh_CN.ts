@@ -4,142 +4,175 @@
 <context>
     <name>AlignLayoutDialog</name>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="33"/>
-        <source>Align &amp; Layout</source>
-        <translation>对齐与布局</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="49"/>
+        <source>Align &amp; Distribute</source>
+        <translation>对齐与分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="56"/>
-        <source>Align</source>
-        <translation>对齐</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="91"/>
+        <source>Horizontal</source>
+        <translation>水平</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="60"/>
-        <source>Left</source>
-        <translation>左对齐</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="97"/>
+        <source>Align left edges</source>
+        <translation>左边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="61"/>
-        <source>HCenter</source>
-        <translation>水平居中</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="98"/>
+        <source>Align horizontal centers</source>
+        <translation>水平居中对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="62"/>
-        <source>Right</source>
-        <translation>右对齐</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="99"/>
+        <source>Align right edges</source>
+        <translation>右边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="63"/>
-        <source>Top</source>
-        <translation>顶部对齐</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="100"/>
+        <source>Stretch to same width, align left &amp; right</source>
+        <translation>拉伸至同宽，左右对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="64"/>
-        <source>VCenter</source>
-        <translation>垂直居中</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="101"/>
+        <source>Stretch horizontally, scale proportionally</source>
+        <translation>水平拉伸，等比缩放</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="65"/>
-        <source>Bottom</source>
-        <translation>底部对齐</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="112"/>
+        <source>Left edges equally spaced</source>
+        <translation>左边缘等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="72"/>
-        <source>Click to align selected items</source>
-        <translation>点击对齐选中图元</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="113"/>
+        <source>Horizontal centers equally spaced</source>
+        <translation>水平中心等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="85"/>
-        <source>Distribute</source>
-        <translation>分布</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="114"/>
+        <source>Right edges equally spaced</source>
+        <translation>右边缘等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="89"/>
-        <source>Distribute Horizontally</source>
-        <translation>水平分布</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="115"/>
+        <source>Equal horizontal gaps</source>
+        <translation>水平等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="90"/>
-        <source>Distribute Vertically</source>
-        <translation>垂直分布</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="116"/>
+        <source>Custom horizontal gap spacing</source>
+        <translation>自定义水平间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="93"/>
-        <source>Click to distribute selected items horizontally</source>
-        <translation>点击将选中图元水平均匀分布</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="133"/>
+        <source>Gap:</source>
+        <translation>间距:</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="94"/>
-        <source>Click to distribute selected items vertically</source>
-        <translation>点击将选中图元垂直均匀分布</translation>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="132"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="182"/>
+        <source>Gap value for Custom Gap distribution</source>
+        <translation>自定义间距分布的值</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="110"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="141"/>
+        <source>Vertical</source>
+        <translation>垂直</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="147"/>
+        <source>Align top edges</source>
+        <translation>顶部边缘对齐</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="148"/>
+        <source>Align vertical centers</source>
+        <translation>垂直居中对齐</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="149"/>
+        <source>Align bottom edges</source>
+        <translation>底部边缘对齐</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="150"/>
+        <source>Stretch to same height, align top &amp; bottom</source>
+        <translation>拉伸至同高，上下对齐</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="151"/>
+        <source>Stretch vertically, scale proportionally</source>
+        <translation>垂直拉伸，等比缩放</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="162"/>
+        <source>Top edges equally spaced</source>
+        <translation>顶部边缘等间距分布</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="163"/>
+        <source>Vertical centers equally spaced</source>
+        <translation>垂直中心等间距分布</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="164"/>
+        <source>Bottom edges equally spaced</source>
+        <translation>底部边缘等间距分布</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="165"/>
+        <source>Equal vertical gaps</source>
+        <translation>垂直等间距分布</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="166"/>
+        <source>Custom vertical gap spacing</source>
+        <translation>自定义垂直间距分布</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="191"/>
+        <source>Page</source>
+        <translation>页面</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="194"/>
+        <source>Center horizontally on canvas</source>
+        <translation>在画布上水平居中</translation>
+    </message>
+    <message>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="195"/>
+        <source>Center vertically on canvas</source>
+        <translation>在画布上垂直居中</translation>
+    </message>
+    <message>
         <location filename="../UI/AlignLayoutDialog.cpp" line="130"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="180"/>
         <source> px</source>
         <translation> 像素</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="120"/>
-        <source>H:</source>
-        <translation>水平间距:</translation>
-    </message>
-    <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="140"/>
-        <source>V:</source>
-        <translation>垂直间距:</translation>
-    </message>
-    <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="151"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="203"/>
         <source>Selected: 0 items</source>
         <translation>已选中: 0 个图元</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="155"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="207"/>
         <source>Close</source>
         <translation>关闭</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="196"/>
-        <source>Auto</source>
-        <translation>自动</translation>
-    </message>
-    <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="196"/>
-        <source>Manual</source>
-        <translation>手动</translation>
-    </message>
-    <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="234"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="260"/>
         <source>Selected: %1 item(s)</source>
         <translation>已选中: %1 个图元</translation>
-    </message>
-    <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="297"/>
-        <source>Align %1</source>
-        <translation>对齐 %1</translation>
-    </message>
-    <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="325"/>
-        <source>Distribute %1</source>
-        <translation>分布 %1</translation>
-    </message>
-    <message>
-        <source>Toggle auto spacing</source>
-        <translation>切换自动间距</translation>
-    </message>
-    <message>
-        <source>Close the dialog</source>
-        <translation>关闭对话框</translation>
     </message>
 </context>
 <context>
     <name>MainWindow</name>
     <message>
         <location filename="../UI/mainwindow.ui" line="14"/>
-        <location filename="../UI/mainwindow.cpp" line="59"/>
-        <source>GraphicsDemo</source>
-        <translation>图形编辑器</translation>
+        <location filename="../UI/mainwindow.cpp" line="84"/>
+        <source>AT Drawing Tools</source>
+        <translation>AT 绘图工具</translation>
     </message>
     <message>
         <source>&amp;File</source>
@@ -394,24 +427,37 @@
         <translation>逆时针旋转 90°</translation>
     </message>
     <message>
-        <source>X: %1  Y: %2</source>
-        <translation>X: %1  Y: %2</translation>
+        <location filename="../UI/mainwindow.cpp" line="692"/>
+        <source>X: %1 mm  Y: %2 mm</source>
+        <translation>X: %1 mm  Y: %2 mm</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="694"/>
+        <source>X: %1 px  Y: %2 px</source>
+        <translation>X: %1 px  Y: %2 px</translation>
     </message>
     <message>
         <source>%1%</source>
         <translation>%1%</translation>
     </message>
     <message>
-        <source>X: 0.0  Y: 0.0</source>
-        <translation>X: 0.0  Y: 0.0</translation>
+        <location filename="../UI/mainwindow.cpp" line="612"/>
+        <source>X: 0.0 px  Y: 0.0 px</source>
+        <translation>X: 0.0 px  Y: 0.0 px</translation>
     </message>
     <message>
         <source>100%</source>
         <translation>100%</translation>
     </message>
     <message>
-        <source>Canvas: %1 x %2 mm</source>
-        <translation>画布: %1 × %2 毫米</translation>
+        <location filename="../UI/mainwindow.cpp" line="716"/>
+        <source>Canvas: %1 × %2 mm · %3 PPI</source>
+        <translation>画布: %1 × %2 毫米 · %3 PPI</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="721"/>
+        <source>Canvas: %1 × %2 px · %3 PPI</source>
+        <translation>画布: %1 × %2 像素 · %3 PPI</translation>
     </message>
     <message>
         <source>Tool: Select</source>
@@ -616,6 +662,31 @@
     <message>
         <source>Close</source>
         <translation>关闭</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="493"/>
+        <source>Rotate 90° CW</source>
+        <translation>顺时针旋转 90°</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="500"/>
+        <source>Rotate 90° CCW</source>
+        <translation>逆时针旋转 90°</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="739"/>
+        <source>Hand</source>
+        <translation>手型</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="754"/>
+        <source>Freehand</source>
+        <translation>自由线条</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="615"/>
+        <source>Rip</source>
+        <translation>Rip</translation>
     </message>
 </context>
 <context>
@@ -913,74 +984,89 @@
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../Commands/Commands.cpp" line="16"/>
+        <location filename="../Commands/Commands.cpp" line="13"/>
         <source>Add Item</source>
         <translation>添加图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="53"/>
+        <location filename="../Commands/Commands.cpp" line="50"/>
         <source>Delete Items</source>
         <translation>删除图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="102"/>
+        <location filename="../Commands/Commands.cpp" line="103"/>
         <source>Move Items</source>
         <translation>移动图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="142"/>
+        <location filename="../Commands/Commands.cpp" line="143"/>
         <source>Change Pen</source>
         <translation>修改边框</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="143"/>
+        <location filename="../Commands/Commands.cpp" line="144"/>
         <source>Change Brush</source>
         <translation>修改画刷</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="144"/>
+        <location filename="../Commands/Commands.cpp" line="145"/>
         <source>Change Font</source>
         <translation>修改字体</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="145"/>
+        <location filename="../Commands/Commands.cpp" line="146"/>
         <source>Change Text</source>
         <translation>修改文字</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="146"/>
+        <location filename="../Commands/Commands.cpp" line="147"/>
         <source>Resize</source>
         <translation>调整大小</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="147"/>
+        <location filename="../Commands/Commands.cpp" line="148"/>
         <source>Change Corner Radius</source>
         <translation>修改圆角半径</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="225"/>
+        <location filename="../Commands/Commands.cpp" line="208"/>
         <source>Paste Items</source>
         <translation>粘贴图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="269"/>
+        <location filename="../Commands/Commands.cpp" line="257"/>
         <source>Change Z-Order</source>
         <translation>修改层级</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="307"/>
+        <location filename="../Commands/Commands.cpp" line="295"/>
         <source>Align Items</source>
         <translation>对齐图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="338"/>
+        <location filename="../Commands/Commands.cpp" line="337"/>
+        <source>Stretch Align Items</source>
+        <translation>拉伸对齐图元</translation>
+    </message>
+    <message>
+        <location filename="../Commands/Commands.cpp" line="374"/>
         <source>Change Position</source>
         <translation>修改位置</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="382"/>
+        <location filename="../Commands/Commands.cpp" line="420"/>
         <source>Rotate %1°</source>
         <translation>旋转 %1°</translation>
+    </message>
+    <message>
+        <location filename="../Commands/Commands.cpp" line="447"/>
+        <source>Group Items</source>
+        <translation>成组图元</translation>
+    </message>
+    <message>
+        <location filename="../Commands/Commands.cpp" line="532"/>
+        <source>Ungroup Items</source>
+        <translation>解散组图元</translation>
     </message>
     <message>
         <location filename="../Utils/ImageUtils.cpp" line="94"/>

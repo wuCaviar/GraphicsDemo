@@ -82,7 +82,7 @@ private slots:
                            const QPointF &newPos);
     void onRotationChanged(QGraphicsItem *item, qreal oldRotation,
                            qreal newRotation);
-    void onRequestFinished(const QJsonDocument &json);
+    void onRequestFinished(const QJsonDocument &json, NetworkRequestType type);
     void onUpdateInfo();
 
 private:

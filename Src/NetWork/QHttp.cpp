@@ -125,12 +125,11 @@ QGlobal::~QGlobal() { }
 
 QGlobalManagerPtr QGlobalManager::shared()
 {
-    static QGlobalManagerPtr s_instance =
-        qmake_shared(QGlobalManager, QCoreApplication::instance());
+    static QGlobalManagerPtr s_instance = qmake_shared(QGlobalManager);
     return s_instance;
 }
 
-QGlobalManager::QGlobalManager(QObject *parent) : QObject(parent) { }
+QGlobalManager::QGlobalManager() { }
 
 QGlobalManager::~QGlobalManager() { }
 
@@ -453,7 +452,7 @@ void QHttp::_handleResponse()
             ptrReq->file()->write(m_pReply->readAll());
             ptrReq->file()->close();
         }
-        ptrResp->setBody( ptrReq->file()->fileName().toUtf8());
+        ptrResp->setBody(ptrReq->file()->fileName().toUtf8());
     } else {
         ptrResp->setBody(m_pReply->readAll());
     }
