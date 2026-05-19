@@ -53,6 +53,7 @@
         <file>icons/page-vcenter.svg</file>
     </qresource>
     <qresource prefix="/style">
-        <file>style.qss</file>
+        <file>style_light.qss</file>
+        <file>style_dark.qss</file>
     </qresource>
 </RCC>

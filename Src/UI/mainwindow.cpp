@@ -90,7 +90,16 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::loadStyleSheet()
 {
-    QFile f(":/style/style.qss");
+    QSettings settings;
+    bool dark = settings.value("theme/dark", false).toBool();
+    applyTheme(dark);
+}
+
+void MainWindow::applyTheme(bool dark)
+{
+    const QString path = dark ? QStringLiteral(":/style/style_dark.qss")
+                              : QStringLiteral(":/style/style_light.qss");
+    QFile f(path);
     if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qApp->setStyleSheet(f.readAll());
         f.close();
@@ -303,6 +312,11 @@ void MainWindow::_initMenuBar()
     QMenu *settingsMenu = menu->addMenu(tr("&Settings"));
     settingsMenu->addAction(tr("设置..."), this, &MainWindow::onSettings)
         ->setToolTip(tr("Open application settings"));
+
+    m_darkThemeAction = settingsMenu->addAction(tr("Dark Theme"));
+    m_darkThemeAction->setCheckable(true);
+    m_darkThemeAction->setToolTip(tr("Toggle dark theme"));
+    connect(m_darkThemeAction, &QAction::toggled, this, &MainWindow::applyTheme);
 
     // ---- 视图 ----
     QMenu *viewMenu = menu->addMenu(tr("&View"));
@@ -1575,6 +1589,10 @@ void MainWindow::loadWindowState()
             m_gridAction->setChecked(gridVisible);
         }
     }
+    if (m_darkThemeAction && settings.contains("theme/dark")) {
+        bool dark = settings.value("theme/dark").toBool();
+        m_darkThemeAction->setChecked(dark);
+    }
 }
 
 void MainWindow::saveWindowState()
@@ -1608,6 +1626,9 @@ void MainWindow::saveWindowState()
     // 保存其他设置
     if (m_pView) {
         settings.setValue("view/gridVisible", m_pView->isGridVisible());
+    }
+    if (m_darkThemeAction) {
+        settings.setValue("theme/dark", m_darkThemeAction->isChecked());
     }
 
     settings.sync();

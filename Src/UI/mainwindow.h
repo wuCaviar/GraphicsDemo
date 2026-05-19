@@ -96,6 +96,7 @@ private:
     void _initNetWork();
     void _updateUndoRedoActions();
     void loadStyleSheet();
+    void applyTheme(bool dark);
 
     // 窗口状态持久化
     void loadWindowState();
@@ -136,6 +137,9 @@ private:
     // 刻度尺
     class RulerBar *m_hRuler = nullptr;
     class RulerBar *m_vRuler = nullptr;
+
+    // 主题切换
+    QAction *m_darkThemeAction = nullptr;
 
     // 网格显示切换
     QAction *m_gridAction = nullptr;
