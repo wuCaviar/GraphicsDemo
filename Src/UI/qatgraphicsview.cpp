@@ -240,25 +240,6 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
         return;
     }
 
-    if (m_tool == Tool::Image) {
-        QSizeF canvasSize = m_pCanvas ? m_pCanvas->canvasSize() : QSizeF();
-        auto result = ImageUtils::importImageWithDialog(this, canvasSize);
-        if (result.isValid()) {
-            auto *item = new ImageItem(QPixmap::fromImage(result.image));
-            item->setItemPen(QPen(Qt::NoPen));
-            item->setFilePath(result.filePath);
-            item->setRawTiffData(result.rawTiffMat);
-            if (result.isCmykSource)
-                item->setCmykSourceData(result.rawCmykMat);
-            item->setPos(scenePos);
-
-            if (m_undoStack)
-                m_undoStack->push(new AddItemCommand(m_scene, item));
-            emit itemAdded(item);
-        }
-        return;
-    }
-
     if (m_tool == Tool::Text) {
         auto *item = new TextItem(tr("Text"));
         item->setFont(m_defaultFont);

@@ -7,10 +7,10 @@
 #include "CanvasItem.h"
 #include "Commands.h"
 #include "EllipseItem.h"
-#include "ExportImageDialog.h"
+
 #include "ImageItem.h"
 #include "ImageUtils.h"
-#include "ImportImageDialog.h"
+
 #include "LineItem.h"
 #include "NewFileDialog.h"
 #include "SettingsDialog.h"
@@ -429,7 +429,7 @@ void MainWindow::_initToolBar()
     actionGroup->setExclusive(true);
 
     auto addToolAction = [&](const QString &iconPath, const QString &text,
-                             Tool tool, const QString &shortcut = { }) {
+                             Tool tool, const QString &shortcut = {}) {
         QAction *act = drawBar->addAction(QIcon(iconPath), text);
         act->setCheckable(true);
         act->setToolTip(text);
@@ -807,6 +807,9 @@ void MainWindow::onNew()
     QSizeF canvasSize = dlg.selectedSize();
     qreal ppi = dlg.selectedPpi();
 
+    x_dpi = ppi;
+    y_dpi = ppi;
+
     // 先清空 undo 栈，避免命令引用即将被删除的图元
     m_undoStack->clear();
 
@@ -825,6 +828,8 @@ void MainWindow::onNew()
     m_hRuler->setPpi(ppi);
     m_vRuler->setPpi(ppi);
 
+    m_pProgress->setValue(0);
+
     // PPI 变化后刷新刻度尺和状态栏
     m_hRuler->updateRuler();
     m_vRuler->updateRuler();
@@ -834,7 +839,8 @@ void MainWindow::onNew()
 
 void MainWindow::onImportImage()
 {
-    QSizeF canvasSize = m_pView->canvasItem() ? m_pView->canvasItem()->canvasSize() : QSizeF();
+    QSizeF canvasSize =
+        m_pView->canvasItem() ? m_pView->canvasItem()->canvasSize() : QSizeF();
     auto result = ImageUtils::importImageWithDialog(this, canvasSize);
     if (!result.isValid())
         return;
@@ -842,9 +848,7 @@ void MainWindow::onImportImage()
     auto *item = new ImageItem(QPixmap::fromImage(result.image));
     item->setItemPen(QPen(Qt::NoPen));
     item->setFilePath(result.filePath);
-    item->setRawTiffData(result.rawTiffMat);
-    if (result.isCmykSource)
-        item->setCmykSourceData(result.rawCmykMat);
+    item->setCmykSourceData(result.rawCmykMat);
 
     m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
 }
@@ -852,27 +856,22 @@ void MainWindow::onImportImage()
 void MainWindow::onExportImage()
 {
     // 第一步：选择保存路径和格式
-
-    // TODO: 修改成prn保存路径，明天跟王工确认
     QString path = QFileDialog::getSaveFileName(
-        this, tr("Export Image"), QString(),
-        tr("TIFF (*.tif *.tiff);;PNG (*.png);;JPEG (*.jpg);;BMP (*.bmp)"));
+        this, tr("Export Image"), QString(), tr("prn Files (*.prn)"));
     if (path.isEmpty())
         return;
 
+    QFileInfo fi(path);
+
     bool bRip = false;
     SettingsDialog dlg(this);
+    dlg.setOutputPath(fi.absolutePath());
     if (dlg.exec() == QDialog::Accepted)
         bRip = true;
 
     QApplication::setOverrideCursor(Qt::WaitCursor);
 
-    // 不再显示参数设置对话框，直接设置参数
-    ImageUtils::ExportParameters exportParams;
-    exportParams.colorSpace =
-        ImageUtils::ExportParameters::ColorSpace::ConvertToCMYK;
-
-    // 第三步：根据画布或场景内容创建图像
+    // 默认参数导出
     QRectF exportRect;
     if (m_pView->canvasItem()) {
         exportRect = m_pView->canvasItem()->rect();
@@ -889,17 +888,12 @@ void MainWindow::onExportImage()
     m_pView->scene()->render(&painter, QRectF(), exportRect);
     painter.end();
 
-    // 第四步：根据参数导出
-    if (path.endsWith(".tif", Qt::CaseInsensitive)
-        || path.endsWith(".tiff", Qt::CaseInsensitive)) {
-        if (exportParams.colorSpace
-            == ImageUtils::ExportParameters::ColorSpace::ConvertToCMYK) {
-            QList<QGraphicsItem *> items =
-                ::filterSelectableItems(m_pView->scene()->items());
-            ImageUtils::exportTiffCmyk(path, image, items, exportRect,
-                                       exportParams);
-        }
-    }
+    // 导出
+    // 去掉文件扩展名prn，统一添加 .tif 以供后续 RIP 处理
+    path = fi.absolutePath() + "/" + fi.completeBaseName() + ".tif";
+    QList<QGraphicsItem *> items =
+        ::filterSelectableItems(m_pView->scene()->items());
+    ImageUtils::exportTiffCmyk(path, image, items, exportRect);
 
     QApplication::restoreOverrideCursor();
 

@@ -92,9 +92,9 @@ void SettingsDialog::setupUI()
     mainLayout->addWidget(outputGroup);
 
     // ---- 按钮 ----
-    auto *buttonBox =
-        new QDialogButtonBox(QDialogButtonBox::Ok);
-    buttonBox->button(QDialogButtonBox::Ok)->setToolTip(tr("Save settings and close"));
+    auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok);
+    buttonBox->button(QDialogButtonBox::Ok)
+        ->setToolTip(tr("Save settings and close"));
     mainLayout->addWidget(buttonBox);
 
     connect(dotCurveBtn, &QPushButton::clicked, this, [this]() {
@@ -144,6 +144,11 @@ QString SettingsDialog::colorCurvePath() const
 QString SettingsDialog::outputPath() const
 {
     return m_outputPathEdit->text();
+}
+
+void SettingsDialog::setOutputPath(const QString &path)
+{
+    m_outputPathEdit->setText(path);
 }
 
 void SettingsDialog::loadConfig()

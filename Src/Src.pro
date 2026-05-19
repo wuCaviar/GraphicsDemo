@@ -26,8 +26,6 @@ HEADERS += \
     UI/RulerBar.h \
     UI/GradientDialog.h \
     UI/AlignLayoutDialog.h \
-    UI/ImportImageDialog.h \
-    UI/ExportImageDialog.h \
     UI/SettingsDialog.h \
     Items/IGraphicsItem.h \
     Items/RectItem.h \
@@ -49,7 +47,8 @@ HEADERS += \
     CommonDefs.h \
     QCommonDefs.h \
     Utils/NetWorkDefs.h \
-    Utils/NetWorkUtils.h
+    Utils/NetWorkUtils.h \
+    Tiff/tifffile.h \
 
 SOURCES += \
     App/SingleInstance.cpp \
@@ -62,8 +61,6 @@ SOURCES += \
     UI/RulerBar.cpp \
     UI/GradientDialog.cpp \
     UI/AlignLayoutDialog.cpp \
-    UI/ImportImageDialog.cpp \
-    UI/ExportImageDialog.cpp \
     UI/SettingsDialog.cpp \
     Items/IGraphicsItem.cpp \
     Items/RectItem.cpp \
@@ -82,7 +79,8 @@ SOURCES += \
     Utils/AlignmentUtils.cpp \
     ColorTrans/colortransform.cpp \
     NetWork/QHttp.cpp \
-    Utils/NetWorkUtils.cpp
+    Utils/NetWorkUtils.cpp \
+    Tiff/tifffile.cpp \
 
 FORMS += \
     UI/mainwindow.ui \
@@ -103,6 +101,7 @@ INCLUDEPATH += \
     $$PWD/Commands \
     $$PWD/Utils \
     $$PWD/ColorTrans \
-    $$PWD/NetWork
-
+    $$PWD/NetWork \
+    $$PWD/Tiff \
+    
 include(../Common.pri)

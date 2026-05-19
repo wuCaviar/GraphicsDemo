@@ -8,154 +8,71 @@
 #include <QMap>
 #include <QVariant>
 #include <QString>
+#include <QByteArray>
+
+static int x_dpi = 72;
+static int y_dpi = 72;
 
 namespace ImageUtils {
 
+// NOTE:导入导出不在需要设置参数，按照默认要求参数即可。
+
 // 4-channel 8-bit raw pixel buffer, replaces cv::Mat (CV_8UC4)
-struct RawPixelBuffer {
+struct RawPixelBuffer
+{
     int width = 0;
     int height = 0;
     QByteArray data;
 
     bool isEmpty() const { return data.isEmpty(); }
-    uint8_t *ptr(int y) { return reinterpret_cast<uint8_t *>(data.data()) + y * width * 4; }
-    const uint8_t *ptr(int y) const { return reinterpret_cast<const uint8_t *>(data.data()) + y * width * 4; }
+    uint8_t *ptr(int y)
+    {
+        return reinterpret_cast<uint8_t *>(data.data()) + y * width * 4;
+    }
+    const uint8_t *ptr(int y) const
+    {
+        return reinterpret_cast<const uint8_t *>(data.data()) + y * width * 4;
+    }
 };
 
-// 导入参数
-struct ImportParameters {
-    // DPI 设置
-    enum class DpiPolicy {
-        UseImageDpi,    // 使用图像自带的 DPI
-        ForceDpi,       // 强制使用指定的 DPI
-        IgnoreDpi       // 忽略 DPI（作为 72 DPI 处理）
-    };
-    DpiPolicy dpiPolicy = DpiPolicy::UseImageDpi;
-    int forcedDpi = 300;  // 当 dpiPolicy = ForceDpi 时有效
-
-    // 颜色空间
-    enum class ColorSpace {
-        KeepOriginal,    // 保持原始颜色空间
-        ConvertToSRGB,   // 转换为 sRGB
-        ConvertToAdobeRGB // 转换为 Adobe RGB
-    };
-    ColorSpace colorSpace = ColorSpace::KeepOriginal;
-
-    // Alpha 通道处理
-    enum class AlphaHandling {
-        Keep,            // 保持 Alpha 通道
-        Discard,         // 丢弃 Alpha 通道（替换为白色）
-        Premultiply      // 预乘 Alpha
-    };
-    AlphaHandling alphaHandling = AlphaHandling::Keep;
-
-    // 图像缩放
-    bool enableScaling = false;
-    qreal scaleFactor = 1.0;  // 缩放因子（1.0 = 原始大小）
-
-    // TIFF 特定选项
-    bool preserveTiffMetadata = true;  // 保留 TIFF 元数据
-};
-
-// 导出参数
-struct ExportParameters {
-    // ===== 通用参数 =====
-    int dpi = 300;
-
-    enum class ColorSpace {
-        KeepOriginal,
-        ConvertToSRGB,
-        ConvertToAdobeRGB,
-        ConvertToCMYK
-    };
-    ColorSpace colorSpace = ColorSpace::KeepOriginal;
-
-    enum class TransparencyHandling {
-        Keep,
-        FlattenOnWhite
-    };
-    TransparencyHandling transparency = TransparencyHandling::Keep;
-
-    // ===== 格式通用枚举 =====
-    enum class CompressionType {
-        None,
-        LZW,
-        ZIP,
-        JPEG,
-        PackBits
-    };
-
-    enum class ByteOrder { LittleEndian, BigEndian };
-    enum class BitDepth { Bits8, Bits16 };
-    enum class PlanarConfig { Contig, Separate };
-    enum class Predictor { None, Horizontal };
-
-    // ===== TIFF 专业参数 =====
-    struct TiffOptions {
-        CompressionType compression = CompressionType::None;
-        ByteOrder byteOrder = ByteOrder::LittleEndian;
-        BitDepth bitDepth = BitDepth::Bits8;
-        PlanarConfig planarConfig = PlanarConfig::Contig;
-        Predictor predictor = Predictor::None;
-        bool embedICCProfile = true;
-        bool preserveMetadata = true;
-        int jpegQuality = 95;  // 1-100, 仅 JPEG 压缩时有效
-    };
-    TiffOptions tiff;
-
-    // ===== PNG 参数（预留扩展） =====
-    struct PngOptions {
-        int compressionLevel = 6;  // 0-9
-    };
-    PngOptions png;
-
-    // ===== JPEG 参数（预留扩展） =====
-    struct JpegOptions {
-        int quality = 95;  // 1-100
-    };
-    JpegOptions jpeg;
+// 图像导入结果
+struct ImportResult
+{
+    QImage image; // 通过QImageReader读取的用于显示的图片
+    RawPixelBuffer rawCmykMat; // 读取/转换到的cmyk原始数据值(0-100.0)
+    QString filePath; // 文件路径
+    QMap<QString, QVariant> metadata; // 元数据（EXIF、XMP等）
+    int dpiX = 72; // 水平 DPI
+    int dpiY = 72; // 垂直 DPI
+    bool isValid() const { return !image.isNull(); }
 };
 
 // 判断文件路径是否为 TIFF 格式
 bool isTiffFile(const QString &path);
 
-// 图像导入结果
-struct ImportResult {
-    QImage image;              // 解码后的图像
-    RawPixelBuffer rawTiffMat;    // 原始 TIFF 数据（仅 TIFF 文件有值）
-    QString filePath;          // 文件路径
-    QMap<QString, QVariant> metadata; // 元数据（EXIF、XMP等）
-    int dpiX = 72;            // 水平 DPI
-    int dpiY = 72;            // 垂直 DPI
-    bool isValid() const { return !image.isNull(); }
+// NOTE:导入流程
+/*
+    选择文件路径，判断文件名后缀，libTiff\QImageReader读取
+    保存导入数据
+*/
 
-    // CMYK 源数据（仅 CMYK TIFF 导入时有值）
-    RawPixelBuffer rawCmykMat;  // 原始 CMYK 像素（4 bytes/pixel, 0-255/通道, libtiff 顺序）
-    bool isCmykSource = false;
-};
-
-// 使用 libtiff 导入 TIFF 图像（支持 RGBA、CMYK、安全检查）
-QImage importTiffWithLibtiff(const QString &path, const ImportParameters &params = ImportParameters(),
-                             ImportResult *result = nullptr);
+// 使用 libtiff 、QImageReader导入图像（支持 RGBA、CMYK、安全检查）
+void importTiffWithLibtiff(const QString &path, ImportResult *result = nullptr);
 
 // 从文件加载图像（自动识别 TIFF 与普通格式，保留 TIFF 原始数据）
-ImportResult loadImageFromFile(const QString &path, const ImportParameters &params = ImportParameters());
+ImportResult loadImageFromFile(const QString &path);
 
 // 弹出文件对话框并加载所选图像，对比画布尺寸询问是否缩放适配
-ImportResult importImageWithDialog(QWidget *parent, const QSizeF &canvasSize = QSizeF());
+ImportResult importImageWithDialog(QWidget *parent,
+                                   const QSizeF &canvasSize = QSizeF());
 
-// 使用 libtiff 导出 TIFF（支持压缩参数、DPI、元数据）
-bool exportTiffLossless(const QString &path, const QImage &image,
-                        const ExportParameters &params = ExportParameters());
+// 使用 libtiff 导出 TIFF（默认 LZW 压缩、300 DPI）
+bool exportTiffLossless(const QString &path, const QImage &image);
 
 // 导出 CMYK TIFF：RGB 图像逐像素转换 CMYK，并用图元存储的精确 CMYK 覆写纯色区域
 bool exportTiffCmyk(const QString &path, const QImage &image,
-                    const QList<QGraphicsItem *> &items, const QRectF &exportRect,
-                    const ExportParameters &params = ExportParameters());
-
-// 使用 QImageWriter 导出 PNG/JPEG 等格式（支持压缩参数）
-bool exportImageWithParams(const QString &path, const QImage &image,
-                           const ExportParameters &params);
+                    const QList<QGraphicsItem *> &items,
+                    const QRectF &exportRect);
 
 } // namespace ImageUtils
 

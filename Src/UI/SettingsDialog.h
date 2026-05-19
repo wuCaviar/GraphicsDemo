@@ -18,6 +18,7 @@ public:
     QString dotCurvePath() const;
     QString colorCurvePath() const;
     QString outputPath() const;
+    void setOutputPath(const QString &path);
 
 private:
     void setupUI();
