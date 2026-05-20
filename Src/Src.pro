@@ -9,6 +9,7 @@ DEFINES += QTCOLORWIDGETS_STATICALLY_LINKED
 
 include(Qt-Color-Widgets/color_widgets.pri)
 include(QtGradientEditor/qtgradienteditor.pri)
+include(QSimpleUpdater/qsimpleupdater.pri)
 
 # 启用 RTTI（AlignmentUtils 使用 dynamic_cast<IGraphicsItem*>）
 CONFIG += rtti c++17
@@ -44,11 +45,13 @@ HEADERS += \
     Utils/AlignmentUtils.h \
     ColorTrans/colortransform.h \
     NetWork/QHttp.h \
+    Action/QATActionBase.h \
     CommonDefs.h \
     QCommonDefs.h \
     Utils/NetWorkDefs.h \
     Utils/NetWorkUtils.h \
     Tiff/tifffile.h \
+    version.h \
 
 SOURCES += \
     App/SingleInstance.cpp \
@@ -79,6 +82,7 @@ SOURCES += \
     Utils/AlignmentUtils.cpp \
     ColorTrans/colortransform.cpp \
     NetWork/QHttp.cpp \
+    Action/QATActionBase.cpp \
     Utils/NetWorkUtils.cpp \
     Tiff/tifffile.cpp \
 

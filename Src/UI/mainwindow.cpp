@@ -19,6 +19,7 @@
 #include "RulerBar.h"
 #include "TextItem.h"
 #include "GraphicsItemGroup.h"
+#include "version.h"
 
 #include <algorithm>
 
@@ -34,6 +35,7 @@
 #include <QImage>
 #include <QInputDialog>
 #include <QKeyEvent>
+#include <QMessageBox>
 #include <QLabel>
 #include <QMap>
 #include <QMimeData>
@@ -49,6 +51,8 @@
 #include <QVBoxLayout>
 
 static const char *kMimeFormat = "application/x-graphicsdemo-items";
+
+static QString RipVersion = "Unknown";
 
 namespace {
 QFrame *createStatusSeparator(QWidget *parent)
@@ -90,16 +94,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::loadStyleSheet()
 {
-    QSettings settings;
-    bool dark = settings.value("theme/dark", false).toBool();
-    applyTheme(dark);
-}
-
-void MainWindow::applyTheme(bool dark)
-{
-    const QString path = dark ? QStringLiteral(":/style/style_dark.qss")
-                              : QStringLiteral(":/style/style_light.qss");
-    QFile f(path);
+    QFile f(":/style/style.qss");
     if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
         qApp->setStyleSheet(f.readAll());
         f.close();
@@ -310,19 +305,19 @@ void MainWindow::_initMenuBar()
 
     // ---- 设置 ----
     QMenu *settingsMenu = menu->addMenu(tr("&Settings"));
-    settingsMenu->addAction(tr("设置..."), this, &MainWindow::onSettings)
+    settingsMenu->addAction(tr("&Settings..."), this, &MainWindow::onSettings)
         ->setToolTip(tr("Open application settings"));
-
-    m_darkThemeAction = settingsMenu->addAction(tr("Dark Theme"));
-    m_darkThemeAction->setCheckable(true);
-    m_darkThemeAction->setToolTip(tr("Toggle dark theme"));
-    connect(m_darkThemeAction, &QAction::toggled, this, &MainWindow::applyTheme);
 
     // ---- 视图 ----
     QMenu *viewMenu = menu->addMenu(tr("&View"));
     viewMenu->addAction(m_pPropertyPanel->toggleViewAction());
     viewMenu->addAction(m_alignLayoutDlg->toggleViewAction());
     viewMenu->addSeparator();
+
+    // ---- 帮助 ----
+    QMenu *helpMenu = menu->addMenu(tr("&Help"));
+    helpMenu->addAction(tr("&About..."), this, &MainWindow::onAbout)
+        ->setToolTip(tr("About this application"));
 
     // 网格显示/隐藏
     m_gridAction = viewMenu->addAction(QIcon(":/icons/icons/view-grid.svg"),
@@ -473,45 +468,45 @@ void MainWindow::_initToolBar()
                   "T");
 
     // 对齐工具栏
-    m_alignToolBar = new QToolBar(tr("Align"), this);
-    m_alignToolBar->setObjectName("AlignToolBar");
-    m_alignToolBar->setMovable(false);
-    m_alignToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    m_alignToolBar->setIconSize(QSize(20, 20));
-    addToolBar(Qt::TopToolBarArea, m_alignToolBar);
+    QToolBar *alignToolBar = new QToolBar(tr("Align"), this);
+    alignToolBar->setObjectName("AlignToolBar");
+    alignToolBar->setMovable(false);
+    alignToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    alignToolBar->setIconSize(QSize(20, 20));
+    addToolBar(Qt::TopToolBarArea, alignToolBar);
 
-    QAction *alignLayoutAct = m_alignToolBar->addAction(
+    QAction *alignLayoutAct = alignToolBar->addAction(
         QIcon(":/icons/icons/align-layout.svg"), tr("Align && Layout..."));
     alignLayoutAct->setToolTip(tr("Open Align & Layout dialog"));
     connect(alignLayoutAct, &QAction::triggered, this,
             &MainWindow::onAlignLayoutDialog);
 
-    m_alignToolBar->addSeparator();
+    alignToolBar->addSeparator();
 
     // 成组/解组
-    QAction *groupAct = m_alignToolBar->addAction(
-        QIcon(":/icons/icons/group.svg"), tr("Group"));
+    QAction *groupAct =
+        alignToolBar->addAction(QIcon(":/icons/icons/group.svg"), tr("Group"));
     groupAct->setToolTip(tr("Group selected items (Ctrl+G)"));
     groupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
     connect(groupAct, &QAction::triggered, this, &MainWindow::onGroup);
 
-    QAction *ungroupAct = m_alignToolBar->addAction(
+    QAction *ungroupAct = alignToolBar->addAction(
         QIcon(":/icons/icons/ungroup.svg"), tr("Ungroup"));
     ungroupAct->setToolTip(tr("Ungroup selected items (Ctrl+Shift+G)"));
     ungroupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
     connect(ungroupAct, &QAction::triggered, this, &MainWindow::onUngroup);
 
-    m_alignToolBar->addSeparator();
+    alignToolBar->addSeparator();
 
     // 顺时针旋转 90°
-    QAction *rotateCWAct = m_alignToolBar->addAction(
+    QAction *rotateCWAct = alignToolBar->addAction(
         QIcon(":/icons/icons/rotate-cw.svg"), tr("Rotate 90\u00b0 CW"));
     rotateCWAct->setToolTip(tr("Rotate 90\u00b0 clockwise"));
     connect(rotateCWAct, &QAction::triggered, this,
             [this]() { rotateSelectedItems(90.0); });
 
     // 逆时针旋转 90°
-    QAction *rotateCCWAct = m_alignToolBar->addAction(
+    QAction *rotateCCWAct = alignToolBar->addAction(
         QIcon(":/icons/icons/rotate-ccw.svg"), tr("Rotate 90\u00b0 CCW"));
     rotateCCWAct->setToolTip(tr("Rotate 90\u00b0 counter-clockwise"));
     connect(rotateCCWAct, &QAction::triggered, this,
@@ -915,6 +910,7 @@ void MainWindow::onExportImage()
     bool hasTiffFiles = QFileInfo::exists(path);
     // 网络请求
     if (bRip && hasTiffFiles && m_pNetWorkUtils) {
+        setEnabled(false);
         m_pNetWorkUtils->doAddRip(dlg.resolutionX(), dlg.resolutionY(), path);
     }
 }
@@ -1126,6 +1122,17 @@ void MainWindow::onSettings()
         return;
     // TODO: 使用 dlg.resolutionX(), dlg.resolutionY(),
     //       dlg.dotCurvePath(), dlg.colorCurvePath(), dlg.outputPath()
+}
+
+void MainWindow::onAbout()
+{
+    QString strText = QString(tr("<h3>AT Drawing Tools</h3>"
+                                 "<p>Current Version: %1</p>"
+                                 "<p>    Rip Version: %2</p>"))
+                          .arg(ATHC_VERSION_STR_MAJ_MIN_MIC)
+                          .arg(RipVersion);
+
+    QMessageBox::about(this, tr("About AT Drawing Tools"), strText);
 }
 
 // ============================================================
@@ -1340,10 +1347,13 @@ void MainWindow::onRequestFinished(const QJsonDocument &json,
         if (progress == m_pProgress->maximum()) {
             m_pTimer->stop();
             m_pTimer->disconnect(this);
+            setEnabled(true);
         }
     } break;
-    case NetworkRequestType::RequestRipVersion:
-        break;
+    case NetworkRequestType::RequestRipVersion: {
+        QJsonValue value = json.object().value("ripVersion");
+        RipVersion = value.toString();
+    } break;
 
     default:
         break;
@@ -1589,9 +1599,10 @@ void MainWindow::loadWindowState()
             m_gridAction->setChecked(gridVisible);
         }
     }
-    if (m_darkThemeAction && settings.contains("theme/dark")) {
-        bool dark = settings.value("theme/dark").toBool();
-        m_darkThemeAction->setChecked(dark);
+
+    // 获取 Rip 版本
+    if (m_pNetWorkUtils) {
+        m_pNetWorkUtils->doRipVersion();
     }
 }
 
@@ -1626,9 +1637,6 @@ void MainWindow::saveWindowState()
     // 保存其他设置
     if (m_pView) {
         settings.setValue("view/gridVisible", m_pView->isGridVisible());
-    }
-    if (m_darkThemeAction) {
-        settings.setValue("theme/dark", m_darkThemeAction->isChecked());
     }
 
     settings.sync();

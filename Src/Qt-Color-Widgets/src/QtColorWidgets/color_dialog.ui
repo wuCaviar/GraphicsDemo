@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>685</width>
+    <width>643</width>
     <height>337</height>
    </rect>
   </property>
@@ -23,7 +23,7 @@
       <enum>Qt::Orientation::Horizontal</enum>
      </property>
      <property name="handleWidth">
-      <number>10</number>
+      <number>3</number>
      </property>
      <widget class="QWidget" name="layoutWidget">
       <layout class="QVBoxLayout" name="verticalLayout">
@@ -35,6 +35,12 @@
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="minimumSize">
+          <size>
+           <width>200</width>
+           <height>0</height>
+          </size>
+         </property>
         </widget>
        </item>
        <item>
@@ -44,6 +50,12 @@
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>200</width>
+           <height>0</height>
+          </size>
          </property>
         </widget>
        </item>
@@ -58,7 +70,7 @@
       </property>
       <property name="maximumSize">
        <size>
-        <width>400</width>
+        <width>16777215</width>
         <height>16777215</height>
        </size>
       </property>
@@ -66,7 +78,7 @@
        <enum>Qt::Orientation::Horizontal</enum>
       </property>
       <property name="handleWidth">
-       <number>10</number>
+       <number>3</number>
       </property>
       <widget class="QWidget" name="layoutWidget">
        <layout class="QGridLayout" name="gridLayout_2">
@@ -481,11 +493,11 @@
             <property name="decimals">
              <number>1</number>
             </property>
-            <property name="singleStep">
-             <double>0.500000000000000</double>
-            </property>
             <property name="maximum">
              <double>100.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.500000000000000</double>
             </property>
            </widget>
           </item>
@@ -506,11 +518,11 @@
             <property name="decimals">
              <number>1</number>
             </property>
-            <property name="singleStep">
-             <double>0.500000000000000</double>
-            </property>
             <property name="maximum">
              <double>100.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.500000000000000</double>
             </property>
            </widget>
           </item>
@@ -570,11 +582,11 @@
             <property name="decimals">
              <number>1</number>
             </property>
-            <property name="singleStep">
-             <double>0.500000000000000</double>
-            </property>
             <property name="maximum">
              <double>100.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.500000000000000</double>
             </property>
            </widget>
           </item>
@@ -595,11 +607,11 @@
             <property name="decimals">
              <number>1</number>
             </property>
-            <property name="singleStep">
-             <double>0.500000000000000</double>
-            </property>
             <property name="maximum">
              <double>100.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.500000000000000</double>
             </property>
            </widget>
           </item>

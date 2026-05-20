@@ -54,6 +54,7 @@ private slots:
     void onUngroup();
     void onAlignLayoutDialog();
     void onSettings();
+    void onAbout();
     void onAlignLeft();
     void onAlignRight();
     void onAlignTop();
@@ -96,7 +97,6 @@ private:
     void _initNetWork();
     void _updateUndoRedoActions();
     void loadStyleSheet();
-    void applyTheme(bool dark);
 
     // 窗口状态持久化
     void loadWindowState();
@@ -128,18 +128,12 @@ private:
     QMap<Tool, QAction *> m_toolActions;
     Tool m_currentTool = Tool::Select;
 
-    // 对齐工具栏
-    QToolBar *m_alignToolBar = nullptr;
-
     // 对齐与布局对话框（非模态单例）
     AlignLayoutDialog *m_alignLayoutDlg = nullptr;
 
     // 刻度尺
     class RulerBar *m_hRuler = nullptr;
     class RulerBar *m_vRuler = nullptr;
-
-    // 主题切换
-    QAction *m_darkThemeAction = nullptr;
 
     // 网格显示切换
     QAction *m_gridAction = nullptr;

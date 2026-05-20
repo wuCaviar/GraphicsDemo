@@ -27,8 +27,6 @@
 namespace ImageUtils {
 
 // ========== 辅助函数声明 ==========
-static void readTiffMetadata(TIFF *tif, QMap<QString, QVariant> &metadata);
-
 bool isTiffFile(const QString &path)
 {
     return path.endsWith(".tif", Qt::CaseInsensitive)
@@ -99,13 +97,13 @@ static RawPixelBuffer imageToCmykBuffer(const QImage &image)
             }
             int off = x * 4;
             dst[off + 0] =
-                static_cast<uint8_t>(qBound(0.0, 255.0 - cd * 2.55, 255.0));
+                static_cast<uint8_t>(qRound(cd));
             dst[off + 1] =
-                static_cast<uint8_t>(qBound(0.0, 255.0 - md * 2.55, 255.0));
+                static_cast<uint8_t>(qRound(md));
             dst[off + 2] =
-                static_cast<uint8_t>(qBound(0.0, 255.0 - yd * 2.55, 255.0));
+                static_cast<uint8_t>(qRound(yd));
             dst[off + 3] =
-                static_cast<uint8_t>(qBound(0.0, 255.0 - kd * 2.55, 255.0));
+                static_cast<uint8_t>(qRound(kd));
         }
     }
     return buf;
@@ -154,11 +152,6 @@ void importTiffWithLibtiff(const QString &path, ImportResult *result)
         QPair<int, int> dpi = getTiffDpi(tif);
         result->dpiX = dpi.first;
         result->dpiY = dpi.second;
-    }
-
-    // 读取 TIFF 元数据（如果启用）
-    if (result) {
-        readTiffMetadata(tif, result->metadata);
     }
 
     bool readError = false;
@@ -326,50 +319,6 @@ void importTiffWithLibtiff(const QString &path, ImportResult *result)
     TIFFClose(tif);
 }
 
-// 读取 TIFF 元数据
-static void readTiffMetadata(TIFF *tif, QMap<QString, QVariant> &metadata)
-{
-    // 读取常见的 TIFF 标签
-    char *tagValue = nullptr;
-
-    // 软件信息
-    if (TIFFGetField(tif, TIFFTAG_SOFTWARE, &tagValue) && tagValue) {
-        metadata["Software"] = QString::fromLatin1(tagValue);
-    }
-
-    // 文档名称
-    if (TIFFGetField(tif, TIFFTAG_DOCUMENTNAME, &tagValue) && tagValue) {
-        metadata["DocumentName"] = QString::fromLatin1(tagValue);
-    }
-
-    // 图像描述
-    if (TIFFGetField(tif, TIFFTAG_IMAGEDESCRIPTION, &tagValue) && tagValue) {
-        metadata["ImageDescription"] = QString::fromLatin1(tagValue);
-    }
-
-    // 作者
-    if (TIFFGetField(tif, TIFFTAG_ARTIST, &tagValue) && tagValue) {
-        metadata["Artist"] = QString::fromLatin1(tagValue);
-    }
-
-    // 版权
-    if (TIFFGetField(tif, TIFFTAG_COPYRIGHT, &tagValue) && tagValue) {
-        metadata["Copyright"] = QString::fromLatin1(tagValue);
-    }
-
-    // 日期时间
-    if (TIFFGetField(tif, TIFFTAG_DATETIME, &tagValue) && tagValue) {
-        metadata["DateTime"] = QString::fromLatin1(tagValue);
-    }
-
-    // 色度信息（白点、原色）
-    float *colorant = nullptr;
-    if (TIFFGetField(tif, TIFFTAG_WHITEPOINT, &colorant) && colorant) {
-        metadata["WhitePointX"] = colorant[0];
-        metadata["WhitePointY"] = colorant[1];
-    }
-}
-
 ImportResult loadImageFromFile(const QString &path)
 {
     ImportResult result;
@@ -460,13 +409,9 @@ ImportResult importImageWithDialog(QWidget *parent, const QSizeF &canvasSize)
 static void writeTiffMetadata(TIFF *tif)
 {
     // 始终写入软件和时间戳
-    TIFFSetField(tif, TIFFTAG_SOFTWARE, "GraphicsDemo");
     QString dateTime =
         QDateTime::currentDateTime().toString("yyyy:MM:dd HH:mm:ss");
     TIFFSetField(tif, TIFFTAG_DATETIME, dateTime.toUtf8().constData());
-
-    // 预留：从导入元数据写回 DocumentName, ImageDescription, Artist, Copyright
-    // 需要调用方传入 ImportResult::metadata，当前未连接
 }
 
 bool exportTiffCmyk(const QString &path, const QImage &image,
