@@ -4,28 +4,34 @@
 #include <QtGlobal>
 #include <QString>
 
+#define USE_NEW_RIP
+
 #if defined(Q_OS_MACOS)
 static const QString ExePath = QStringLiteral("");
 
 static const QString ConfigPath =
     QStringLiteral("/Volumes/Caviar/Test/GraphicsDemo/Bin/ripconfig.xml");
 #elif defined(Q_OS_WIN)
+#    if defined(USE_NEW_RIP)
+static const QString ExePath =
+    QStringLiteral("D:/WorkSpace/Caviar/FileRip/FileRIP0521.exe");
+#    else
 static const QString ExePath =
     QStringLiteral("D:/WorkSpace/Caviar/FileRip/FileRIP.exe");
-
+#    endif
 static const QString ConfigPath =
     QStringLiteral("D:/WorkSpace/Caviar/FileRip/ripconfig.xml");
-
 #endif
 
-#define NETWORK_ROOT                        "http://127.0.0.1:9201"
+#define NETWORK_ROOT "http://127.0.0.1:9201"
 
-#define NETWORK_ROOT_HELPABOUT              NETWORK_ROOT "/helpabout"
-#define NETWORK_ROOT_ADDRIP                 NETWORK_ROOT "/addrip"
-#define NETWORK_ROOT_RIPSTATUS              NETWORK_ROOT "/ripstatus"
-#define NETWORK_ROOT_RIPVERSION             NETWORK_ROOT "/ripVersion"
+#define NETWORK_ROOT_HELPABOUT NETWORK_ROOT "/helpabout"
+#define NETWORK_ROOT_ADDRIP NETWORK_ROOT "/addrip"
+#define NETWORK_ROOT_RIPSTATUS NETWORK_ROOT "/ripstatus"
+#define NETWORK_ROOT_RIPVERSION NETWORK_ROOT "/ripVersion"
 
-enum NetworkRequestType {
+enum NetworkRequestType
+{
     RequestHelpAbout,
     RequestAddRip,
     RequestRipStatus,

@@ -24,6 +24,8 @@ protected:
 
     void readTiffByLibTiff(const QString &path);
 
+    void readTiffRawData(const QString &path);
+
 private:
     Ui::MainWindow *ui;
 };

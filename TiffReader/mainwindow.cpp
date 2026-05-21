@@ -5,6 +5,12 @@
 #include <QFileDialog>
 #include <QImageReader>
 #include <tiffio.h>
+#include <fstream>
+#include <vector>
+#include <cstdint>
+#include <stdexcept>
+
+#include "TiffRawReader.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow)
@@ -38,8 +44,9 @@ void MainWindow::slotOpenImage()
 
     ui->lineEdit->setText(path);
 
-    readTiffByQt(path);
-    readTiffByLibTiff(path);
+    // readTiffByQt(path);
+    // readTiffByLibTiff(path);
+    readTiffRawData(path);
 }
 
 void MainWindow::readTiffByQt(const QString &path)
@@ -50,236 +57,167 @@ void MainWindow::readTiffByQt(const QString &path)
     QImageReader reader(path);
     QImage image = reader.read();
     scene->addPixmap(QPixmap::fromImageReader(&reader));
+
+    qDebug() << image.format();
 }
-
-#include <fstream>
-#include <vector>
-#include <cstdint>
-#include <stdexcept>
-
 void MainWindow::readTiffByLibTiff(const QString &path)
 {
-
-#if 0
-
-    TIFF *tif = TIFFOpen(path.toStdString().c_str(), "r");
-    if (!tif)
+    QByteArray temp = path.toLocal8Bit();
+    TIFF *tif = TIFFOpen(temp.data(), "r");
+    if (!tif) {
         qDebug() << "Cannot open " << path;
+        return;
+    }
 
-    uint32_t width, height;
-
+    uint32_t width = 0, height = 0;
     TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
     TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
 
-    const std::string &filename = path.toStdString();
-    std::streampos startOffset = 194;
-    std::size_t byteCount = width * height * 4; // CMYK 每像素4字节
-    // 以二进制模式打开文件，并设置区域设置避免空格转换
-    std::ifstream file(filename, std::ios::binary);
-    if (!file)
-        throw std::runtime_error("Cannot open file: " + filename);
+    QByteArray
+        cmykData; // 存放所有像素的 CMYK 原始字节，顺序: C0,M0,Y0,K0, C1,M1,Y1,K1, ...
 
-    // 定位到起始偏移
-    file.seekg(startOffset);
-    if (!file)
-        throw std::runtime_error("Failed to seek to offset "
-                                 + std::to_string(startOffset));
+    // 检查是否有条带字节计数标签（表示图像是按条带组织的）
+    uint32_t *stripByteCounts = nullptr;
+    if (TIFFGetField(tif, TIFFTAG_STRIPBYTECOUNTS, &stripByteCounts)
+        && stripByteCounts[0] > 0) {
+        // ----- Scanline 读取（libtiff 内部处理条带） -----
+        uint16_t samplesPerPixel = 0, bitsPerSample = 0;
+        uint16_t photometric = 0, planarConfig = 0;
+        TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &samplesPerPixel);
+        TIFFGetField(tif, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
+        TIFFGetField(tif, TIFFTAG_PHOTOMETRIC, &photometric);
+        TIFFGetField(tif, TIFFTAG_PLANARCONFIG, &planarConfig);
 
-    // 读取指定字节数
-    std::vector<uint8_t> buffer(byteCount);
-    file.read(reinterpret_cast<char *>(buffer.data()), byteCount);
-
-    // 检查实际读取量
-    if (file.gcount() != static_cast<std::streamsize>(byteCount))
-        throw std::runtime_error("Read failed: expected "
-                                 + std::to_string(byteCount) + " bytes, got "
-                                 + std::to_string(file.gcount()));
-
-    for (uint32_t row = 0; row < height; row++) {
-        for (uint32_t col = 0; col < width; col++) {
-            unsigned char C = buffer[(row * width + col) * 4 + 0];
-            unsigned char M = buffer[(row * width + col) * 4 + 1];
-            unsigned char Y = buffer[(row * width + col) * 4 + 2];
-            unsigned char K = buffer[(row * width + col) * 4 + 3];
-
-            int c = static_cast<int>(C);
-            int m = static_cast<int>(M);
-            int y = static_cast<int>(Y);
-            int k = static_cast<int>(K);
-
-            if (c == 0 && m == 0 && y == 0 && k == 0) {
-                // 纯白像素
-            } else if (c == 255 && m == 255 && y == 255 && k == 255) {
-                // 纯黑像素
-            } else {
-                // 其他颜色
-                qDebug() << "Pixel at (" << col << "," << row << "): C=" << c
-                         << " M=" << m << " Y=" << y << " K=" << k;
-            }
+        if (photometric != PHOTOMETRIC_SEPARATED || samplesPerPixel != 4) {
+            qDebug() << "Not a standard CMYK TIFF.";
+            TIFFClose(tif);
+            return;
         }
-    }
 
-#endif
-
-#if 1
-    TIFF *tif = TIFFOpen(path.toStdString().c_str(), "r");
-    if (!tif)
-        qDebug() << "Cannot open " << path;
-
-    uint32_t width, height, rowsPerStrip;
-    uint16_t samplesPerPixel, bitsPerSample, photometric, planarConfig,
-        compression;
-
-    TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
-    TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
-    TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &samplesPerPixel);
-    TIFFGetField(tif, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
-    TIFFGetField(tif, TIFFTAG_PHOTOMETRIC, &photometric);
-    TIFFGetField(tif, TIFFTAG_PLANARCONFIG, &planarConfig);
-    TIFFGetField(tif, TIFFTAG_COMPRESSION, &compression);
-
-    if (compression != COMPRESSION_NONE) {
-        fprintf(stderr, "Only uncompressed files can be recovered this way.\n");
-    }
-    if (!TIFFGetField(tif, TIFFTAG_ROWSPERSTRIP, &rowsPerStrip)) {
-        // 如果 RowsPerStrip 也缺失，则假设整个图像是一个条带
-        rowsPerStrip = height;
-    }
-
-    tsize_t scanlineSize = TIFFScanlineSize(tif);
-    uint32_t nStrips = TIFFNumberOfStrips(
-        tif); // 这个函数不依赖 StripByteCounts，它用 RowsPerStrip 和 height 计算
-
-    // 获取 strip 偏移
-    uint64_t stripOffsets;
-    if (!TIFFGetField(tif, TIFFTAG_STRIPOFFSETS, &stripOffsets)) {
-        fprintf(stderr, "StripOffsets missing, impossible to recover.\n");
-    }
-
-    // 分配一个完整图像的缓冲区
-    size_t totalBytes = width * height * 4; // CMYK 4字节
-    unsigned char *image = (unsigned char *)malloc(totalBytes);
-
-    for (uint32_t strip = 0; strip < nStrips; strip++) {
-        uint32_t startRow = strip * rowsPerStrip;
-        uint32_t rowsInStrip = (startRow + rowsPerStrip > height)
-                                   ? height - startRow
-                                   : rowsPerStrip;
-        tsize_t rawCount = rowsInStrip * scanlineSize;
-
-        tdata_t stripBuf = _TIFFmalloc(rawCount);
-        TIFFReadRawStrip(tif, strip, stripBuf, rawCount);
-
-        // 复制到图像缓冲区（CONTIG 格式）
-        memcpy(image + startRow * width * 4, stripBuf, rawCount);
-        _TIFFfree(stripBuf);
-    }
-
-    // 此时 image 中已经包含了整个图像的 CMYK 数据，可以根据需要进行处理
-    // 读取每个像素的 CMYK 值并进行处理
-    for (uint32_t row = 0; row < height; row++) {
-        for (uint32_t col = 0; col < width; col++) {
-            unsigned char C = image[(row * width + col) * 4 + 0];
-            unsigned char M = image[(row * width + col) * 4 + 1];
-            unsigned char Y = image[(row * width + col) * 4 + 2];
-            unsigned char K = image[(row * width + col) * 4 + 3];
-
-            int c = static_cast<int>(C);
-            int m = static_cast<int>(M);
-            int y = static_cast<int>(Y);
-            int k = static_cast<int>(K);
-
-            if (c == 0 && m == 0 && y == 0 && k == 0) {
-                // 纯白像素
-            } else if (c == 255 && m == 255 && y == 255 && k == 255) {
-                // 纯黑像素
-            } else {
-                // 其他颜色
-                qDebug() << "Pixel at (" << col << "," << row << "): C=" << c
-                         << " M=" << m << " Y=" << y << " K=" << k;
-            }
+        tsize_t scanlineSize = TIFFScanlineSize(tif);
+        tdata_t buf = _TIFFmalloc(scanlineSize);
+        if (!buf) {
+            qDebug() << "Memory allocation failed.";
+            TIFFClose(tif);
+            return;
         }
-    }
 
-    free(image);
-    TIFFClose(tif);
-
-#endif
-
-#if 0
-
-    // 读取必要标签
-    uint32_t width, height;
-    uint16_t samplesPerPixel, bitsPerSample, photometric, planarConfig;
-    TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
-    TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
-    TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &samplesPerPixel);
-    TIFFGetField(tif, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
-    TIFFGetField(tif, TIFFTAG_PHOTOMETRIC, &photometric);
-    TIFFGetField(tif, TIFFTAG_PLANARCONFIG, &planarConfig);
-
-    // 验证是否为 CMYK
-    if (photometric != PHOTOMETRIC_SEPARATED || samplesPerPixel != 4) {
-        fprintf(stderr, "Not a standard CMYK TIFF.\n");
-        TIFFClose(tif);
-    }
-
-    printf("Image: %ux%u, %u-bit CMYK, PlanarConfig=%u\n", width, height,
-           bitsPerSample, planarConfig);
-
-    tsize_t scanlineSize = TIFFScanlineSize(tif); // 一行数据的字节数
-    tdata_t buf = _TIFFmalloc(scanlineSize);
-    if (!buf) {
-        fprintf(stderr, "Memory allocation failed.\n");
-        TIFFClose(tif);
-    }
-
-    if (planarConfig == PLANARCONFIG_CONTIG) { // 1 - 交错存储
-        for (uint32_t row = 0; row < height; row++) {
-            int size = TIFFReadScanline(tif, buf, row, 0);
-            // 处理该行: buf 中按 C,M,Y,K 顺序存放每个像素的4个分量
-            unsigned char *pixel = (unsigned char *)buf;
-            for (uint32_t col = 0; col < width; col++) {
-                unsigned char C = pixel[col * 4 + 0];
-                unsigned char M = pixel[col * 4 + 1];
-                unsigned char Y = pixel[col * 4 + 2];
-                unsigned char K = pixel[col * 4 + 3];
-                // 在此处使用 CMYK 值
-
-                // 转换成Int
-                int c = static_cast<int>(C);
-                int m = static_cast<int>(M);    
-                int y = static_cast<int>(Y);
-                int k = static_cast<int>(K);
-
-                if (c == 0 && m == 0 && y == 0 && k == 0) {
-                    // 纯白像素
-                } else if (c == 255 && m == 255 && y == 255 && k == 255) {
-                    // 纯黑像素
-                } else {
-                    // 其他颜色
-                    qDebug() << "Pixel at (" << col << "," << row << "): C=" << c
-                             << " M=" << m << " Y=" << y << " K=" << k;
+        if (planarConfig == PLANARCONFIG_CONTIG) { // 交错存储
+            for (uint32_t row = 0; row < height; ++row) {
+                if (TIFFReadScanline(tif, buf, row, 0) < 0) {
+                    qDebug() << "Read error at row" << row;
+                    break;
                 }
+                // 整行 CMYK 数据直接追加
+                cmykData.append(static_cast<const char *>(buf), scanlineSize);
             }
-        }
-    } else { // planarConfig == PLANARCONFIG_SEPARATE (2) - 独立平面
-        // 为每个通道分配一个扫描线缓冲区（尺寸可能相同）
-        tdata_t channelBuf = _TIFFmalloc(scanlineSize); // 每个通道一行的大小
-        for (uint32_t row = 0; row < height; row++) {
-            for (uint16_t sample = 0; sample < 4; sample++) {
-                TIFFReadScanline(tif, channelBuf, row, sample);
-                // channelBuf 现在是该行该通道的原始数据
-                unsigned char *values = (unsigned char *)channelBuf;
-                // 可根据需要收集或合并到完整像素中
+        } else { // PLANARCONFIG_SEPARATE：独立平面，需合并四个通道
+            tdata_t channelBuf = _TIFFmalloc(scanlineSize);
+            if (!channelBuf) {
+                _TIFFfree(buf);
+                TIFFClose(tif);
+                return;
             }
-            // 此处 row 行所有通道数据已就绪，可合并为一个 CMYK 像素数组
+
+            std::vector<unsigned char> rowPixels(width * 4); // 一行合并后的像素
+            for (uint32_t row = 0; row < height; ++row) {
+                // 依次读取四个通道到 channelBuf，并填入 rowPixels 对应位置
+                for (uint16_t sample = 0; sample < samplesPerPixel; ++sample) {
+                    if (TIFFReadScanline(tif, channelBuf, row, sample) < 0) {
+                        qDebug() << "Read error at row" << row << "channel"
+                                 << sample;
+                        break;
+                    }
+                    unsigned char *chanData =
+                        static_cast<unsigned char *>(channelBuf);
+                    for (uint32_t col = 0; col < width; ++col) {
+                        rowPixels[col * 4 + sample] = chanData[col];
+                    }
+                }
+                // 将该行完整的 CMYK 数据追加到 cmykData
+                cmykData.append(
+                    reinterpret_cast<const char *>(rowPixels.data()),
+                    static_cast<int>(rowPixels.size()));
+            }
+            _TIFFfree(channelBuf);
         }
-        _TIFFfree(channelBuf);
+        _TIFFfree(buf);
+    } else {
+        // ----- 无条带信息，按二进制文件设置偏移量读取原始数据 -----
+        const std::string filename = path.toStdString();
+        const std::streampos startOffset = 194;
+        const std::size_t byteCount =
+            static_cast<std::size_t>(width) * height * 4; // CMYK
+
+        std::ifstream file(filename, std::ios::binary);
+        if (!file) {
+            qDebug() << "Cannot open file for binary read:" << path;
+            TIFFClose(tif);
+            return;
+        }
+
+        file.seekg(startOffset);
+        if (!file) {
+            qDebug() << "Failed to seek to offset" << startOffset;
+            TIFFClose(tif);
+            return;
+        }
+
+        std::vector<uint8_t> buffer(byteCount);
+        file.read(reinterpret_cast<char *>(buffer.data()), byteCount);
+        if (file.gcount() != static_cast<std::streamsize>(byteCount)) {
+            qDebug() << "Read failed: expected" << byteCount << "bytes, got"
+                     << file.gcount();
+            TIFFClose(tif);
+            return;
+        }
+
+        // 原始像素数据直接存入 cmykData
+        cmykData.append(reinterpret_cast<const char *>(buffer.data()),
+                        static_cast<int>(buffer.size()));
     }
 
-    _TIFFfree(buf);
     TIFFClose(tif);
 
-#endif
+    // ===== 统一输出：遍历 cmykData，保持原有的输出条件（非纯白、非纯黑） =====
+    const int totalPixels = cmykData.size() / 4; // 每个像素 4 字节
+    for (int i = 0; i < totalPixels; ++i) {
+        int offset = i * 4;
+        unsigned char C = cmykData[offset];
+        unsigned char M = cmykData[offset + 1];
+        unsigned char Y = cmykData[offset + 2];
+        unsigned char K = cmykData[offset + 3];
+
+        int c = C, m = M, y = Y, k = K;
+        if (c == 0 && m == 0 && y == 0 && k == 0) {
+            // 纯白，不输出
+        } else if (c == 255 && m == 255 && y == 255 && k == 255) {
+            // 纯黑，不输出
+        } else {
+            uint32_t row = i / width;
+            uint32_t col = i % width;
+            qDebug() << "Pixel at (" << col << "," << row << "): C=" << c
+                     << " M=" << m << " Y=" << y << " K=" << k;
+        }
+    }
+}
+
+void MainWindow::readTiffRawData(const QString &path)
+{
+    TiffRawReader reader;
+    if (!reader.open(path)) {
+        qDebug() << "Open failed:" << reader.lastError();
+    }
+
+    qDebug() << "Image:" << reader.width() << "x" << reader.height()
+             << "samples:" << reader.samplesPerPixel()
+             << "bits:" << reader.bitsPerSample();
+
+    QByteArray raw = reader.readRawData();
+    if (raw.isEmpty()) {
+        qDebug() << "Read failed:" << reader.lastError();
+    }
+
+    // raw 现在包含完整的像素数据，可进一步处理
+    qDebug() << "Raw data size:" << raw.size() << "bytes";
 }

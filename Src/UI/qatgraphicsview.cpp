@@ -448,12 +448,12 @@ void QAtGraphicsView::contextMenuEvent(QContextMenuEvent *event)
         return;
 
     QMenu menu;
-    menu.addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring to Front"),
+    menu.addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring Forward"),
                    this, &QAtGraphicsView::bringToFrontRequested)
-        ->setToolTip(tr("Bring selected items to the front"));
-    menu.addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send to Back"),
+        ->setToolTip(tr("Bring selected items forward one step"));
+    menu.addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send Backward"),
                    this, &QAtGraphicsView::sendToBackRequested)
-        ->setToolTip(tr("Send selected items to the back"));
+        ->setToolTip(tr("Send selected items backward one step"));
 
     menu.addSeparator();
 

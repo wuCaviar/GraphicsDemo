@@ -10,10 +10,12 @@ include(../Common.pri)
 
 SOURCES += \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    TiffRawReader.cpp \
 
 HEADERS += \
-    mainwindow.h
+    mainwindow.h \
+    TiffRawReader.h \
 
 FORMS += \
     mainwindow.ui

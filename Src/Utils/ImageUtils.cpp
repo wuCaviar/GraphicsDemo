@@ -96,14 +96,10 @@ static RawPixelBuffer imageToCmykBuffer(const QImage &image)
                 kd *= 100.0;
             }
             int off = x * 4;
-            dst[off + 0] =
-                static_cast<uint8_t>(qRound(cd));
-            dst[off + 1] =
-                static_cast<uint8_t>(qRound(md));
-            dst[off + 2] =
-                static_cast<uint8_t>(qRound(yd));
-            dst[off + 3] =
-                static_cast<uint8_t>(qRound(kd));
+            dst[off + 0] = static_cast<uint8_t>(qRound(cd * 2.55));
+            dst[off + 1] = static_cast<uint8_t>(qRound(md * 2.55));
+            dst[off + 2] = static_cast<uint8_t>(qRound(yd * 2.55));
+            dst[off + 3] = static_cast<uint8_t>(qRound(kd * 2.55));
         }
     }
     return buf;
@@ -111,7 +107,8 @@ static RawPixelBuffer imageToCmykBuffer(const QImage &image)
 
 void importTiffWithLibtiff(const QString &path, ImportResult *result)
 {
-    TIFF *tif = TIFFOpen(path.toStdString().c_str(), "r");
+    QByteArray array = path.toLocal8Bit();
+    TIFF *tif = TIFFOpen(array.data(), "r");
     if (!tif)
         return;
 
@@ -299,11 +296,12 @@ void importTiffWithLibtiff(const QString &path, ImportResult *result)
         for (uint32_t y = 0; y < height; ++y) {
             QRgb *scanLine = reinterpret_cast<QRgb *>(img.scanLine(y));
             for (uint32_t x = 0; x < width; ++x) {
-                uint32_t abgr = raster[y * width + x];
-                int a = (abgr >> 24) & 0xFF;
-                int b = (abgr >> 16) & 0xFF;
-                int g = (abgr >> 8) & 0xFF;
-                int r = abgr & 0xFF;
+
+                uint32_t argb = raster[y * width + x];
+                int a = (argb >> 24) & 0xFF;
+                int r = (argb >> 16) & 0xFF;
+                int g = (argb >> 8) & 0xFF;
+                int b = argb & 0xFF;
 
                 scanLine[x] = qRgba(r, g, b, a);
             }
@@ -325,6 +323,7 @@ ImportResult loadImageFromFile(const QString &path)
     result.filePath = path;
 
     QImageReader reader(path);
+    reader.setAllocationLimit(0);
     result.image = reader.read();
 
     if (!result.image.isNull()) {
@@ -393,9 +392,6 @@ ImportResult importImageWithDialog(QWidget *parent, const QSizeF &canvasSize)
                 result.image =
                     result.image.scaled(newW, newH, Qt::IgnoreAspectRatio,
                                         Qt::SmoothTransformation);
-                // 缩放后重新生成 CMYK 数据
-                // TODO: 待修改
-                result.rawCmykMat = imageToCmykBuffer(result.image);
             }
         }
     }
@@ -609,34 +605,41 @@ bool exportTiffCmyk(const QString &path, const QImage &image,
                 QRectF pixelRect((sceneRect.x() - exportRect.x()),
                                  (sceneRect.y() - exportRect.y()),
                                  sceneRect.width(), sceneRect.height());
-                if (srcW > 0 && srcH > 0 && y >= pixelRect.top()
-                    && y <= pixelRect.bottom()) {
-                    int x0 = qBound(0, static_cast<int>(pixelRect.left()),
-                                    width - 1);
-                    int x1 = qBound(0, static_cast<int>(pixelRect.right()),
-                                    width - 1);
-                    double scaleX =
-                        static_cast<double>(srcW) / pixelRect.width();
-                    double scaleY =
-                        static_cast<double>(srcH) / pixelRect.height();
-                    int srcY = qBound(
-                        0, static_cast<int>((y - pixelRect.top()) * scaleY),
-                        srcH - 1);
-                    const uint8_t *srcRow = cmykMat.ptr(srcY);
-                    for (int x = x0; x <= x1; ++x) {
-                        int srcX = qBound(
-                            0,
-                            static_cast<int>((x - pixelRect.left()) * scaleX),
-                            srcW - 1);
-                        int srcOff = srcX * 4;
-                        int dstOff = x * 4;
-                        // libtiff: 0 = max ink, 255 = no ink
-                        // export:  0 = no ink,  255 = max ink → invert
-                        rowBuf[dstOff + 0] = srcRow[srcOff + 0];
-                        rowBuf[dstOff + 1] = srcRow[srcOff + 1];
-                        rowBuf[dstOff + 2] = srcRow[srcOff + 2];
-                        rowBuf[dstOff + 3] = srcRow[srcOff + 3];
-                    }
+
+                if (pixelRect.width() <= 0.0 || pixelRect.height() <= 0.0)
+                    continue;
+
+                // 4. 检查当前行 y 是否在有效范围内
+                if (y < pixelRect.top() || y > pixelRect.bottom())
+                    continue;
+
+                int x0 = static_cast<int>(std::ceil(pixelRect.left()));
+                int x1 = static_cast<int>(std::ceil(pixelRect.right())) - 1;
+                x0 = qBound(0, x0, width - 1);
+                x1 = qBound(0, x1, width - 1);
+                if (x0 > x1)
+                    continue;
+
+                // 6. 计算缩放比例
+                double scaleX = static_cast<double>(srcW) / pixelRect.width();
+                double scaleY = static_cast<double>(srcH) / pixelRect.height();
+
+                // 7. ★ 修复：映射源行号时加上 0.5 实现正确的最近邻
+                double srcYFloat = (y - pixelRect.top()) * scaleY + 0.5;
+                int srcY = qBound(0, static_cast<int>(srcYFloat), srcH - 1);
+                const uint8_t *srcRow = cmykMat.ptr(srcY);
+
+                // 8. 逐列采样、反相并填充到行缓冲
+                for (int x = x0; x <= x1; ++x) {
+                    double srcXFloat = (x - pixelRect.left()) * scaleX + 0.5;
+                    int srcX = qBound(0, static_cast<int>(srcXFloat), srcW - 1);
+                    int srcOff = srcX * 4;
+                    int dstOff = x * 4;
+
+                    rowBuf[dstOff + 0] = srcRow[srcOff + 0]; // C
+                    rowBuf[dstOff + 1] = srcRow[srcOff + 1]; // M
+                    rowBuf[dstOff + 2] = srcRow[srcOff + 2]; // Y
+                    rowBuf[dstOff + 3] = srcRow[srcOff + 3]; // K
                 }
             }
         }

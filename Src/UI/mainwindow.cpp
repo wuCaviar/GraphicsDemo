@@ -245,12 +245,12 @@ void MainWindow::_initMenuBar()
     QMenu *arrMenu = menu->addMenu(tr("&Arrange"));
     arrMenu
         ->addAction(QIcon(":/icons/icons/bring-front.svg"),
-                    tr("Bring to Front"), this, &MainWindow::onBringToFront)
-        ->setToolTip(tr("Bring selected items to the front"));
+                    tr("Bring Forward"), this, &MainWindow::onBringToFront)
+        ->setToolTip(tr("Bring selected items forward one step"));
     arrMenu
-        ->addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send to Back"),
+        ->addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send Backward"),
                     this, &MainWindow::onSendToBack)
-        ->setToolTip(tr("Send selected items to the back"));
+        ->setToolTip(tr("Send selected items backward one step"));
     arrMenu->addSeparator();
     QAction *groupAct =
         arrMenu->addAction(QIcon(":/icons/icons/group.svg"), tr("&Group"));
@@ -534,7 +534,7 @@ void MainWindow::_initConnections()
     connect(m_pView, &QAtGraphicsView::itemAdded, this,
             &MainWindow::onItemAdded);
 
-    // 右键菜单 → 复用菜单栏的 Bring to Front / Send to Back
+    // 右键菜单 → 复用菜单栏的 Bring Forward / Send Backward
     connect(m_pView, &QAtGraphicsView::bringToFrontRequested, this,
             &MainWindow::onBringToFront);
     connect(m_pView, &QAtGraphicsView::sendToBackRequested, this,
@@ -1003,13 +1003,9 @@ void MainWindow::onBringToFront()
         return;
 
     QList<qreal> oldZ, newZ;
-    qreal maxZ = 0;
-    for (auto *item : m_pView->scene()->items())
-        maxZ = qMax(maxZ, item->zValue());
-
     for (auto *item : items) {
         oldZ << item->zValue();
-        newZ << (++maxZ);
+        newZ << item->zValue() + 1.0;
     }
     m_undoStack->push(
         new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
@@ -1022,13 +1018,9 @@ void MainWindow::onSendToBack()
         return;
 
     QList<qreal> oldZ, newZ;
-    qreal minZ = 0;
-    for (auto *item : m_pView->scene()->items())
-        minZ = qMin(minZ, item->zValue());
-
     for (auto *item : items) {
         oldZ << item->zValue();
-        newZ << (--minZ);
+        newZ << item->zValue() - 1.0;
     }
     m_undoStack->push(
         new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
