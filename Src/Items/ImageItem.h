@@ -59,6 +59,15 @@ public:
     int cmykSourceWidth() const { return m_rawCmykMat.width; }
     int cmykSourceHeight() const { return m_rawCmykMat.height; }
 
+    // 原始图像尺寸（缩放前）
+    QSize originalSize() const { return m_originalSize; }
+    void setOriginalSize(const QSize &sz) { m_originalSize = sz; }
+
+    // DPI
+    int dpiX() const { return m_dpiX; }
+    int dpiY() const { return m_dpiY; }
+    void setDpi(int x, int y) { m_dpiX = x; m_dpiY = y; }
+
     void serialize(QDataStream &out) const override;
     bool deserialize(QDataStream &in) override;
 
@@ -71,6 +80,9 @@ private:
     CmykColor m_penCmyk;
     QRectF m_rect;       // 自定义包围矩形（由缩放手柄设置）
     QString m_filePath;
+    QSize m_originalSize; // 原始图像尺寸（缩放前）
+    int m_dpiX = 72;
+    int m_dpiY = 72;
     ImageUtils::RawPixelBuffer m_rawTiffMat;  // 原始 TIFF 像素数据用于无损导出
 
     // CMYK 源像素数据

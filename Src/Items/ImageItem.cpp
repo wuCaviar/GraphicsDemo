@@ -99,7 +99,7 @@ void ImageItem::serialize(QDataStream &out) const
     QImage img = pixmap().toImage();
     out << img << m_pen << pos() << rotation() << m_filePath;
     writePixelBuffer(out, m_rawTiffMat);
-    out << m_rect;
+    out << m_rect << m_originalSize << m_dpiX << m_dpiY;
     out << m_isCmykSource;
     if (m_isCmykSource)
         writePixelBuffer(out, m_rawCmykMat);
@@ -112,7 +112,7 @@ bool ImageItem::deserialize(QDataStream &in)
     QPointF pos_;
     in >> img >> m_pen >> pos_ >> rot >> m_filePath;
     m_rawTiffMat = readPixelBuffer(in);
-    in >> m_rect;
+    in >> m_rect >> m_originalSize >> m_dpiX >> m_dpiY;
     if (in.status() != QDataStream::Ok)
         return false;
 

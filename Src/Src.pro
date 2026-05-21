@@ -1,7 +1,7 @@
 
 TEMPLATE = app
 
-QT += core gui widgets network xml
+QT += core gui widgets network xml concurrent
 
 TARGET = GraphicsDemo
 
@@ -41,6 +41,8 @@ HEADERS += \
     Items/ResizeHandleItem.h \
     Commands/Commands.h \
     Utils/ImageUtils.h \
+    Utils/ImageWorker.h \
+    Utils/ProgressManager.h \
     Utils/ColorUtils.h \
     Utils/AlignmentUtils.h \
     ColorTrans/colortransform.h \
@@ -78,6 +80,8 @@ SOURCES += \
     Items/ResizeHandleItem.cpp \
     Commands/Commands.cpp \
     Utils/ImageUtils.cpp \
+    Utils/ImageWorker.cpp \
+    Utils/ProgressManager.cpp \
     Utils/ColorUtils.cpp \
     Utils/AlignmentUtils.cpp \
     ColorTrans/colortransform.cpp \

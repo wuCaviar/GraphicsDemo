@@ -22,10 +22,13 @@
 #include "version.h"
 
 #include <algorithm>
+#include <memory>
 
 #include <QActionGroup>
 #include <QApplication>
 #include <QClipboard>
+#include <QtConcurrent>
+#include <QFutureWatcher>
 #include <QCloseEvent>
 #include <QDataStream>
 #include <QFile>
@@ -33,6 +36,7 @@
 #include <QFrame>
 #include <QImageWriter>
 #include <QImage>
+#include <QImageReader>
 #include <QInputDialog>
 #include <QKeyEvent>
 #include <QMessageBox>
@@ -629,12 +633,7 @@ void MainWindow::_initStatusBar()
     m_posLabel = new QLabel(tr("X: 0.0 px  Y: 0.0 px"));
     m_posLabel->setMinimumWidth(220);
 
-    m_pRipLabel = new QLabel(tr("Rip"));
-    m_pRipLabel->setMinimumWidth(50);
-    m_pProgress = new QProgressBar(this);
-    m_pProgress->setRange(0, 100);
-    m_pProgress->setValue(0);
-    m_pProgress->setFormat("%p%"); // 显示百分比
+    m_pProgressMgr = new ProgressManager(this);
 
     // 缩放标签
     m_zoomLabel = new QLabel(tr("100%"));
@@ -666,8 +665,8 @@ void MainWindow::_initStatusBar()
 
     bar->addWidget(m_posLabel);
     bar->addPermanentWidget(createStatusSeparator(bar));
-    bar->addPermanentWidget(m_pRipLabel);
-    bar->addPermanentWidget(m_pProgress);
+    bar->addPermanentWidget(m_pProgressMgr->label());
+    bar->addPermanentWidget(m_pProgressMgr->bar());
     bar->addPermanentWidget(createStatusSeparator(bar));
     bar->addPermanentWidget(m_zoomLabel);
     bar->addPermanentWidget(m_zoomSlider);
@@ -837,7 +836,7 @@ void MainWindow::onNew()
     m_hRuler->setPpi(ppi);
     m_vRuler->setPpi(ppi);
 
-    m_pProgress->setValue(0);
+    m_pProgressMgr->resetAll();
 
     // PPI 变化后刷新刻度尺和状态栏
     m_hRuler->updateRuler();
@@ -848,23 +847,100 @@ void MainWindow::onNew()
 
 void MainWindow::onImportImage()
 {
-    QSizeF canvasSize =
-        m_pView->canvasItem() ? m_pView->canvasItem()->canvasSize() : QSizeF();
-    auto result = ImageUtils::importImageWithDialog(this, canvasSize);
-    if (!result.isValid())
+    // 1. 多选文件
+    const QStringList paths = QFileDialog::getOpenFileNames(
+        this, tr("Import Images"), QString(),
+        tr("Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;"
+           "TIFF (*.tif *.tiff);;"
+           "PNG (*.png);;"
+           "JPEG (*.jpg *.jpeg);;"
+           "BMP (*.bmp);;"
+           "All Files (*)"));
+    if (paths.isEmpty())
         return;
 
-    auto *item = new ImageItem(QPixmap::fromImage(result.image));
-    item->setItemPen(QPen(Qt::NoPen));
-    item->setFilePath(result.filePath);
-    item->setCmykSourceData(result.rawCmykMat);
+    const QSizeF canvasSize =
+        m_pView->canvasItem() ? m_pView->canvasItem()->canvasSize() : QSizeF();
 
-    m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
+    // 2. 快速扫描图像尺寸，询问是否缩放适配（仅一次）
+    bool scaleToFit = false;
+    if (!canvasSize.isEmpty()) {
+        bool anyExceed = false;
+        for (const QString &path : paths) {
+            QImageReader reader(path);
+            const QSize sz = reader.size();
+            if (sz.isValid()
+                && (sz.width() > canvasSize.width()
+                    || sz.height() > canvasSize.height())) {
+                anyExceed = true;
+                break;
+            }
+        }
+        if (anyExceed) {
+            auto answer = QMessageBox::question(
+                this, tr("Import Images"),
+                tr("Some images exceed canvas size (%1 x %2).\n"
+                   "Scale them to fit?")
+                    .arg(static_cast<int>(canvasSize.width()))
+                    .arg(static_cast<int>(canvasSize.height())),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+            scaleToFit = (answer == QMessageBox::Yes);
+        }
+    }
+
+    // 3. 启动进度任务，通过线程池异步加载每个文件
+    const QString taskId =
+        m_pProgressMgr->startTask(tr("Import"), paths.size());
+    auto pCompleted = std::make_shared<int>(0);
+    const int total = paths.size();
+
+    for (const QString &path : paths) {
+        auto *watcher =
+            new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
+        connect(watcher,
+                &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished,
+                this, [this, watcher, taskId, pCompleted, total]() {
+                    auto result = watcher->result();
+                    if (result.success) {
+                        m_importPipeline.run(result.importResult);
+
+                        auto *item = new ImageItem(
+                            QPixmap::fromImage(result.importResult.image));
+                        item->setItemPen(QPen(Qt::NoPen));
+                        item->setFilePath(result.importResult.filePath);
+                        item->setCmykSourceData(
+                            result.importResult.rawCmykMat);
+                        item->setOriginalSize(
+                            result.importResult.originalSize);
+                        item->setDpi(result.importResult.dpiX,
+                                      result.importResult.dpiY);
+
+                        // 每张图偏移 30px，避免全部堆叠在原点
+                        const int index = *pCompleted;
+                        item->setPos(index * 30, index * 30);
+
+                        m_undoStack->push(
+                            new AddItemCommand(m_pView->scene(), item));
+                    } else {
+                        qWarning() << "Import failed:" << result.filePath
+                                   << result.errorMessage;
+                    }
+
+                    (*pCompleted)++;
+                    m_pProgressMgr->updateTask(taskId, *pCompleted);
+                    if (*pCompleted >= total)
+                        m_pProgressMgr->finishTask(taskId);
+
+                    watcher->deleteLater();
+                });
+        watcher->setFuture(QtConcurrent::run(ImageUtils::runImportWorker, path,
+                                              canvasSize, scaleToFit));
+    }
 }
 
 void MainWindow::onExportImage()
 {
-    // 第一步：选择保存路径和格式
+    // 1. 选择保存路径
     QString path = QFileDialog::getSaveFileName(
         this, tr("Export Image"), QString(), tr("prn Files (*.prn)"));
     if (path.isEmpty())
@@ -873,14 +949,16 @@ void MainWindow::onExportImage()
     QFileInfo fi(path);
 
     bool bRip = false;
+    int ripXRes = 0, ripYRes = 0;
     SettingsDialog dlg(this);
     dlg.setOutputPath(fi.absolutePath());
-    if (dlg.exec() == QDialog::Accepted)
+    if (dlg.exec() == QDialog::Accepted) {
         bRip = true;
+        ripXRes = dlg.resolutionX();
+        ripYRes = dlg.resolutionY();
+    }
 
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-
-    // 默认参数导出
+    // 2. 计算导出区域
     QRectF exportRect;
     if (m_pView->canvasItem()) {
         exportRect = m_pView->canvasItem()->rect();
@@ -889,6 +967,7 @@ void MainWindow::onExportImage()
             m_pView->scene()->itemsBoundingRect().adjusted(-10, -10, 10, 10);
     }
 
+    // 3. 主线程渲染场景到 QImage
     QImage image(exportRect.size().toSize(), QImage::Format_ARGB32);
     image.fill(Qt::white);
 
@@ -897,22 +976,47 @@ void MainWindow::onExportImage()
     m_pView->scene()->render(&painter, QRectF(), exportRect);
     painter.end();
 
-    // 导出
-    // 去掉文件扩展名prn，统一添加 .tif 以供后续 RIP 处理
-    path = fi.absolutePath() + "/" + fi.completeBaseName() + ".tif";
+    // 4. 运行导出预处理器管线（主线程，在 CMYK 转换之前）
+    m_exportPipeline.run(image, exportRect);
+
+    // 5. 收集 CMYK 覆写快照（主线程，在线程池写入前）
+    const QString tiffPath =
+        fi.absolutePath() + "/" + fi.completeBaseName() + ".tif";
     QList<QGraphicsItem *> items =
         ::filterSelectableItems(m_pView->scene()->items());
-    ImageUtils::exportTiffCmyk(path, image, items, exportRect);
+    auto snapshot = ImageUtils::collectCmykItemSnapshot(items, exportRect);
 
-    QApplication::restoreOverrideCursor();
+    // 6. 启动进度任务，线程池异步写入 CMYK TIFF
+    const QString taskId =
+        m_pProgressMgr->startTask(tr("Export"));
 
-    // 判断当前路径下是否有tiff文件
-    bool hasTiffFiles = QFileInfo::exists(path);
-    // 网络请求
-    if (bRip && hasTiffFiles && m_pNetWorkUtils) {
-        setEnabled(false);
-        m_pNetWorkUtils->doAddRip(dlg.resolutionX(), dlg.resolutionY(), path);
-    }
+    auto *watcher =
+        new QFutureWatcher<ImageUtils::ExportWorkerResult>(this);
+    connect(watcher,
+            &QFutureWatcher<ImageUtils::ExportWorkerResult>::finished, this,
+            [this, watcher, taskId, bRip, ripXRes, ripYRes, tiffPath]() {
+                auto result = watcher->result();
+                QApplication::restoreOverrideCursor();
+
+                if (result.success) {
+                    m_pProgressMgr->finishTask(taskId);
+
+                    if (bRip && m_pNetWorkUtils) {
+                        setEnabled(false);
+                        m_pNetWorkUtils->doAddRip(ripXRes, ripYRes,
+                                                   result.filePath);
+                    }
+                } else {
+                    m_pProgressMgr->cancelTask(taskId);
+                    qWarning() << "Export failed:" << result.filePath
+                               << result.errorMessage;
+                }
+                watcher->deleteLater();
+            });
+
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    watcher->setFuture(QtConcurrent::run(ImageUtils::runExportWorker, tiffPath,
+                                          image, snapshot, exportRect));
 }
 
 // ============================================================
@@ -1325,18 +1429,20 @@ void MainWindow::onRequestFinished(const QJsonDocument &json,
         if (m_pTimer) {
             m_pTimer->stop();
             m_pTimer->disconnect(this);
+
+            m_ripTaskId = m_pProgressMgr->startTask(tr("RIP"));
+
             connect(m_pTimer, &QTimer::timeout, this,
                     [this]() { m_pNetWorkUtils->doRipStatus(); });
-
-            m_pProgress->setValue(0);
             m_pTimer->start(1000);
         }
     } break;
     case NetworkRequestType::RequestRipStatus: {
         QJsonValue value = json.object().value("rip_picture_progress");
         int progress = value.toInt();
-        m_pProgress->setValue(progress);
-        if (progress == m_pProgress->maximum()) {
+        m_pProgressMgr->updateTask(m_ripTaskId, progress);
+        if (progress >= 100) {
+            m_pProgressMgr->finishTask(m_ripTaskId);
             m_pTimer->stop();
             m_pTimer->disconnect(this);
             setEnabled(true);

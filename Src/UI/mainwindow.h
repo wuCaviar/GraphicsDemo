@@ -3,6 +3,8 @@
 
 #include "PropertyPanel.h"
 #include "ImageUtils.h"
+#include "ImageWorker.h"
+#include "ProgressManager.h"
 #include "qatgraphicsview.h"
 #include "AlignmentUtils.h"
 #include "NetWorkUtils.h"
@@ -121,6 +123,9 @@ private:
 
     NetWorkUtils *m_pNetWorkUtils = nullptr;
 
+    ImageUtils::ImageImportPipeline m_importPipeline;
+    ImageUtils::ImageExportPipeline m_exportPipeline;
+
     QAction *m_undoAction = nullptr;
     QAction *m_redoAction = nullptr;
 
@@ -141,10 +146,14 @@ private:
     // 刻度尺单位切换
     QAction *m_rulerUnitAction = nullptr;
 
-    // Rip进度控件
-    QLabel *m_pRipLabel = nullptr;
-    QProgressBar *m_pProgress = nullptr;
+    // 通用进度管理器
+    ProgressManager *m_pProgressMgr = nullptr;
+
+    // RIP 轮询定时器
     QTimer *m_pTimer = nullptr;
+
+    // 当前 RIP 进度任务 ID
+    QString m_ripTaskId;
 
     // 状态栏控件
     QLabel *m_posLabel = nullptr;

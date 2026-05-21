@@ -11,6 +11,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFileInfo>
 #include <QDoubleSpinBox>
 #include <QFontComboBox>
 #include <QFormLayout>
@@ -154,6 +155,27 @@ void PropertyPanel::setupUI()
     rotationLayout->addRow(tr("Angle:"), m_rotationSpin);
     mainLayout->addWidget(m_rotationGroup);
 
+    // ---- 图像信息（仅 ImageItem） ----
+    m_imageInfoGroup = new QGroupBox(tr("Image Info"));
+    auto *imgInfoLayout = new QFormLayout(m_imageInfoGroup);
+
+    m_imgPathLabel = new QLabel;
+    m_imgPathLabel->setWordWrap(true);
+    m_imgPathLabel->setTextFormat(Qt::PlainText);
+    m_imgFormatLabel = new QLabel;
+    m_imgDisplaySizeLabel = new QLabel;
+    m_imgOriginalSizeLabel = new QLabel;
+    m_imgColorSpaceLabel = new QLabel;
+    m_imgDpiLabel = new QLabel;
+
+    imgInfoLayout->addRow(tr("Path:"), m_imgPathLabel);
+    imgInfoLayout->addRow(tr("Format:"), m_imgFormatLabel);
+    imgInfoLayout->addRow(tr("Display Size:"), m_imgDisplaySizeLabel);
+    imgInfoLayout->addRow(tr("Original Size:"), m_imgOriginalSizeLabel);
+    imgInfoLayout->addRow(tr("Color Space:"), m_imgColorSpaceLabel);
+    imgInfoLayout->addRow(tr("DPI:"), m_imgDpiLabel);
+    mainLayout->addWidget(m_imageInfoGroup);
+
     mainLayout->addStretch();
     scrollArea->setWidget(mainWidget);
     setWidget(scrollArea);
@@ -165,6 +187,7 @@ void PropertyPanel::setupUI()
     m_textGroup->setVisible(false);
     m_cornerGroup->setVisible(false);
     m_rotationGroup->setVisible(false);
+    m_imageInfoGroup->setVisible(false);
     m_noSelectionLabel->setVisible(true);
 
     // ---- 信号连接 ----
@@ -443,6 +466,7 @@ void PropertyPanel::updatePanel()
         m_textGroup->setVisible(false);
         m_cornerGroup->setVisible(false);
         m_rotationGroup->setVisible(false);
+        m_imageInfoGroup->setVisible(false);
         return;
     }
 
@@ -578,6 +602,48 @@ void PropertyPanel::updatePanel()
         m_rotationGroup->setVisible(true);
     } else {
         m_rotationGroup->setVisible(false);
+    }
+
+    // ---- 图像信息 ----
+    auto *imgItem = qgraphicsitem_cast<ImageItem *>(m_currentItem);
+    if (imgItem && (flags & IGraphicsItem::HasImage)) {
+        // 文件路径
+        m_imgPathLabel->setText(imgItem->filePath());
+
+        // 文件格式
+        QFileInfo fi(imgItem->filePath());
+        m_imgFormatLabel->setText(fi.suffix().toUpper());
+
+        // 显示尺寸（画布上的当前尺寸）
+        QSizeF displaySz = imgItem->geometryRect().size();
+        m_imgDisplaySizeLabel->setText(tr("%1 x %2 px")
+            .arg(qRound(displaySz.width()))
+            .arg(qRound(displaySz.height())));
+
+        // 原始尺寸
+        QSize origSz = imgItem->originalSize();
+        if (!origSz.isValid() && imgItem->isCmykSource())
+            origSz = QSize(imgItem->cmykSourceWidth(), imgItem->cmykSourceHeight());
+        if (origSz.isValid()) {
+            m_imgOriginalSizeLabel->setText(tr("%1 x %2 px")
+                .arg(origSz.width())
+                .arg(origSz.height()));
+        } else {
+            m_imgOriginalSizeLabel->setText(tr("Unknown"));
+        }
+
+        // 色彩空间
+        if (imgItem->isCmykSource())
+            m_imgColorSpaceLabel->setText(tr("CMYK"));
+        else
+            m_imgColorSpaceLabel->setText(tr("RGB"));
+
+        // DPI
+        m_imgDpiLabel->setText(tr("%1 x %2").arg(imgItem->dpiX()).arg(imgItem->dpiY()));
+
+        m_imageInfoGroup->setVisible(true);
+    } else {
+        m_imageInfoGroup->setVisible(false);
     }
 }
 

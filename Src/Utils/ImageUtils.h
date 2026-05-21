@@ -41,6 +41,7 @@ struct ImportResult
     QImage image; // 通过QImageReader读取的用于显示的图片
     RawPixelBuffer rawCmykMat; // 读取/转换到的cmyk原始数据值(0-100.0)
     QString filePath; // 文件路径
+    QSize originalSize; // 原始图像尺寸（缩放前）
     QMap<QString, QVariant> metadata; // 元数据（EXIF、XMP等）
     int dpiX = 72; // 水平 DPI
     int dpiY = 72; // 垂直 DPI

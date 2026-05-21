@@ -32,6 +32,7 @@ static QPushButton *makeBtn(const QString &iconPath, const QString &tooltip,
     btn->setMaximumSize(48, 48);
     btn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     btn->setFocusPolicy(Qt::NoFocus);
+    btn->setFlat(true);
     return btn;
 }
 
@@ -59,15 +60,17 @@ AlignLayoutDialog::AlignLayoutDialog(QGraphicsScene *scene,
 void AlignLayoutDialog::setupUI(QWidget *container)
 {
     auto *mainLayout = new QVBoxLayout(container);
-    mainLayout->setSpacing(6);
+    mainLayout->setContentsMargins(4, 4, 4, 4);
+    mainLayout->setSpacing(4);
 
     // ---- Horizontal Group ----
     auto *hGroup = new QGroupBox(tr("Horizontal"), container);
     auto *hLayout = new QVBoxLayout(hGroup);
-    hLayout->setSpacing(4);
+    hLayout->setContentsMargins(4, 8, 4, 4);
+    hLayout->setSpacing(2);
 
     auto *hAlignRow = new QHBoxLayout;
-    hAlignRow->setSpacing(4);
+    hAlignRow->setSpacing(2);
     m_hAlignLeft = makeBtn(ICON("align-left"), tr("Align left edges"), container);
     m_hAlignCenter =
         makeBtn(ICON("align-hcenter"), tr("Align horizontal centers"), container);
@@ -87,7 +90,7 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     hLayout->addLayout(hAlignRow);
 
     auto *hDistRow = new QHBoxLayout;
-    hDistRow->setSpacing(4);
+    hDistRow->setSpacing(2);
     m_hDistLeft =
         makeBtn(ICON("dist-left"), tr("Left edges equally spaced"), container);
     m_hDistCenter = makeBtn(ICON("dist-hcenter"),
@@ -124,10 +127,11 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     // ---- Vertical Group ----
     auto *vGroup = new QGroupBox(tr("Vertical"), container);
     auto *vLayout = new QVBoxLayout(vGroup);
-    vLayout->setSpacing(4);
+    vLayout->setContentsMargins(4, 8, 4, 4);
+    vLayout->setSpacing(2);
 
     auto *vAlignRow = new QHBoxLayout;
-    vAlignRow->setSpacing(4);
+    vAlignRow->setSpacing(2);
     m_vAlignTop = makeBtn(ICON("align-top"), tr("Align top edges"), container);
     m_vAlignCenter =
         makeBtn(ICON("align-vcenter"), tr("Align vertical centers"), container);
@@ -148,7 +152,7 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     vLayout->addLayout(vAlignRow);
 
     auto *vDistRow = new QHBoxLayout;
-    vDistRow->setSpacing(4);
+    vDistRow->setSpacing(2);
     m_vDistTop =
         makeBtn(ICON("dist-top"), tr("Top edges equally spaced"), container);
     m_vDistCenter = makeBtn(ICON("dist-vcenter"),
@@ -174,6 +178,7 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     m_vSpacingSpin->setDecimals(1);
     m_vSpacingSpin->setSuffix(tr(" px"));
     m_vSpacingSpin->setValue(s_vSpacing);
+    m_vSpacingSpin->setMaximumWidth(90);
     m_vSpacingSpin->setToolTip(tr("Gap value for Custom Gap distribution"));
     vSpRow->addWidget(new QLabel(tr("Gap:"), container));
     vSpRow->addWidget(m_vSpacingSpin);
@@ -185,7 +190,8 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     // ---- Page Group ----
     auto *pageGroup = new QGroupBox(tr("Page"), container);
     auto *pageLayout = new QHBoxLayout(pageGroup);
-    pageLayout->setSpacing(4);
+    pageLayout->setContentsMargins(4, 8, 4, 4);
+    pageLayout->setSpacing(2);
     m_pageHCenter = makeBtn(ICON("page-hcenter"),
                             tr("Center horizontally on canvas"), container);
     m_pageVCenter =
@@ -201,6 +207,8 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     bottomRow->addWidget(m_selectionInfoLabel);
     bottomRow->addStretch();
     mainLayout->addLayout(bottomRow);
+
+    setMaximumHeight(sizeHint().height());
 
     // ---- Signal connections ----
     connect(m_hAlignLeft, &QPushButton::clicked, this,

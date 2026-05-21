@@ -100,6 +100,7 @@ private:
     QGroupBox *m_textGroup = nullptr;
     QGroupBox *m_cornerGroup = nullptr;
     QGroupBox *m_rotationGroup = nullptr;
+    QGroupBox *m_imageInfoGroup = nullptr;
 
     // 无选中项占位标签
     QLabel *m_noSelectionLabel = nullptr;
@@ -135,6 +136,14 @@ private:
 
     // 旋转
     QDoubleSpinBox *m_rotationSpin = nullptr;
+
+    // 图像信息标签
+    QLabel *m_imgPathLabel = nullptr;
+    QLabel *m_imgFormatLabel = nullptr;
+    QLabel *m_imgDisplaySizeLabel = nullptr;
+    QLabel *m_imgOriginalSizeLabel = nullptr;
+    QLabel *m_imgColorSpaceLabel = nullptr;
+    QLabel *m_imgDpiLabel = nullptr;
 
     // 当前值缓存
     QPen m_oldPen;
