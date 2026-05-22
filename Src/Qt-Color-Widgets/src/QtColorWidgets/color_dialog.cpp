@@ -30,11 +30,9 @@ QColor ColorDialog::cmyk_to_rgb(double c, double m, double y, double k)
 {
     QATColorManager &cm = QATColorManager::instance();
     if (cm.isValid()) {
-        cm.buildCMYK2RGBTransforms(INTENT_PERCEPTUAL,
-                                   cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_LOWRESPRECALC);
-
-        QColor cmyk = cm.toRgb(QATColorManager::Cmyk{c, m, y, k});
-        return cmyk;
+        return cm.toRgb(QATColorManager::Cmyk{c, m, y, k},
+                        INTENT_PERCEPTUAL,
+                        cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_LOWRESPRECALC);
     }
 
     return QColor();
@@ -50,11 +48,9 @@ void ColorDialog::rgb_to_cmyk(const QColor &color, double &c, double &m, double 
 {
     QATColorManager &cm = QATColorManager::instance();
     if (cm.isValid()) {
-        cm.buildRGB2CMYKTransforms(INTENT_PERCEPTUAL,
-                                   cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
-
-        QATColorManager::Cmyk cmyk = cm.toCmyk(color);
-
+        QATColorManager::Cmyk cmyk = cm.toCmyk(color,
+                                                INTENT_PERCEPTUAL,
+                                                cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
         c = cmyk.c;
         m = cmyk.m;
         y = cmyk.y;

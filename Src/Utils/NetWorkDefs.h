@@ -7,10 +7,12 @@
 #define USE_NEW_RIP
 
 #if defined(Q_OS_MACOS)
-static const QString ExePath = QStringLiteral("");
+static const QString RIP_EXE_PATH = QStringLiteral("");
 
 static const QString ConfigPath =
     QStringLiteral("/Volumes/Caviar/Test/GraphicsDemo/Bin/ripconfig.xml");
+
+#define RIP_PROGRESS_MAX 100
 
 #elif defined(Q_OS_WIN)
 

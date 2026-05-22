@@ -211,10 +211,11 @@ bool exportTiffCmykFromSnapshot(const QString &path, const QImage &image,
     // 4. Embed CMYK ICC profile
     QATColorManager &cm = QATColorManager::instance();
     bool useLcms2 = cm.isValid();
+    cmsHTRANSFORM xform = nullptr;
     if (useLcms2) {
-        cm.buildRGB2CMYKTransforms(INTENT_PERCEPTUAL,
-                                   cmsFLAGS_BLACKPOINTCOMPENSATION
-                                       | cmsFLAGS_HIGHRESPRECALC);
+        xform = cm.createBgraToCmyk8(INTENT_PERCEPTUAL,
+                                     cmsFLAGS_BLACKPOINTCOMPENSATION
+                                         | cmsFLAGS_HIGHRESPRECALC);
     }
 #if defined(Q_OS_WIN)
     QString iccPath = QCoreApplication::applicationDirPath()
@@ -239,40 +240,33 @@ bool exportTiffCmykFromSnapshot(const QString &path, const QImage &image,
     QImage img32 = img.convertToFormat(QImage::Format_ARGB32);
 
     for (int y = 0; y < height; ++y) {
-        const QRgb *scanLine =
-            reinterpret_cast<const QRgb *>(img32.constScanLine(y));
-
-        // RGB → CMYK per pixel
-        for (int x = 0; x < width; ++x) {
-            QRgb c = scanLine[x];
-            double cd, md, yd, kd;
-            if (useLcms2) {
-                QATColorManager::Cmyk cmyk = cm.toCmyk(QColor(c));
-                cd = cmyk.c;
-                md = cmyk.m;
-                yd = cmyk.y;
-                kd = cmyk.k;
-            } else {
+        // RGB → CMYK：逐行批量转换，再覆写图元 CMYK 数据
+        if (useLcms2) {
+            QATColorManager::convertBgra8ToCmyk8(xform, img32.constScanLine(y),
+                                                  rowBuf.data(), width);
+        } else {
+            const QRgb *scanLine =
+                reinterpret_cast<const QRgb *>(img32.constScanLine(y));
+            for (int x = 0; x < width; ++x) {
+                QRgb c = scanLine[x];
                 double r = qRed(c) / 255.0, g = qGreen(c) / 255.0,
                        b = qBlue(c) / 255.0;
-                cd = 1.0 - r;
-                md = 1.0 - g;
-                yd = 1.0 - b;
-                kd = qMin(cd, qMin(md, yd));
+                double cd = 1.0 - r, md = 1.0 - g, yd = 1.0 - b;
+                double kd = qMin(cd, qMin(md, yd));
                 cd = (cd - kd) / (1.0 - kd) * 100.0;
                 md = (md - kd) / (1.0 - kd) * 100.0;
                 yd = (yd - kd) / (1.0 - kd) * 100.0;
                 kd *= 100.0;
+                int off = x * 4;
+                rowBuf[off + 0] =
+                    static_cast<uint8_t>(qBound(0.0, cd * 2.55, 255.0));
+                rowBuf[off + 1] =
+                    static_cast<uint8_t>(qBound(0.0, md * 2.55, 255.0));
+                rowBuf[off + 2] =
+                    static_cast<uint8_t>(qBound(0.0, yd * 2.55, 255.0));
+                rowBuf[off + 3] =
+                    static_cast<uint8_t>(qBound(0.0, kd * 2.55, 255.0));
             }
-            int off = x * 4;
-            rowBuf[off + 0] =
-                static_cast<uint8_t>(qBound(0.0, cd * 2.55, 255.0));
-            rowBuf[off + 1] =
-                static_cast<uint8_t>(qBound(0.0, md * 2.55, 255.0));
-            rowBuf[off + 2] =
-                static_cast<uint8_t>(qBound(0.0, yd * 2.55, 255.0));
-            rowBuf[off + 3] =
-                static_cast<uint8_t>(qBound(0.0, kd * 2.55, 255.0));
         }
 
         // Overwrite brush CMYK areas from snapshot
@@ -359,11 +353,15 @@ bool exportTiffCmykFromSnapshot(const QString &path, const QImage &image,
 
         if (TIFFWriteScanline(tif, rowBuf.data(), y) < 0) {
             TIFFClose(tif);
+            if (xform)
+                cmsDeleteTransform(xform);
             return false;
         }
     }
 
     TIFFClose(tif);
+    if (xform)
+        cmsDeleteTransform(xform);
     return true;
 }
 

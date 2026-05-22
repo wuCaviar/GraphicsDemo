@@ -53,16 +53,13 @@ static QPair<int, int> getTiffDpi(TIFF *tif)
     return qMakePair(72, 72);
 }
 
-// 将 QImage 的 RGB 像素逐像素转换为 CMYK RawPixelBuffer（libtiff 格式：0 = 最大油墨, 255 = 无油墨）
+// 将 QImage 的 RGB 像素转换为 CMYK RawPixelBuffer
+// LCMS2 可用时使用批量扫描线转换（TYPE_BGRA_8 → TYPE_CMYK_8），
+// 否则回退到逐像素数学转换
 static RawPixelBuffer imageToCmykBuffer(const QImage &image)
 {
     QATColorManager &cm = QATColorManager::instance();
     bool useLcms2 = cm.isValid();
-    if (useLcms2) {
-        cm.buildRGB2CMYKTransforms(INTENT_PERCEPTUAL,
-                                   cmsFLAGS_BLACKPOINTCOMPENSATION
-                                       | cmsFLAGS_HIGHRESPRECALC);
-    }
 
     int w = image.width();
     int h = image.height();
@@ -71,36 +68,40 @@ static RawPixelBuffer imageToCmykBuffer(const QImage &image)
     buf.height = h;
     buf.data.resize(w * h * 4);
 
+    // Format_ARGB32 小端序扫描线 = BGRA 字节序，匹配 TYPE_BGRA_8
     QImage img32 = image.convertToFormat(QImage::Format_ARGB32);
-    for (int y = 0; y < h; ++y) {
-        const QRgb *scanLine =
-            reinterpret_cast<const QRgb *>(img32.constScanLine(y));
-        uint8_t *dst = buf.ptr(y);
-        for (int x = 0; x < w; ++x) {
-            QRgb c = scanLine[x];
-            double cd = 0.0, md = 0.0, yd = 0.0, kd = 0.0;
-            if (useLcms2) {
-                QATColorManager::Cmyk cmyk = cm.toCmyk(QColor(c));
-                cd = cmyk.c;
-                md = cmyk.m;
-                yd = cmyk.y;
-                kd = cmyk.k;
-            } else {
+
+    if (useLcms2) {
+        // 创建线程独立的批量变换句柄，使用后立即销毁
+        cmsHTRANSFORM xform = cm.createBgraToCmyk8(
+            INTENT_PERCEPTUAL,
+            cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
+        QATColorManager::convertBgra8ToCmyk8(xform, img32.constBits(), buf.ptr(0), w, h);
+        cmsDeleteTransform(xform);
+    } else {
+        // 回退路径：逐像素数学转换（无 LCMS2 时）
+        for (int y = 0; y < h; ++y) {
+            const QRgb *scanLine =
+                reinterpret_cast<const QRgb *>(img32.constScanLine(y));
+            uint8_t *dst = buf.ptr(y);
+            for (int x = 0; x < w; ++x) {
+                QRgb c = scanLine[x];
                 double r = qRed(c) / 255.0, g = qGreen(c) / 255.0,
                        b = qBlue(c) / 255.0;
-                kd = qMin(1.0 - r, qMin(1.0 - g, 1.0 - b));
+                double kd = qMin(1.0 - r, qMin(1.0 - g, 1.0 - b));
+                double cd = 0.0, md = 0.0, yd = 0.0;
                 if (kd < 1.0) {
                     cd = (1.0 - r - kd) / (1.0 - kd) * 100.0;
                     md = (1.0 - g - kd) / (1.0 - kd) * 100.0;
                     yd = (1.0 - b - kd) / (1.0 - kd) * 100.0;
                 }
                 kd *= 100.0;
+                int off = x * 4;
+                dst[off + 0] = static_cast<uint8_t>(qRound(cd * 2.55));
+                dst[off + 1] = static_cast<uint8_t>(qRound(md * 2.55));
+                dst[off + 2] = static_cast<uint8_t>(qRound(yd * 2.55));
+                dst[off + 3] = static_cast<uint8_t>(qRound(kd * 2.55));
             }
-            int off = x * 4;
-            dst[off + 0] = static_cast<uint8_t>(qRound(cd * 2.55));
-            dst[off + 1] = static_cast<uint8_t>(qRound(md * 2.55));
-            dst[off + 2] = static_cast<uint8_t>(qRound(yd * 2.55));
-            dst[off + 3] = static_cast<uint8_t>(qRound(kd * 2.55));
         }
     }
     return buf;

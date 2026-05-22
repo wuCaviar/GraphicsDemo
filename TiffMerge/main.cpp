@@ -1,5 +1,6 @@
 #include <QCoreApplication>
 #include <QCommandLineParser>
+#include <QDebug>
 
 int main(int argc, char *argv[])
 {

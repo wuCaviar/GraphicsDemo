@@ -7,7 +7,7 @@
 QString QATColorManager::m_err = "";
 
 // ================================================================
-//  内部辅助: QColor ↔ lcms2 BGRA8
+//  内部辅助: QColor ↔ lcms2
 // ================================================================
 static inline void qcolorToRGB(const QColor &c, uchar out[3])
 {
@@ -109,60 +109,135 @@ bool QATColorManager::loadProfiles()
 }
 
 // ================================================================
-//  色彩变换
+//  单像素转换（每次调用创建独立变换句柄，避免共享状态）
+//  仅供主线程 UI 使用，调用频率低，变换创建开销可接受
 // ================================================================
 
-bool QATColorManager::buildRGB2CMYKTransforms(cmsUInt32Number Intent, cmsUInt32Number dwFlags)
-{
-    m_tRgbToCmyk = cmsCreateTransform(m_srgb, TYPE_RGB_8, m_cmyk, TYPE_CMYK_DBL, Intent, dwFlags);
-
-    return m_tRgbToCmyk != nullptr;
-}
-
-bool QATColorManager::buildCMYK2RGBTransforms(cmsUInt32Number Intent, cmsUInt32Number dwFlags)
-{
-    m_tCmykToRgb = cmsCreateTransform(m_cmyk, TYPE_CMYK_DBL, m_srgb, TYPE_RGB_8, Intent, dwFlags);
-
-    return m_tCmykToRgb != nullptr;
-}
-
-// ================================================================
-//  转换接口
-// ================================================================
-
-QATColorManager::Cmyk QATColorManager::toCmyk(const QColor &rgb) const
+QATColorManager::Cmyk QATColorManager::toCmyk(const QColor &rgb,
+                                               cmsUInt32Number intent,
+                                               cmsUInt32Number flags) const
 {
     Q_ASSERT(m_ok);
     uchar src[3];
     double dst[4];
     qcolorToRGB(rgb, src);
-    cmsDoTransform(m_tRgbToCmyk, src, dst, 1);
+
+    cmsHTRANSFORM xform = cmsCreateTransform(m_srgb, TYPE_RGB_8,
+                                             m_cmyk, TYPE_CMYK_DBL,
+                                             intent, flags);
+    cmsDoTransform(xform, src, dst, 1);
+    cmsDeleteTransform(xform);
+
     return {dst[0], dst[1], dst[2], dst[3]};
 }
 
-QColor QATColorManager::toRgb(const Cmyk &cmyk) const
+QColor QATColorManager::toRgb(const Cmyk &cmyk,
+                              cmsUInt32Number intent,
+                              cmsUInt32Number flags) const
 {
     Q_ASSERT(m_ok);
     double src[4] = {cmyk.c, cmyk.m, cmyk.y, cmyk.k};
     uchar dst[3];
-    cmsDoTransform(m_tCmykToRgb, src, dst, 1);
+
+    cmsHTRANSFORM xform = cmsCreateTransform(m_cmyk, TYPE_CMYK_DBL,
+                                             m_srgb, TYPE_RGB_8,
+                                             intent, flags);
+    cmsDoTransform(xform, src, dst, 1);
+    cmsDeleteTransform(xform);
+
     return rgbToQcolor(dst);
 }
 
 // ================================================================
-//  清理
+//  批量变换工厂方法（每次调用创建新句柄，调用方管理生命周期）
+// ================================================================
+
+cmsHTRANSFORM QATColorManager::createBgraToCmyk8(cmsUInt32Number intent,
+                                                  cmsUInt32Number flags) const
+{
+    Q_ASSERT(m_ok);
+    return cmsCreateTransform(m_srgb, TYPE_BGRA_8, m_cmyk, TYPE_CMYK_8, intent, flags);
+}
+
+cmsHTRANSFORM QATColorManager::createCmyk8ToBgra(cmsUInt32Number intent,
+                                                  cmsUInt32Number flags) const
+{
+    Q_ASSERT(m_ok);
+    return cmsCreateTransform(m_cmyk, TYPE_CMYK_8, m_srgb, TYPE_BGRA_8, intent, flags);
+}
+
+// ================================================================
+//  批量转换静态方法（需传入线程独立的变换句柄）
+// ================================================================
+
+void QATColorManager::convertBgra8ToCmyk8(cmsHTRANSFORM xform,
+                                          const unsigned char *src,
+                                          unsigned char *dst,
+                                          int pixelCount)
+{
+    Q_ASSERT(xform);
+    cmsDoTransform(xform, src, dst, pixelCount);
+}
+
+void QATColorManager::convertCmyk8ToBgra8(cmsHTRANSFORM xform,
+                                          const unsigned char *src,
+                                          unsigned char *dst,
+                                          int pixelCount)
+{
+    Q_ASSERT(xform);
+    cmsDoTransform(xform, src, dst, pixelCount);
+}
+
+void QATColorManager::convertBgra8ToCmyk8(cmsHTRANSFORM xform,
+                                          const unsigned char *src,
+                                          unsigned char *dst,
+                                          int width, int height,
+                                          int singleShotThreshold)
+{
+    Q_ASSERT(xform);
+    const int totalPixels = width * height;
+    const int rowBytes = width * 4;
+
+    if (totalPixels <= singleShotThreshold) {
+        cmsDoTransform(xform, src, dst, totalPixels);
+    } else {
+        for (int y = 0; y < height; ++y) {
+            cmsDoTransform(xform,
+                           src + y * rowBytes,
+                           dst + y * rowBytes,
+                           width);
+        }
+    }
+}
+
+void QATColorManager::convertCmyk8ToBgra8(cmsHTRANSFORM xform,
+                                          const unsigned char *src,
+                                          unsigned char *dst,
+                                          int width, int height,
+                                          int singleShotThreshold)
+{
+    Q_ASSERT(xform);
+    const int totalPixels = width * height;
+    const int rowBytes = width * 4;
+
+    if (totalPixels <= singleShotThreshold) {
+        cmsDoTransform(xform, src, dst, totalPixels);
+    } else {
+        for (int y = 0; y < height; ++y) {
+            cmsDoTransform(xform,
+                           src + y * rowBytes,
+                           dst + y * rowBytes,
+                           width);
+        }
+    }
+}
+
+// ================================================================
+//  清理（仅清理 Profile，变换句柄由各调用方管理）
 // ================================================================
 
 void QATColorManager::cleanup()
 {
-    if (m_tRgbToCmyk) {
-        cmsDeleteTransform(m_tRgbToCmyk);
-        m_tRgbToCmyk = nullptr;
-    }
-    if (m_tCmykToRgb) {
-        cmsDeleteTransform(m_tCmykToRgb);
-        m_tCmykToRgb = nullptr;
-    }
     if (m_srgb) {
         cmsCloseProfile(m_srgb);
         m_srgb = nullptr;
