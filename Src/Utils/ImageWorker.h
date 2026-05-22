@@ -57,18 +57,22 @@ private:
 
 // ========== CMYK 覆写数据快照（线程安全，在主线程收集） ==========
 
-struct CmykItemSnapshot {
-    struct BrushCmyk {
+struct CmykItemSnapshot
+{
+    struct BrushCmyk
+    {
         QRectF sceneRect;
         uint8_t c, m, y, k;
     };
-    struct PenCmyk {
+    struct PenCmyk
+    {
         QRectF sceneRect;
         qreal penWidth;
         bool hasBrush; // true 时仅覆写边缘（stroke），false 时覆写整个区域
         uint8_t c, m, y, k;
     };
-    struct ImageCmykSource {
+    struct ImageCmykSource
+    {
         QRectF sceneRect;
         RawPixelBuffer cmykMat;
     };
@@ -80,18 +84,20 @@ struct CmykItemSnapshot {
 
 // 从场景图元收集 CMYK 覆写数据（必须在主线程调用）
 CmykItemSnapshot collectCmykItemSnapshot(const QList<QGraphicsItem *> &items,
-                                          const QRectF &exportRect);
+                                         const QRectF &exportRect);
 
 // ========== 工作线程结果 ==========
 
-struct ImportWorkerResult {
+struct ImportWorkerResult
+{
     ImportResult importResult;
     QString filePath;
     QString errorMessage;
     bool success = false;
 };
 
-struct ExportWorkerResult {
+struct ExportWorkerResult
+{
     QString filePath;
     QString errorMessage;
     bool success = false;
@@ -100,18 +106,16 @@ struct ExportWorkerResult {
 // ========== 线程池入口函数（线程安全） ==========
 
 ImportWorkerResult runImportWorker(const QString &filePath,
-                                    const QSizeF &canvasSize,
-                                    bool scaleToFit);
+                                   const QSizeF &canvasSize, bool scaleToFit);
 
-ExportWorkerResult runExportWorker(const QString &path,
-                                    const QImage &image,
-                                    const CmykItemSnapshot &snapshot,
-                                    const QRectF &exportRect);
+ExportWorkerResult runExportWorker(const QString &path, const QImage &image,
+                                   const CmykItemSnapshot &snapshot,
+                                   const QRectF &exportRect);
 
 // 线程安全的 CMYK TIFF 导出（使用预收集的快照，不访问 QGraphicsItem）
 bool exportTiffCmykFromSnapshot(const QString &path, const QImage &image,
-                                 const CmykItemSnapshot &snapshot,
-                                 const QRectF &exportRect);
+                                const CmykItemSnapshot &snapshot,
+                                const QRectF &exportRect);
 
 } // namespace ImageUtils
 

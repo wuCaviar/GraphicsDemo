@@ -17,7 +17,7 @@ namespace ImageUtils {
 
 // NOTE:导入导出不在需要设置参数，按照默认要求参数即可。
 
-// 4-channel 8-bit raw pixel buffer, replaces cv::Mat (CV_8UC4)
+// 4-channel 8-bit raw pixel buffer
 struct RawPixelBuffer
 {
     int width = 0;

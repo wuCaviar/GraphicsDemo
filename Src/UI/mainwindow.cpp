@@ -19,7 +19,6 @@
 #include "RulerBar.h"
 #include "TextItem.h"
 #include "GraphicsItemGroup.h"
-#include "version.h"
 
 #include <algorithm>
 #include <memory>
@@ -55,9 +54,6 @@
 #include <QVBoxLayout>
 
 static const char *kMimeFormat = "application/x-graphicsdemo-items";
-
-static QString RipVersion = "Unknown";
-
 namespace {
 QFrame *createStatusSeparator(QWidget *parent)
 {
@@ -84,6 +80,7 @@ MainWindow::MainWindow(QWidget *parent)
     _initToolBar();
     _initConnections();
     _initStatusBar();
+    _initProcess();
     _initNetWork();
 
     // 加载 QSS 样式表
@@ -119,9 +116,9 @@ MainWindow::~MainWindow()
     if (m_undoStack)
         m_undoStack->clear();
 
-    // 停止网络请求线程
-    if (m_pNetWorkUtils)
-        m_pNetWorkUtils->stop();
+    if (m_pProcessGuard) {
+        m_pProcessGuard->stopAll();
+    }
 
     delete ui;
 }
@@ -248,8 +245,8 @@ void MainWindow::_initMenuBar()
     // ---- 排列 ----
     QMenu *arrMenu = menu->addMenu(tr("&Arrange"));
     arrMenu
-        ->addAction(QIcon(":/icons/icons/bring-front.svg"),
-                    tr("Bring Forward"), this, &MainWindow::onBringToFront)
+        ->addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring Forward"),
+                    this, &MainWindow::onBringToFront)
         ->setToolTip(tr("Bring selected items forward one step"));
     arrMenu
         ->addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send Backward"),
@@ -678,13 +675,16 @@ void MainWindow::_initStatusBar()
 void MainWindow::_initNetWork()
 {
     m_pNetWorkUtils = new NetWorkUtils(this);
-    m_pTimer = new QTimer(this);
-
-    // connect
     connect(m_pNetWorkUtils, &NetWorkUtils::requestFinished, this,
-            &MainWindow::onRequestFinished, Qt::QueuedConnection);
+            &MainWindow::onRequestFinished);
+}
 
-    m_pNetWorkUtils->start();
+void MainWindow::_initProcess()
+{
+    m_pProcessGuard = new ProcessGuard(this);
+    if (m_pProcessGuard) {
+        m_pProcessGuard->addProcess(RIP_EXE_PATH);
+    }
 }
 
 void MainWindow::_updateUndoRedoActions()
@@ -803,6 +803,17 @@ void MainWindow::setMainWindowVisibility(bool state)
         hide();
     }
 }
+
+void MainWindow::getToolInfo()
+{
+    // 获取Rip工具版本
+    if (m_pNetWorkUtils) {
+        // 同步请求获取 Rip 版本（阻塞主线程，通常很快）
+        m_pNetWorkUtils->doRipVersion();
+    }
+
+    // 获取其他工具版本，可用性
+}
 // ============================================================
 // 文件操作
 // ============================================================
@@ -891,51 +902,55 @@ void MainWindow::onImportImage()
     // 3. 启动进度任务，通过线程池异步加载每个文件
     const QString taskId =
         m_pProgressMgr->startTask(tr("Import"), paths.size());
-    auto pCompleted = std::make_shared<int>(0);
-    const int total = paths.size();
 
-    for (const QString &path : paths) {
-        auto *watcher =
-            new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
-        connect(watcher,
-                &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished,
-                this, [this, watcher, taskId, pCompleted, total]() {
-                    auto result = watcher->result();
-                    if (result.success) {
-                        m_importPipeline.run(result.importResult);
+    auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
 
-                        auto *item = new ImageItem(
-                            QPixmap::fromImage(result.importResult.image));
-                        item->setItemPen(QPen(Qt::NoPen));
-                        item->setFilePath(result.importResult.filePath);
-                        item->setCmykSourceData(
-                            result.importResult.rawCmykMat);
-                        item->setOriginalSize(
-                            result.importResult.originalSize);
-                        item->setDpi(result.importResult.dpiX,
-                                      result.importResult.dpiY);
+    connect(
+        watcher,
+        &QFutureWatcher<ImageUtils::ImportWorkerResult>::progressValueChanged,
+        this, [this, taskId](int progressValue) {
+            m_pProgressMgr->updateTask(taskId, progressValue);
+        });
 
-                        // 每张图偏移 30px，避免全部堆叠在原点
-                        const int index = *pCompleted;
-                        item->setPos(index * 30, index * 30);
+    connect(
+        watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
+        this, [this, watcher](int index) {
+            // 处理单个文件导入完成的结果
+            auto result = watcher->resultAt(index);
+            if (result.success) {
+                m_importPipeline.run(result.importResult);
 
-                        m_undoStack->push(
-                            new AddItemCommand(m_pView->scene(), item));
-                    } else {
-                        qWarning() << "Import failed:" << result.filePath
-                                   << result.errorMessage;
-                    }
+                auto *item = new ImageItem(
+                    QPixmap::fromImage(result.importResult.image));
+                item->setItemPen(QPen(Qt::NoPen));
+                item->setFilePath(result.importResult.filePath);
+                item->setCmykSourceData(result.importResult.rawCmykMat);
+                item->setOriginalSize(result.importResult.originalSize);
+                item->setDpi(result.importResult.dpiX,
+                             result.importResult.dpiY);
 
-                    (*pCompleted)++;
-                    m_pProgressMgr->updateTask(taskId, *pCompleted);
-                    if (*pCompleted >= total)
-                        m_pProgressMgr->finishTask(taskId);
+                // 每张图偏移 30px，避免全部堆叠在原点
+                item->setPos(index * 30, index * 30);
 
-                    watcher->deleteLater();
-                });
-        watcher->setFuture(QtConcurrent::run(ImageUtils::runImportWorker, path,
-                                              canvasSize, scaleToFit));
-    }
+                m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
+            } else {
+                qWarning() << "Import failed:" << result.filePath
+                           << result.errorMessage;
+            }
+        });
+
+    connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished,
+            this, [this, watcher, taskId]() {
+                m_pProgressMgr->finishTask(taskId);
+                watcher->deleteLater();
+            });
+
+    auto future = QtConcurrent::mapped(
+        paths, [canvasSize, scaleToFit](const QString &path) {
+            return ImageUtils::runImportWorker(path, canvasSize, scaleToFit);
+        });
+
+    watcher->setFuture(future);
 }
 
 void MainWindow::onExportImage()
@@ -987,14 +1002,11 @@ void MainWindow::onExportImage()
     auto snapshot = ImageUtils::collectCmykItemSnapshot(items, exportRect);
 
     // 6. 启动进度任务，线程池异步写入 CMYK TIFF
-    const QString taskId =
-        m_pProgressMgr->startTask(tr("Export"));
+    const QString taskId = m_pProgressMgr->startTask(tr("Export"));
 
-    auto *watcher =
-        new QFutureWatcher<ImageUtils::ExportWorkerResult>(this);
-    connect(watcher,
-            &QFutureWatcher<ImageUtils::ExportWorkerResult>::finished, this,
-            [this, watcher, taskId, bRip, ripXRes, ripYRes, tiffPath]() {
+    auto *watcher = new QFutureWatcher<ImageUtils::ExportWorkerResult>(this);
+    connect(watcher, &QFutureWatcher<ImageUtils::ExportWorkerResult>::finished,
+            this, [this, watcher, taskId, bRip, ripXRes, ripYRes, tiffPath]() {
                 auto result = watcher->result();
                 QApplication::restoreOverrideCursor();
 
@@ -1002,9 +1014,8 @@ void MainWindow::onExportImage()
                     m_pProgressMgr->finishTask(taskId);
 
                     if (bRip && m_pNetWorkUtils) {
-                        setEnabled(false);
                         m_pNetWorkUtils->doAddRip(ripXRes, ripYRes,
-                                                   result.filePath);
+                                                  result.filePath);
                     }
                 } else {
                     m_pProgressMgr->cancelTask(taskId);
@@ -1016,7 +1027,7 @@ void MainWindow::onExportImage()
 
     QApplication::setOverrideCursor(Qt::WaitCursor);
     watcher->setFuture(QtConcurrent::run(ImageUtils::runExportWorker, tiffPath,
-                                          image, snapshot, exportRect));
+                                         image, snapshot, exportRect));
 }
 
 // ============================================================
@@ -1426,26 +1437,17 @@ void MainWindow::onRequestFinished(const QJsonDocument &json,
     case NetworkRequestType::RequestHelpAbout:
         break;
     case NetworkRequestType::RequestAddRip: {
-        if (m_pTimer) {
-            m_pTimer->stop();
-            m_pTimer->disconnect(this);
+        m_ripTaskId = m_pProgressMgr->startTask(tr("RIP"), RIP_PROGRESS_MAX);
+        m_pNetWorkUtils->doWhileRipStatus();
 
-            m_ripTaskId = m_pProgressMgr->startTask(tr("RIP"));
-
-            connect(m_pTimer, &QTimer::timeout, this,
-                    [this]() { m_pNetWorkUtils->doRipStatus(); });
-            m_pTimer->start(1000);
-        }
     } break;
     case NetworkRequestType::RequestRipStatus: {
         QJsonValue value = json.object().value("rip_picture_progress");
         int progress = value.toInt();
         m_pProgressMgr->updateTask(m_ripTaskId, progress);
-        if (progress >= 100) {
+        if (progress >= RIP_PROGRESS_MAX) {
+            m_pNetWorkUtils->doStopWhile();
             m_pProgressMgr->finishTask(m_ripTaskId);
-            m_pTimer->stop();
-            m_pTimer->disconnect(this);
-            setEnabled(true);
         }
     } break;
     case NetworkRequestType::RequestRipVersion: {
@@ -1696,11 +1698,6 @@ void MainWindow::loadWindowState()
         if (m_gridAction) {
             m_gridAction->setChecked(gridVisible);
         }
-    }
-
-    // 获取 Rip 版本
-    if (m_pNetWorkUtils) {
-        m_pNetWorkUtils->doRipVersion();
     }
 }
 

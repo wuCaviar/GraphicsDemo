@@ -208,8 +208,6 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     bottomRow->addStretch();
     mainLayout->addLayout(bottomRow);
 
-    setMaximumHeight(sizeHint().height());
-
     // ---- Signal connections ----
     connect(m_hAlignLeft, &QPushButton::clicked, this,
             &AlignLayoutDialog::onAlignClicked);

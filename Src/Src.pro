@@ -19,6 +19,7 @@ QMAKE_CXXFLAGS += -Wall
 
 HEADERS += \
     App/SingleInstance.h \
+    UI/MergeTiffProcessor.h \
     UI/mainwindow.h \
     UI/qatgraphicsview.h \
     UI/GraphicsScene.h \
@@ -42,6 +43,7 @@ HEADERS += \
     Commands/Commands.h \
     Utils/ImageUtils.h \
     Utils/ImageWorker.h \
+    Utils/ProcessGuard.h \
     Utils/ProgressManager.h \
     Utils/ColorUtils.h \
     Utils/AlignmentUtils.h \
@@ -58,6 +60,7 @@ HEADERS += \
 SOURCES += \
     App/SingleInstance.cpp \
     App/main.cpp \
+    UI/MergeTiffProcessor.cpp \
     UI/mainwindow.cpp \
     UI/qatgraphicsview.cpp \
     UI/GraphicsScene.cpp \
@@ -81,6 +84,7 @@ SOURCES += \
     Commands/Commands.cpp \
     Utils/ImageUtils.cpp \
     Utils/ImageWorker.cpp \
+    Utils/ProcessGuard.cpp \
     Utils/ProgressManager.cpp \
     Utils/ColorUtils.cpp \
     Utils/AlignmentUtils.cpp \

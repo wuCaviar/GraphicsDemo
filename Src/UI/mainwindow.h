@@ -8,6 +8,9 @@
 #include "qatgraphicsview.h"
 #include "AlignmentUtils.h"
 #include "NetWorkUtils.h"
+#include "version.h"
+#include "ProcessGuard.h"
+
 #include <QMainWindow>
 #include <QMap>
 #include <QUndoStack>
@@ -33,6 +36,8 @@ public:
     ~MainWindow();
 
     void setMainWindowVisibility(bool state);
+
+    void getToolInfo();
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -97,7 +102,9 @@ private:
     void _initConnections();
     void _initStatusBar();
     void _initNetWork();
+    void _initProcess();
     void _updateUndoRedoActions();
+
     void loadStyleSheet();
 
     // 窗口状态持久化
@@ -149,8 +156,8 @@ private:
     // 通用进度管理器
     ProgressManager *m_pProgressMgr = nullptr;
 
-    // RIP 轮询定时器
-    QTimer *m_pTimer = nullptr;
+    // 进程管理器
+    ProcessGuard *m_pProcessGuard = nullptr;
 
     // 当前 RIP 进度任务 ID
     QString m_ripTaskId;

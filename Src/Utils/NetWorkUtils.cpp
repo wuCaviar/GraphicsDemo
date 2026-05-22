@@ -6,44 +6,15 @@
                   Q_EMIT requestRecv(ptrResp, type);               \
               }));
 
-NetWorkUtils::NetWorkUtils(QObject *parent) : QObject(parent) { }
+NetWorkUtils::NetWorkUtils(QObject *parent) : QObject(parent)
+{
+    connect(this, &NetWorkUtils::requestRecv, this,
+            &NetWorkUtils::onReplyFinished);
+}
 
 NetWorkUtils::~NetWorkUtils()
 {
-    stop();
-
-    if (m_pExeProcess && m_pExeProcess->state() != QProcess::NotRunning) {
-        qDebug() << "正在结束外部程序...";
-        m_pExeProcess->terminate();
-        if (!m_pExeProcess->waitForFinished(3000)) {
-            qWarning() << "强制结束";
-            m_pExeProcess->kill();
-            m_pExeProcess->waitForFinished(3000);
-        }
-    }
-
-    delete m_pExeProcess;
-    m_pExeProcess = nullptr;
-}
-
-void NetWorkUtils::start()
-{
-    // 移动到线程并启动
-    moveToThread(&m_workerThread);
-    connect(&m_workerThread, &QThread::finished, this, &QObject::deleteLater);
-    // 线程启动后，在正确的线程中初始化 manager
-    connect(&m_workerThread, &QThread::started, this, &NetWorkUtils::init);
-    connect(this, &NetWorkUtils::requestRecv, this,
-            &NetWorkUtils::onReplyFinished);
-    m_workerThread.start();
-}
-
-void NetWorkUtils::stop()
-{
-    if (m_workerThread.isRunning()) {
-        m_workerThread.quit();
-        m_workerThread.wait();
-    }
+    doStopWhile();
 }
 
 void NetWorkUtils::doHelpAbout()
@@ -75,23 +46,34 @@ void NetWorkUtils::doRipStatus()
     GET_AND_EMIT(NETWORK_ROOT_RIPSTATUS, RequestRipStatus);
 }
 
+void NetWorkUtils::doWhileRipStatus()
+{
+    int id = QObject::startTimer(1000);
+    m_timeoutFuncs.insert(id, [this]() { doRipStatus(); });
+}
+
+void NetWorkUtils::doStopWhile()
+{
+    for (auto id : m_timeoutFuncs.keys()) {
+        killTimer(id);
+    }
+    m_timeoutFuncs.clear();
+}
+
 void NetWorkUtils::doRipVersion()
 {
     GET_AND_EMIT(NETWORK_ROOT_RIPVERSION, RequestRipVersion);
 }
 
-void NetWorkUtils::init()
+void NetWorkUtils::timerEvent(QTimerEvent *event)
 {
-    // 此时已经在新线程的事件循环中
-    // 启动外部程序
-    m_pExeProcess = new QProcess();
-    m_pExeProcess->start(ExePath);
-    if (m_pExeProcess->waitForStarted(3000)) {
-        qDebug() << ExePath << "启动成功！"
-                 << " " << m_pExeProcess->processId();
-        qDebug() << m_pExeProcess->readAllStandardOutput();
-    } else {
-        qWarning() << ExePath << "启动失败";
+    int id = event->timerId();
+    if (m_timeoutFuncs.contains(id)) {
+        auto func = m_timeoutFuncs.value(id);
+        if (func)
+            func();
+        else
+            killTimer(id);
     }
 }
 

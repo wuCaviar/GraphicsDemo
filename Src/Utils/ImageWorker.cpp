@@ -3,11 +3,13 @@
 #include "ImageItem.h"
 #include "colortransform.h"
 
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDebug>
 #include <QFile>
 #include <QPaintEngine>
 #include <QPainter>
+#include <QThread>
 
 #include <tiff.h>
 #include <tiffio.h>
@@ -17,7 +19,8 @@ namespace ImageUtils {
 
 // ========== Pipeline 实现 ==========
 
-void ImageImportPipeline::addProcessor(std::unique_ptr<IImportPostProcessor> processor)
+void ImageImportPipeline::addProcessor(
+    std::unique_ptr<IImportPostProcessor> processor)
 {
     m_processors.push_back(std::move(processor));
 }
@@ -26,9 +29,9 @@ void ImageImportPipeline::removeProcessor(const QString &name)
 {
     m_processors.erase(
         std::remove_if(m_processors.begin(), m_processors.end(),
-                        [&](const std::unique_ptr<IImportPostProcessor> &p) {
-                            return p->name() == name;
-                        }),
+                       [&](const std::unique_ptr<IImportPostProcessor> &p) {
+                           return p->name() == name;
+                       }),
         m_processors.end());
 }
 
@@ -38,7 +41,8 @@ void ImageImportPipeline::run(ImportResult &result)
         p->process(result);
 }
 
-void ImageExportPipeline::addProcessor(std::unique_ptr<IExportPreProcessor> processor)
+void ImageExportPipeline::addProcessor(
+    std::unique_ptr<IExportPreProcessor> processor)
 {
     m_processors.push_back(std::move(processor));
 }
@@ -47,9 +51,9 @@ void ImageExportPipeline::removeProcessor(const QString &name)
 {
     m_processors.erase(
         std::remove_if(m_processors.begin(), m_processors.end(),
-                        [&](const std::unique_ptr<IExportPreProcessor> &p) {
-                            return p->name() == name;
-                        }),
+                       [&](const std::unique_ptr<IExportPreProcessor> &p) {
+                           return p->name() == name;
+                       }),
         m_processors.end());
 }
 
@@ -62,7 +66,7 @@ void ImageExportPipeline::run(QImage &image, const QRectF &exportRect)
 // ========== CMYK 快照收集（主线程） ==========
 
 CmykItemSnapshot collectCmykItemSnapshot(const QList<QGraphicsItem *> &items,
-                                          const QRectF &exportRect)
+                                         const QRectF &exportRect)
 {
     Q_UNUSED(exportRect);
     CmykItemSnapshot snapshot;
@@ -116,8 +120,7 @@ CmykItemSnapshot collectCmykItemSnapshot(const QList<QGraphicsItem *> &items,
 // ========== 线程池入口函数 ==========
 
 ImportWorkerResult runImportWorker(const QString &filePath,
-                                    const QSizeF &canvasSize,
-                                    bool scaleToFit)
+                                   const QSizeF &canvasSize, bool scaleToFit)
 {
     ImportWorkerResult result;
     result.filePath = filePath;
@@ -136,10 +139,9 @@ ImportWorkerResult runImportWorker(const QString &filePath,
         if (iw > cw || ih > ch) {
             double scale = qMin(static_cast<double>(cw) / iw,
                                 static_cast<double>(ch) / ih);
-            importResult.image =
-                importResult.image.scaled(qRound(iw * scale), qRound(ih * scale),
-                                          Qt::IgnoreAspectRatio,
-                                          Qt::SmoothTransformation);
+            importResult.image = importResult.image.scaled(
+                qRound(iw * scale), qRound(ih * scale), Qt::IgnoreAspectRatio,
+                Qt::SmoothTransformation);
         }
     }
 
@@ -148,10 +150,9 @@ ImportWorkerResult runImportWorker(const QString &filePath,
     return result;
 }
 
-ExportWorkerResult runExportWorker(const QString &path,
-                                    const QImage &image,
-                                    const CmykItemSnapshot &snapshot,
-                                    const QRectF &exportRect)
+ExportWorkerResult runExportWorker(const QString &path, const QImage &image,
+                                   const CmykItemSnapshot &snapshot,
+                                   const QRectF &exportRect)
 {
     ExportWorkerResult result;
     result.filePath = path;
@@ -167,8 +168,8 @@ ExportWorkerResult runExportWorker(const QString &path,
 // ========== 线程安全的 CMYK TIFF 导出 ==========
 
 bool exportTiffCmykFromSnapshot(const QString &path, const QImage &image,
-                                 const CmykItemSnapshot &snapshot,
-                                 const QRectF &exportRect)
+                                const CmykItemSnapshot &snapshot,
+                                const QRectF &exportRect)
 {
     // 1. Flatten transparency on white
     QImage img(image.size(), QImage::Format_ARGB32);
@@ -294,9 +295,9 @@ bool exportTiffCmykFromSnapshot(const QString &path, const QImage &image,
 
         // Overwrite pen CMYK areas from snapshot
         for (const auto &pen : snapshot.penItems) {
-            QRectF strokeRect = pen.sceneRect.adjusted(
-                -pen.penWidth / 2, -pen.penWidth / 2,
-                pen.penWidth / 2, pen.penWidth / 2);
+            QRectF strokeRect =
+                pen.sceneRect.adjusted(-pen.penWidth / 2, -pen.penWidth / 2,
+                                       pen.penWidth / 2, pen.penWidth / 2);
             QRectF pixelRect((strokeRect.x() - exportRect.x()),
                              (strokeRect.y() - exportRect.y()),
                              strokeRect.width(), strokeRect.height());

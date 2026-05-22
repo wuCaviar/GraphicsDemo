@@ -4,5 +4,6 @@ SUBDIRS += \
     NetWorkTest \
     Src \
     LittleCMSTest \
+    TiffMerge \
     TiffReader \
     WidgetTest

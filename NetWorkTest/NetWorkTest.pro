@@ -12,3 +12,6 @@ SOURCES += \
         main.cpp \
         $$PWD/../Src/NetWork/QHttp.cpp \
         $$PWD/../Src/Utils/NetWorkUtils.cpp
+
+INCLUDEPATH += \
+        $$PWD/../Src/NetWork

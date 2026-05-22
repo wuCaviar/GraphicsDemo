@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QTranslator>
 #include <QLocale>
+#include <QTimer>
 
 #include "mainwindow.h"
 #include "SingleInstance.h"
@@ -8,6 +9,7 @@
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+    a.setApplicationVersion(ATHC_VERSION_STR_MAJ_MIN_MIC);
 
     // 加载中文翻译
     QTranslator translator;
@@ -22,9 +24,8 @@ int main(int argc, char *argv[])
 
     QString name = "com.athc.darwingtools";
     SingleInstance instance;
-    if (SingleInstance::hasPrevious(name)) {
+    if (SingleInstance::hasPrevious(name))
         return EXIT_SUCCESS;
-    }
 
     instance.listen(name);
 
@@ -32,7 +33,10 @@ int main(int argc, char *argv[])
     MainWindow window;
     window.showMaximized();
 
-    // Bring the Notes window to the front
+    // 延迟获取工具信息，避免阻塞界面显示
+    QTimer::singleShot(1500, &window, [&]() { (&window)->getToolInfo(); });
+
+    // Bring the window to the front
     QObject::connect(&instance, &SingleInstance::newInstance, &window,
                      [&]() { (&window)->setMainWindowVisibility(true); });
 

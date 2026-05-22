@@ -7,22 +7,21 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QTimerEvent>
 
-#include "../NetWork/QHttp.h"
+#include <functional>
+
+#include "QHttp.h"
 #include "NetWorkDefs.h"
 
-// 独立线程用于专门跑网络接口
+typedef std::function<void()> TimeoutFunc;
+
 class NetWorkUtils : public QObject
 {
     Q_OBJECT
 public:
     explicit NetWorkUtils(QObject *parent = nullptr);
     ~NetWorkUtils();
-
-    // 启动工作线程
-    void start();
-    // 停止工作线程
-    void stop();
 
 public:
     // /helpabout
@@ -34,8 +33,15 @@ public:
     // /ripstatus
     void doRipStatus();
 
+    void doWhileRipStatus();
+
+    void doStopWhile();
+
     // /ripVersion
     void doRipVersion();
+
+protected:
+    virtual void timerEvent(QTimerEvent *event) override;
 
 signals:
     // 请求成功信号（响应体数据）
@@ -46,24 +52,10 @@ signals:
     void requestRecv(Http::QResponsePtr ptrResp, NetworkRequestType type);
 
 private slots:
-    // 在工作线程中初始化 manager（必须在正确线程中调用）
-    void init();
-
     void onReplyFinished(Http::QResponsePtr ptrResp, NetworkRequestType type);
 
-protected:
-    template<typename... Ts>
-    void doGet(Ts &&...ts);
-
 private:
-    QThread m_workerThread;
-    QProcess *m_pExeProcess = nullptr;
+    QMap<int, TimeoutFunc> m_timeoutFuncs;
 };
-
-template<typename... Ts>
-void NetWorkUtils::doGet(Ts &&...ts)
-{
-    Http::Get(ts...);
-}
 
 #endif // NETWORKUTILS_H
