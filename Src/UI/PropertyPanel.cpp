@@ -621,27 +621,25 @@ void PropertyPanel::updatePanel()
             .arg(qRound(displaySz.height())));
 
         // 原始尺寸
-        QSize origSz = imgItem->originalSize();
-        if (!origSz.isValid() && imgItem->isCmykSource())
-            origSz = QSize(imgItem->cmykSourceWidth(), imgItem->cmykSourceHeight());
-        if (origSz.isValid()) {
-            m_imgOriginalSizeLabel->setText(tr("%1 x %2 px")
-                .arg(origSz.width())
-                .arg(origSz.height()));
-        } else {
-            m_imgOriginalSizeLabel->setText(tr("Unknown"));
-        }
+        // QSize origSz = imgItem->originalSize();
+        // if (origSz.isValid()) {
+        //     m_imgOriginalSizeLabel->setText(tr("%1 x %2 px")
+        //         .arg(origSz.width())
+        //         .arg(origSz.height()));
+        // } else {
+        //     m_imgOriginalSizeLabel->setText(tr("Unknown"));
+        // }
 
-        // 色彩空间
-        if (imgItem->isCmykSource())
-            m_imgColorSpaceLabel->setText(tr("CMYK"));
-        else
-            m_imgColorSpaceLabel->setText(tr("RGB"));
+        // // 色彩空间
+        // if (imgItem->isCmykSource())
+        //     m_imgColorSpaceLabel->setText(tr("CMYK"));
+        // else
+        //     m_imgColorSpaceLabel->setText(tr("RGB"));
 
-        // DPI
-        m_imgDpiLabel->setText(tr("%1 x %2").arg(imgItem->dpiX()).arg(imgItem->dpiY()));
+        // // DPI
+        // m_imgDpiLabel->setText(tr("%1 x %2").arg(imgItem->dpiX()).arg(imgItem->dpiY()));
 
-        m_imageInfoGroup->setVisible(true);
+        m_imageInfoGroup->setVisible(false); // 暂时隐藏图像信息，后续完善 ImageItem 后再显示
     } else {
         m_imageInfoGroup->setVisible(false);
     }

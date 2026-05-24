@@ -19,6 +19,7 @@
 #include "RulerBar.h"
 #include "TextItem.h"
 #include "GraphicsItemGroup.h"
+#include "FitCanvasDlg.h"
 
 #include <algorithm>
 #include <memory>
@@ -52,6 +53,10 @@
 #include <QStatusBar>
 #include <QToolBar>
 #include <QVBoxLayout>
+#include <QThreadPool>
+
+#include <tiff.h>
+#include <tiffio.h>
 
 static const char *kMimeFormat = "application/x-graphicsdemo-items";
 namespace {
@@ -288,6 +293,11 @@ void MainWindow::_initMenuBar()
                     &MainWindow::onAlignLayoutDialog)
         ->setToolTip(tr("Open the Align & Layout dialog"));
     arrMenu->addSeparator();
+    QAction *fitCanvasAct =
+        arrMenu->addAction(tr("Fit Canvas to Selection"), this,
+                           &MainWindow::onFitCanvasToItems);
+    fitCanvasAct->setToolTip(tr("Resize the canvas to fit the selected items"));
+    arrMenu->addSeparator();
     QMenu *rotateMenu = arrMenu->addMenu(tr("Rotate"));
     rotateMenu
         ->addAction(QIcon(":/icons/icons/rotate-cw.svg"),
@@ -439,7 +449,7 @@ void MainWindow::_initToolBar()
     actionGroup->setExclusive(true);
 
     auto addToolAction = [&](const QString &iconPath, const QString &text,
-                             Tool tool, const QString &shortcut = {}) {
+                             Tool tool, const QString &shortcut = { }) {
         QAction *act = drawBar->addAction(QIcon(iconPath), text);
         act->setCheckable(true);
         act->setToolTip(text);
@@ -512,6 +522,15 @@ void MainWindow::_initToolBar()
     rotateCCWAct->setToolTip(tr("Rotate 90\u00b0 counter-clockwise"));
     connect(rotateCCWAct, &QAction::triggered, this,
             [this]() { rotateSelectedItems(-90.0); });
+
+    alignToolBar->addSeparator();
+
+    // 画布适配选中图元
+    QAction *fitCanvasAct = alignToolBar->addAction(
+        QIcon(":/icons/icons/view-fit.svg"), tr("Fit Canvas to Selection"));
+    fitCanvasAct->setToolTip(tr("Resize the canvas to fit the selected items"));
+    connect(fitCanvasAct, &QAction::triggered, this,
+            &MainWindow::onFitCanvasToItems);
 }
 
 void MainWindow::_initPropertyPanel()
@@ -544,6 +563,8 @@ void MainWindow::_initConnections()
             &MainWindow::onGroup);
     connect(m_pView, &QAtGraphicsView::ungroupRequested, this,
             &MainWindow::onUngroup);
+    connect(m_pView, &QAtGraphicsView::fitCanvasToItemsRequested, this,
+            &MainWindow::onFitCanvasToItems);
 
     connect(m_pPropertyPanel, &PropertyPanel::penChanged, this,
             &MainWindow::onPenChanged);
@@ -639,7 +660,7 @@ void MainWindow::_initStatusBar()
 
     // 缩放滑块
     m_zoomSlider = new QSlider(Qt::Horizontal);
-    m_zoomSlider->setRange(10, 500);
+    m_zoomSlider->setRange(1, 5000);
     m_zoomSlider->setValue(100);
     m_zoomSlider->setFixedWidth(120);
     m_zoomSlider->setTickPosition(QSlider::TicksBelow);
@@ -826,9 +847,6 @@ void MainWindow::onNew()
     QSizeF canvasSize = dlg.selectedSize();
     qreal ppi = dlg.selectedPpi();
 
-    x_dpi = ppi;
-    y_dpi = ppi;
-
     // 先清空 undo 栈，避免命令引用即将被删除的图元
     m_undoStack->clear();
 
@@ -870,40 +888,29 @@ void MainWindow::onImportImage()
     if (paths.isEmpty())
         return;
 
-    const QSizeF canvasSize =
-        m_pView->canvasItem() ? m_pView->canvasItem()->canvasSize() : QSizeF();
+    CanvasItem *canvas = m_pView->canvasItem();
+    if (!canvas)
+        return;
 
-    // 2. 快速扫描图像尺寸，询问是否缩放适配（仅一次）
-    bool scaleToFit = false;
-    if (!canvasSize.isEmpty()) {
-        bool anyExceed = false;
-        for (const QString &path : paths) {
-            QImageReader reader(path);
-            const QSize sz = reader.size();
-            if (sz.isValid()
-                && (sz.width() > canvasSize.width()
-                    || sz.height() > canvasSize.height())) {
-                anyExceed = true;
-                break;
-            }
-        }
-        if (anyExceed) {
-            auto answer = QMessageBox::question(
-                this, tr("Import Images"),
-                tr("Some images exceed canvas size (%1 x %2).\n"
-                   "Scale them to fit?")
-                    .arg(static_cast<int>(canvasSize.width()))
-                    .arg(static_cast<int>(canvasSize.height())),
-                QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
-            scaleToFit = (answer == QMessageBox::Yes);
-        }
-    }
+    // 2. 画布适配对话框
+    FitCanvasDlg dlg;
+    dlg.setParam(canvas->canvasSize());
+    if (dlg.exec() != QDialog::Accepted)
+        return;
 
-    // 3. 启动进度任务，通过线程池异步加载每个文件
+    const FitCanvasType fitType = dlg.fitType();
+    const double fitVal = dlg.fitValue();
+
+    // 3. 启动进度任务，线程池异步加载（QPixmap 在工作线程中构造）
     const QString taskId =
         m_pProgressMgr->startTask(tr("Import"), paths.size());
 
+    QThreadPool *pool = QThreadPool::globalInstance();
+    pool->setMaxThreadCount(
+        qMin(4, QThread::idealThreadCount())); // 避免 I/O 风暴
+
     auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
+    auto *importedItems = new QList<ImageItem *>();
 
     connect(
         watcher,
@@ -914,47 +921,108 @@ void MainWindow::onImportImage()
 
     connect(
         watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
-        this, [this, watcher](int index) {
-            // 处理单个文件导入完成的结果
+        this, [this, watcher, importedItems](int index) {
             auto result = watcher->resultAt(index);
-            if (result.success) {
-                m_importPipeline.run(result.importResult);
-
-                auto *item = new ImageItem(
-                    QPixmap::fromImage(result.importResult.image));
+            if (result.isValid()) {
+                auto *item = new ImageItem(result.pixmap);
                 item->setItemPen(QPen(Qt::NoPen));
-                item->setFilePath(result.importResult.filePath);
-                item->setCmykSourceData(result.importResult.rawCmykMat);
-                item->setOriginalSize(result.importResult.originalSize);
-                item->setDpi(result.importResult.dpiX,
-                             result.importResult.dpiY);
-
-                // 每张图偏移 30px，避免全部堆叠在原点
+                item->setFilePath(result.path);
                 item->setPos(index * 30, index * 30);
 
                 m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
+                importedItems->append(item);
             } else {
-                qWarning() << "Import failed:" << result.filePath
+                qWarning() << "Import failed:" << result.path
                            << result.errorMessage;
             }
         });
 
     connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished,
-            this, [this, watcher, taskId]() {
+            this, [this, watcher, taskId, importedItems, fitType, fitVal]() {
                 m_pProgressMgr->finishTask(taskId);
                 watcher->deleteLater();
+
+                // 根据用户选择适配画布大小
+                if (fitType != fctNone && !importedItems->isEmpty()) {
+                    CanvasItem *canvas = m_pView->canvasItem();
+                    if (canvas) {
+                        // 计算所有导入图片的场景包围矩形并集
+                        QRectF unitedRect;
+                        for (auto *item : *importedItems) {
+                            QRectF r = item->mapToScene(item->boundingRect()).boundingRect();
+                            unitedRect = unitedRect.isValid() ? unitedRect.united(r) : r;
+                        }
+
+                        // 计算偏移量：若图元在负坐标，整体平移到正坐标区域
+                        qreal offsetX = unitedRect.left() < 0 ? -unitedRect.left() : 0;
+                        qreal offsetY = unitedRect.top() < 0 ? -unitedRect.top() : 0;
+
+                        QSizeF oldSize = canvas->canvasSize();
+                        QSizeF newSize;
+                        switch (fitType) {
+                        case fctAdapt:
+                            newSize = QSizeF(unitedRect.right() + offsetX,
+                                             unitedRect.bottom() + offsetY);
+                            break;
+                        case fctWidth:
+                            newSize = QSizeF(fitVal, oldSize.height());
+                            break;
+                        case fctHeight:
+                            newSize = QSizeF(oldSize.width(), fitVal);
+                            break;
+                        default:
+                            break;
+                        }
+
+                        if (newSize.isValid() && newSize.width() > 0 && newSize.height() > 0
+                            && newSize != oldSize) {
+                            m_undoStack->beginMacro(tr("Fit Canvas on Import"));
+
+                            // 若有负坐标图元，先平移
+                            if (offsetX > 0 || offsetY > 0) {
+                                QPointF delta(offsetX, offsetY);
+                                QList<QPointF> oldPositions, newPositions;
+                                for (auto *item : *importedItems) {
+                                    oldPositions << item->pos();
+                                    newPositions << item->pos() + delta;
+                                    item->setPos(item->pos() + delta);
+                                }
+                                m_undoStack->push(new MoveItemsCommand(
+                                    QList<QGraphicsItem *>(importedItems->begin(), importedItems->end()),
+                                    oldPositions, newPositions, m_pView->scene()));
+                            }
+
+                            m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize,
+                                                                        m_pView->scene()));
+                            m_undoStack->endMacro();
+                            _updateCanvasLabel();
+                            m_pView->fitToCanvas();
+                        }
+                    }
+                }
+
+                delete importedItems;
+                qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz")
+                         << "Finished import";
             });
 
-    auto future = QtConcurrent::mapped(
-        paths, [canvasSize, scaleToFit](const QString &path) {
-            return ImageUtils::runImportWorker(path, canvasSize, scaleToFit);
-        });
+    auto future =
+        QtConcurrent::mapped(pool, paths, ImageUtils::runImportWorker);
 
     watcher->setFuture(future);
+    qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz")
+             << "Started import with" << pool->maxThreadCount() << "threads";
 }
 
 void MainWindow::onExportImage()
 {
+    // 防止重复导出
+    if (m_exporting) {
+        QMessageBox::information(this, tr("Export"),
+                                 tr("An export is already in progress."));
+        return;
+    }
+
     // 1. 选择保存路径
     QString path = QFileDialog::getSaveFileName(
         this, tr("Export Image"), QString(), tr("prn Files (*.prn)"));
@@ -973,46 +1041,132 @@ void MainWindow::onExportImage()
         ripYRes = dlg.resolutionY();
     }
 
-    // 2. 计算导出区域
+    const QString tiffPath =
+        fi.absolutePath() + "/" + fi.completeBaseName() + ".tif";
+
+    // 2. 收集画布上的图片，分析导出路径
+    const auto allItems = ::filterSelectableItems(m_pView->scene()->items());
+    QList<ImageItem *> imageItems;
+    bool hasNonImageItems = false;
+    for (auto *gi : allItems) {
+        auto *imgItem = dynamic_cast<ImageItem *>(gi);
+        if (imgItem)
+            imageItems.append(imgItem);
+        else
+            hasNonImageItems = true;
+    }
+
+    // 3. 计算导出区域
+    CanvasItem *canvas = m_pView->canvasItem();
     QRectF exportRect;
-    if (m_pView->canvasItem()) {
-        exportRect = m_pView->canvasItem()->rect();
+    if (canvas) {
+        exportRect = canvas->rect();
     } else {
         exportRect =
             m_pView->scene()->itemsBoundingRect().adjusted(-10, -10, 10, 10);
     }
+    int targetDpi = canvas ? qRound(canvas->ppi()) : 72;
+    if (bRip) {
+        targetDpi = qMax(targetDpi, qMax(ripXRes, ripYRes));
+    }
 
-    // 3. 主线程渲染场景到 QImage
-    QImage image(exportRect.size().toSize(), QImage::Format_ARGB32);
-    image.fill(Qt::white);
+    // 4. 判断导出路径
+    enum ExportPath { SingleSource, MultiSource, SceneRender };
+    ExportPath exportPath = SceneRender;
+    QString singleSourcePath;
+    QList<ImageUtils::SourceTiffInput> multiSources;
 
-    QPainter painter(&image);
-    painter.setRenderHint(QPainter::LosslessImageRendering);
-    m_pView->scene()->render(&painter, QRectF(), exportRect);
-    painter.end();
+    // Helper：打开文件检测是否为 CMYK TIFF
+    auto isCmykTiffFile = [](const QString &path) -> bool {
+        QByteArray pathBytes = path.toLocal8Bit();
+        TIFF *tif = TIFFOpen(pathBytes.constData(), "r");
+        if (!tif) return false;
+        uint16_t photometric = PHOTOMETRIC_MINISWHITE;
+        uint16_t samplesPerPixel = 1;
+        TIFFGetField(tif, TIFFTAG_PHOTOMETRIC, &photometric);
+        TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &samplesPerPixel);
+        bool cmyk = (photometric == PHOTOMETRIC_SEPARATED && samplesPerPixel >= 4);
+        TIFFClose(tif);
+        return cmyk;
+    };
 
-    // 4. 运行导出预处理器管线（主线程，在 CMYK 转换之前）
-    m_exportPipeline.run(image, exportRect);
+    // Helper：检测是否为多页 TIFF
+    auto isMultiPageTiff = [](const QString &path) -> bool {
+        QByteArray pathBytes = path.toLocal8Bit();
+        TIFF *tif = TIFFOpen(pathBytes.constData(), "r");
+        if (!tif) return false;
+        bool multi = !TIFFLastDirectory(tif);
+        TIFFClose(tif);
+        return multi;
+    };
 
-    // 5. 收集 CMYK 覆写快照（主线程，在线程池写入前）
-    const QString tiffPath =
-        fi.absolutePath() + "/" + fi.completeBaseName() + ".tif";
-    QList<QGraphicsItem *> items =
-        ::filterSelectableItems(m_pView->scene()->items());
-    auto snapshot = ImageUtils::collectCmykItemSnapshot(items, exportRect);
+    // 收集有效的 CMYK TIFF 源文件（导出时打开文件检测）
+    QList<ImageItem *> cmykTiffItems;
+    bool hasRotation = false;
+    for (auto *imgItem : imageItems) {
+        if (!qFuzzyIsNull(imgItem->rotation()))
+            hasRotation = true;
+        bool hasValidCmykTiff = !imgItem->filePath().isEmpty()
+                                && ImageUtils::isTiffFile(imgItem->filePath())
+                                && QFile::exists(imgItem->filePath())
+                                && isCmykTiffFile(imgItem->filePath());
+        if (hasValidCmykTiff)
+            cmykTiffItems.append(imgItem);
+    }
 
-    // 6. 启动进度任务，线程池异步写入 CMYK TIFF
+    if (imageItems.size() == 1 && cmykTiffItems.size() == 1
+        && !hasNonImageItems && !hasRotation) {
+        // 路径 A：单个 CMYK TIFF（无旋转）→ 直接复制源文件，保留原始像素和 tag
+        exportPath = SingleSource;
+        singleSourcePath = cmykTiffItems.first()->filePath();
+    } else if (imageItems.size() >= 2
+               && imageItems.size() == cmykTiffItems.size()
+               && !hasNonImageItems && !hasRotation) {
+        // 路径 B：多个 CMYK TIFF（全部有效，无旋转）→ 并行读取原始数据合成
+        exportPath = MultiSource;
+        for (auto *imgItem : cmykTiffItems) {
+            ImageUtils::SourceTiffInput src;
+            src.filePath = imgItem->filePath();
+            QRectF sceneRect = imgItem->sceneBoundingRect();
+            src.outputRect = QRectF(
+                sceneRect.left() - exportRect.left(),
+                sceneRect.top() - exportRect.top(),
+                sceneRect.width(),
+                sceneRect.height());
+            src.zOrder = static_cast<int>(imgItem->zValue());
+            multiSources.append(src);
+        }
+    }
+    // 否则走路径 C：场景渲染（混合内容 / 非 CMYK TIFF / 有旋转）
+
+    // 多页 TIFF 处理：Path A 支持多页复制，其他路径仅导出首页并警告
+    if (exportPath != SingleSource) {
+        for (auto *imgItem : imageItems) {
+            if (ImageUtils::isTiffFile(imgItem->filePath())
+                && isMultiPageTiff(imgItem->filePath())) {
+                QMessageBox::warning(
+                    this, tr("Multi-page TIFF"),
+                    tr("The image \"%1\" is a multi-page TIFF. "
+                       "Only the first page will be exported.")
+                        .arg(QFileInfo(imgItem->filePath()).fileName()));
+                break;
+            }
+        }
+    }
+
     const QString taskId = m_pProgressMgr->startTask(tr("Export"));
 
-    auto *watcher = new QFutureWatcher<ImageUtils::ExportWorkerResult>(this);
+    auto *watcher =
+        new QFutureWatcher<ImageUtils::ExportWorkerResult>(this);
+
     connect(watcher, &QFutureWatcher<ImageUtils::ExportWorkerResult>::finished,
             this, [this, watcher, taskId, bRip, ripXRes, ripYRes, tiffPath]() {
-                auto result = watcher->result();
-                QApplication::restoreOverrideCursor();
+                auto result = watcher->future().result();
+                watcher->deleteLater();
+                m_exporting = false;
 
                 if (result.success) {
                     m_pProgressMgr->finishTask(taskId);
-
                     if (bRip && m_pNetWorkUtils) {
                         m_pNetWorkUtils->doAddRip(ripXRes, ripYRes,
                                                   result.filePath);
@@ -1022,12 +1176,36 @@ void MainWindow::onExportImage()
                     qWarning() << "Export failed:" << result.filePath
                                << result.errorMessage;
                 }
-                watcher->deleteLater();
             });
 
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-    watcher->setFuture(QtConcurrent::run(ImageUtils::runExportWorker, tiffPath,
-                                         image, snapshot, exportRect));
+    m_exporting = true;
+
+    if (exportPath == SingleSource) {
+        auto future = QtConcurrent::run(ImageUtils::exportFromSourceTiff,
+                                        singleSourcePath, tiffPath);
+        watcher->setFuture(future);
+    } else if (exportPath == MultiSource) {
+        QSize outSize = exportRect.size().toSize();
+        auto future = QtConcurrent::run(
+            ImageUtils::exportFromMultipleSourceTiffs, tiffPath, multiSources,
+            outSize, targetDpi);
+        watcher->setFuture(future);
+    } else {
+        // 场景渲染导出
+        QImage image(exportRect.size().toSize(), QImage::Format_ARGB32);
+        image.fill(Qt::white);
+
+        QPainter painter(&image);
+        painter.setRenderHint(QPainter::LosslessImageRendering);
+        m_pView->scene()->render(&painter, QRectF(), exportRect);
+        painter.end();
+
+        m_exportPipeline.run(image, exportRect);
+
+        auto future = QtConcurrent::run(ImageUtils::exportFromScene, tiffPath,
+                                        image, exportRect, targetDpi);
+        watcher->setFuture(future);
+    }
 }
 
 // ============================================================
@@ -1466,6 +1644,69 @@ void MainWindow::onUpdateInfo()
 }
 
 // ============================================================
+// 画布适配选中图元（无选中时适配全部图元）
+// ============================================================
+void MainWindow::onFitCanvasToItems()
+{
+    CanvasItem *canvas = m_pView->canvasItem();
+    if (!canvas)
+        return;
+
+    // 优先使用选中的图元，无选中时使用场景中全部可操作图元
+    auto selected = filterSelectableItems();
+    QList<QGraphicsItem *> items = selected.isEmpty()
+        ? ::filterSelectableItems(m_pView->scene()->items())
+        : selected;
+    if (items.isEmpty())
+        return;
+
+    // 计算所有目标图元的场景包围矩形并集
+    QRectF unitedRect;
+    for (auto *item : items) {
+        QRectF itemSceneRect = item->mapToScene(item->boundingRect()).boundingRect();
+        unitedRect = unitedRect.isValid() ? unitedRect.united(itemSceneRect) : itemSceneRect;
+    }
+
+    if (!unitedRect.isValid() || unitedRect.width() < 1 || unitedRect.height() < 1)
+        return;
+
+    // 计算偏移量：若图元在负坐标，整体平移到正坐标区域
+    qreal offsetX = unitedRect.left() < 0 ? -unitedRect.left() : 0;
+    qreal offsetY = unitedRect.top() < 0 ? -unitedRect.top() : 0;
+
+    // 画布从 (0,0) 开始，尺寸需覆盖所有图元的最大延伸
+    QSizeF newSize(unitedRect.right() + offsetX, unitedRect.bottom() + offsetY);
+    QSizeF oldSize = canvas->canvasSize();
+
+    if (newSize.width() <= 0 || newSize.height() <= 0)
+        return;
+
+    m_undoStack->beginMacro(tr("Fit Canvas to Selection"));
+
+    // 若有负坐标图元，先平移
+    if (offsetX > 0 || offsetY > 0) {
+        QPointF delta(offsetX, offsetY);
+        QList<QPointF> oldPositions, newPositions;
+        for (auto *item : items) {
+            oldPositions << item->pos();
+            newPositions << item->pos() + delta;
+            item->setPos(item->pos() + delta);
+        }
+        m_undoStack->push(new MoveItemsCommand(items, oldPositions, newPositions,
+                                                m_pView->scene()));
+    }
+
+    // 画布尺寸变更
+    if (oldSize != newSize)
+        m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize,
+                                                        m_pView->scene()));
+
+    m_undoStack->endMacro();
+    _updateCanvasLabel();
+    m_pView->fitToCanvas();
+}
+
+// ============================================================
 // 批量旋转选中图元 — 绕图元中心(单选)或组中心(多选)旋转
 // ============================================================
 void MainWindow::rotateSelectedItems(qreal angleDelta)
@@ -1473,6 +1714,18 @@ void MainWindow::rotateSelectedItems(qreal angleDelta)
     auto items = filterSelectableItems();
     if (items.isEmpty())
         return;
+
+    // 过滤掉不支持旋转的图元（如图片）
+    QList<QGraphicsItem *> rotatableItems;
+    for (auto *item : items) {
+        auto *igi = dynamic_cast<IGraphicsItem *>(item);
+        if (igi && (igi->propertyFlags() & IGraphicsItem::HasRotation))
+            rotatableItems << item;
+    }
+    if (rotatableItems.isEmpty())
+        return;
+
+    items = rotatableItems;
 
     if (items.size() == 1) {
         // 单个图元：绕自身中心旋转（RotationChangeCommand 已内置中心补偿）

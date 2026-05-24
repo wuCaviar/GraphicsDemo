@@ -104,7 +104,7 @@ void QAtGraphicsView::resetCanvas(const QSizeF &size)
 
 void QAtGraphicsView::setZoomLevel(qreal level)
 {
-    level = qBound(0.1, level, 5.0);
+    level = qBound(0.01, level, 50.0);
     if (qFuzzyCompare(m_zoomLevel, level))
         return;
 
@@ -475,6 +475,13 @@ void QAtGraphicsView::contextMenuEvent(QContextMenuEvent *event)
         menu.addAction(QIcon(":/icons/icons/ungroup.svg"), tr("Ungroup"), this,
                        &QAtGraphicsView::ungroupRequested)
             ->setToolTip(tr("Ungroup selected items"));
+
+    if (!filtered.isEmpty() && m_pCanvas) {
+        menu.addSeparator();
+        menu.addAction(tr("Fit Canvas to Selection"), this,
+                       &QAtGraphicsView::fitCanvasToItemsRequested)
+            ->setToolTip(tr("Resize the canvas to fit the selected items"));
+    }
 
     menu.exec(event->globalPos());
 }

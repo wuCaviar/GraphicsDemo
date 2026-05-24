@@ -12,13 +12,13 @@ static const QString RIP_EXE_PATH = QStringLiteral("");
 static const QString ConfigPath =
     QStringLiteral("/Volumes/Caviar/Test/GraphicsDemo/Bin/ripconfig.xml");
 
-#define RIP_PROGRESS_MAX 100
+#    define RIP_PROGRESS_MAX 100
 
 #elif defined(Q_OS_WIN)
 
 #    if defined(USE_NEW_RIP)
 static const QString RIP_EXE_PATH =
-    QStringLiteral("D:/WorkSpace/Caviar/FileRip/FileRIP0521.exe");
+    QStringLiteral("D:/WorkSpace/Caviar/FileRip/FileRIP0523.exe");
 #        define RIP_PROGRESS_MAX 10000
 #    else
 static const QString RIP_EXE_PATH =

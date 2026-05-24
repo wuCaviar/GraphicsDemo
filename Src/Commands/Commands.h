@@ -266,4 +266,24 @@ private:
     bool m_owned = false;
 };
 
+// ============================================================
+// 画布尺寸变更
+// ============================================================
+class CanvasResizeCommand : public QUndoCommand
+{
+public:
+    CanvasResizeCommand(class CanvasItem *canvas, const QSizeF &oldSize, const QSizeF &newSize,
+                        QGraphicsScene *scene = nullptr,
+                        QUndoCommand *parent = nullptr);
+
+    void undo() override;
+    void redo() override;
+
+private:
+    CanvasItem *m_canvas;
+    QSizeF m_oldSize;
+    QSizeF m_newSize;
+    QPointer<QGraphicsScene> m_scene;
+};
+
 #endif // COMMANDS_H

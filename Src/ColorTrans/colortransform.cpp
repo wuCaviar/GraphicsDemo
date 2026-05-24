@@ -80,23 +80,25 @@ bool QATColorManager::loadProfiles()
     QString path = "/Volumes/Caviar/Test/GraphicsDemo/Bin";
 #endif
 
-    m_srgb = cmsOpenProfileFromFile(QString("%1%2")
-                                        .arg(path)
-                                        .arg("/../ICC Profile/RGB/SRGB IEC61966-2.1.icc")
-                                        .toStdString()
-                                        .c_str(),
-                                    "r");
+    m_srgb = cmsOpenProfileFromFile(
+        QString("%1%2")
+            .arg(path)
+            .arg("/../ICC Profile/RGB/SRGB IEC61966-2.1.icc")
+            .toStdString()
+            .c_str(),
+        "r");
     if (!m_srgb) {
         m_ok = false;
         return false;
     }
 
-    m_cmyk = cmsOpenProfileFromFile(QString("%1%2")
-                                        .arg(path)
-                                        .arg("/../ICC Profile/CMYK/JapanColor2001Coated.icc")
-                                        .toStdString()
-                                        .c_str(),
-                                    "r");
+    m_cmyk = cmsOpenProfileFromFile(
+        QString("%1%2")
+            .arg(path)
+            .arg("/../ICC Profile/CMYK/JapanColor2001Coated.icc")
+            .toStdString()
+            .c_str(),
+        "r");
     if (!m_cmyk) {
         cmsCloseProfile(m_srgb);
         m_srgb = nullptr;
@@ -114,34 +116,31 @@ bool QATColorManager::loadProfiles()
 // ================================================================
 
 QATColorManager::Cmyk QATColorManager::toCmyk(const QColor &rgb,
-                                               cmsUInt32Number intent,
-                                               cmsUInt32Number flags) const
+                                              cmsUInt32Number intent,
+                                              cmsUInt32Number flags) const
 {
     Q_ASSERT(m_ok);
     uchar src[3];
     double dst[4];
     qcolorToRGB(rgb, src);
 
-    cmsHTRANSFORM xform = cmsCreateTransform(m_srgb, TYPE_RGB_8,
-                                             m_cmyk, TYPE_CMYK_DBL,
-                                             intent, flags);
+    cmsHTRANSFORM xform = cmsCreateTransform(m_srgb, TYPE_RGB_8, m_cmyk,
+                                             TYPE_CMYK_DBL, intent, flags);
     cmsDoTransform(xform, src, dst, 1);
     cmsDeleteTransform(xform);
 
-    return {dst[0], dst[1], dst[2], dst[3]};
+    return { dst[0], dst[1], dst[2], dst[3] };
 }
 
-QColor QATColorManager::toRgb(const Cmyk &cmyk,
-                              cmsUInt32Number intent,
+QColor QATColorManager::toRgb(const Cmyk &cmyk, cmsUInt32Number intent,
                               cmsUInt32Number flags) const
 {
     Q_ASSERT(m_ok);
-    double src[4] = {cmyk.c, cmyk.m, cmyk.y, cmyk.k};
+    double src[4] = { cmyk.c, cmyk.m, cmyk.y, cmyk.k };
     uchar dst[3];
 
-    cmsHTRANSFORM xform = cmsCreateTransform(m_cmyk, TYPE_CMYK_DBL,
-                                             m_srgb, TYPE_RGB_8,
-                                             intent, flags);
+    cmsHTRANSFORM xform = cmsCreateTransform(m_cmyk, TYPE_CMYK_DBL, m_srgb,
+                                             TYPE_RGB_8, intent, flags);
     cmsDoTransform(xform, src, dst, 1);
     cmsDeleteTransform(xform);
 
@@ -153,17 +152,19 @@ QColor QATColorManager::toRgb(const Cmyk &cmyk,
 // ================================================================
 
 cmsHTRANSFORM QATColorManager::createBgraToCmyk8(cmsUInt32Number intent,
-                                                  cmsUInt32Number flags) const
+                                                 cmsUInt32Number flags) const
 {
     Q_ASSERT(m_ok);
-    return cmsCreateTransform(m_srgb, TYPE_BGRA_8, m_cmyk, TYPE_CMYK_8, intent, flags);
+    return cmsCreateTransform(m_srgb, TYPE_BGRA_8, m_cmyk, TYPE_CMYK_8, intent,
+                              flags);
 }
 
 cmsHTRANSFORM QATColorManager::createCmyk8ToBgra(cmsUInt32Number intent,
-                                                  cmsUInt32Number flags) const
+                                                 cmsUInt32Number flags) const
 {
     Q_ASSERT(m_ok);
-    return cmsCreateTransform(m_cmyk, TYPE_CMYK_8, m_srgb, TYPE_BGRA_8, intent, flags);
+    return cmsCreateTransform(m_cmyk, TYPE_CMYK_8, m_srgb, TYPE_BGRA_8, intent,
+                              flags);
 }
 
 // ================================================================
@@ -172,8 +173,7 @@ cmsHTRANSFORM QATColorManager::createCmyk8ToBgra(cmsUInt32Number intent,
 
 void QATColorManager::convertBgra8ToCmyk8(cmsHTRANSFORM xform,
                                           const unsigned char *src,
-                                          unsigned char *dst,
-                                          int pixelCount)
+                                          unsigned char *dst, int pixelCount)
 {
     Q_ASSERT(xform);
     cmsDoTransform(xform, src, dst, pixelCount);
@@ -181,8 +181,7 @@ void QATColorManager::convertBgra8ToCmyk8(cmsHTRANSFORM xform,
 
 void QATColorManager::convertCmyk8ToBgra8(cmsHTRANSFORM xform,
                                           const unsigned char *src,
-                                          unsigned char *dst,
-                                          int pixelCount)
+                                          unsigned char *dst, int pixelCount)
 {
     Q_ASSERT(xform);
     cmsDoTransform(xform, src, dst, pixelCount);
@@ -190,9 +189,8 @@ void QATColorManager::convertCmyk8ToBgra8(cmsHTRANSFORM xform,
 
 void QATColorManager::convertBgra8ToCmyk8(cmsHTRANSFORM xform,
                                           const unsigned char *src,
-                                          unsigned char *dst,
-                                          int width, int height,
-                                          int singleShotThreshold)
+                                          unsigned char *dst, int width,
+                                          int height, int singleShotThreshold)
 {
     Q_ASSERT(xform);
     const int totalPixels = width * height;
@@ -202,9 +200,7 @@ void QATColorManager::convertBgra8ToCmyk8(cmsHTRANSFORM xform,
         cmsDoTransform(xform, src, dst, totalPixels);
     } else {
         for (int y = 0; y < height; ++y) {
-            cmsDoTransform(xform,
-                           src + y * rowBytes,
-                           dst + y * rowBytes,
+            cmsDoTransform(xform, src + y * rowBytes, dst + y * rowBytes,
                            width);
         }
     }
@@ -212,9 +208,8 @@ void QATColorManager::convertBgra8ToCmyk8(cmsHTRANSFORM xform,
 
 void QATColorManager::convertCmyk8ToBgra8(cmsHTRANSFORM xform,
                                           const unsigned char *src,
-                                          unsigned char *dst,
-                                          int width, int height,
-                                          int singleShotThreshold)
+                                          unsigned char *dst, int width,
+                                          int height, int singleShotThreshold)
 {
     Q_ASSERT(xform);
     const int totalPixels = width * height;
@@ -224,9 +219,7 @@ void QATColorManager::convertCmyk8ToBgra8(cmsHTRANSFORM xform,
         cmsDoTransform(xform, src, dst, totalPixels);
     } else {
         for (int y = 0; y < height; ++y) {
-            cmsDoTransform(xform,
-                           src + y * rowBytes,
-                           dst + y * rowBytes,
+            cmsDoTransform(xform, src + y * rowBytes, dst + y * rowBytes,
                            width);
         }
     }
@@ -249,9 +242,12 @@ void QATColorManager::cleanup()
     m_ok = false;
 }
 
-void QATColorManager::errorLogger(cmsContext context, cmsUInt32Number code, const char *error)
+void QATColorManager::errorLogger(cmsContext context, cmsUInt32Number code,
+                                  const char *error)
 {
-    fprintf(stderr, "[LCMS Error] Code: %u, Message: %s\n", (unsigned)code, error);
+    fprintf(stderr, "[LCMS Error] Code: %u, Message: %s\n", (unsigned)code,
+            error);
 
-    m_err = QString("[LCMS Error] Code: %1, Message: %2\n").arg(code).arg(error);
+    m_err =
+        QString("[LCMS Error] Code: %1, Message: %2\n").arg(code).arg(error);
 }

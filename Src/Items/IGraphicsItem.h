@@ -57,8 +57,6 @@ public:
     virtual void setItemFont(const QFont &) {}
 
     // 图像属性
-    virtual QImage itemImage() const { return {}; }
-    virtual void setItemImage(const QImage &) {}
     virtual QString filePath() const { return {}; }
     virtual void setFilePath(const QString &) {}
 
@@ -72,6 +70,9 @@ public:
     virtual bool hasBrushCmyk() const { return false; }
     virtual void brushCmyk(double &c, double &m, double &y, double &k) const { c = m = y = k = 0; }
     virtual void clearBrushCmyk() {}
+
+    // 是否允许缩放手柄调整大小
+    virtual bool isResizable() const { return true; }
 
     // 精确几何矩形（不含画笔边距），用于对齐/分布等精确计算
     // 默认实现返回空 QRectF 并报告不支持；子类应按需重写

@@ -1,4 +1,5 @@
 #include "Commands.h"
+#include "CanvasItem.h"
 #include "RectItem.h"
 #include "GraphicsItemGroup.h"
 
@@ -598,4 +599,35 @@ void UngroupItemsCommand::redo()
     m_scene->removeItem(m_group);
 
     m_owned = true; // command 持有组（子图元在场景中）
+}
+
+// ============================================================
+// CanvasResizeCommand
+// ============================================================
+CanvasResizeCommand::CanvasResizeCommand(CanvasItem *canvas, const QSizeF &oldSize,
+                                         const QSizeF &newSize, QGraphicsScene *scene,
+                                         QUndoCommand *parent)
+    : QUndoCommand(parent), m_canvas(canvas), m_oldSize(oldSize), m_newSize(newSize), m_scene(scene)
+{
+    setText(QObject::tr("Fit Canvas"));
+}
+
+void CanvasResizeCommand::undo()
+{
+    if (m_canvas) {
+        m_canvas->setCanvasSize(m_oldSize);
+        if (m_scene)
+            m_scene->setSceneRect(-500, -500, m_oldSize.width() + 1000,
+                                  m_oldSize.height() + 1000);
+    }
+}
+
+void CanvasResizeCommand::redo()
+{
+    if (m_canvas) {
+        m_canvas->setCanvasSize(m_newSize);
+        if (m_scene)
+            m_scene->setSceneRect(-500, -500, m_newSize.width() + 1000,
+                                  m_newSize.height() + 1000);
+    }
 }

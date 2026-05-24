@@ -68,6 +68,7 @@ signals:
     void sendToBackRequested();
     void groupRequested();
     void ungroupRequested();
+    void fitCanvasToItemsRequested();
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;

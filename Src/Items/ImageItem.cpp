@@ -20,6 +20,7 @@ QGraphicsItem *ImageItem::cloneItem() const
 {
     auto *item = new ImageItem(pixmap());
     item->setItemPen(m_pen);
+    item->setItemPenCmyk(m_penCmyk.c, m_penCmyk.m, m_penCmyk.y, m_penCmyk.k);
     item->setPos(pos());
     item->setRotation(rotation());
     item->setTransform(transform());
@@ -27,23 +28,11 @@ QGraphicsItem *ImageItem::cloneItem() const
     if (m_rect.isValid())
         item->setRect(m_rect);
     item->setFilePath(m_filePath);
-    item->setRawTiffData(m_rawTiffMat);
-    if (m_isCmykSource)
-        item->setCmykSourceData(m_rawCmykMat);
+    item->setCmykSource(m_isCmykSource);
+    item->setMultiPageSource(m_isMultiPage);
+    item->setOriginalSize(m_originalSize);
+    item->setDpi(m_dpiX, m_dpiY);
     return item;
-}
-
-QImage ImageItem::itemImage() const { return pixmap().toImage(); }
-
-void ImageItem::setItemImage(const QImage &img)
-{
-    prepareGeometryChange();
-    setPixmap(QPixmap::fromImage(img));
-    if (!img.isNull())
-        m_rect = QRectF(QPointF(0, 0), img.size());
-    else
-        m_rect = QRectF();
-    update();
 }
 
 QRectF ImageItem::rect() const
@@ -77,60 +66,27 @@ void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
     }
 }
 
-static void writePixelBuffer(QDataStream &out, const ImageUtils::RawPixelBuffer &buf)
-{
-    out << buf.width << buf.height << buf.data;
-}
-
-static ImageUtils::RawPixelBuffer readPixelBuffer(QDataStream &in)
-{
-    ImageUtils::RawPixelBuffer buf;
-    in >> buf.width >> buf.height >> buf.data;
-    if (buf.width <= 0 || buf.height <= 0 || buf.data.isEmpty()) {
-        buf.width = 0;
-        buf.height = 0;
-        buf.data.clear();
-    }
-    return buf;
-}
 
 void ImageItem::serialize(QDataStream &out) const
 {
-    QImage img = pixmap().toImage();
-    out << img << m_pen << pos() << rotation() << m_filePath;
-    writePixelBuffer(out, m_rawTiffMat);
-    out << m_rect << m_originalSize << m_dpiX << m_dpiY;
-    out << m_isCmykSource;
-    if (m_isCmykSource)
-        writePixelBuffer(out, m_rawCmykMat);
+    out << pixmap() << m_pen << pos() << rotation() << m_filePath;
+    out << m_rect << m_originalSize << m_dpiX << m_dpiY << m_isCmykSource
+        << m_isMultiPage;
 }
 
 bool ImageItem::deserialize(QDataStream &in)
 {
-    QImage img;
+    QPixmap pix;
     qreal rot;
     QPointF pos_;
-    in >> img >> m_pen >> pos_ >> rot >> m_filePath;
-    m_rawTiffMat = readPixelBuffer(in);
-    in >> m_rect >> m_originalSize >> m_dpiX >> m_dpiY;
+    in >> pix >> m_pen >> pos_ >> rot >> m_filePath;
+    in >> m_rect >> m_originalSize >> m_dpiX >> m_dpiY >> m_isCmykSource
+       >> m_isMultiPage;
     if (in.status() != QDataStream::Ok)
         return false;
 
-    m_isCmykSource = false;
-    if (!in.atEnd()) {
-        in >> m_isCmykSource;
-        if (m_isCmykSource)
-            m_rawCmykMat = readPixelBuffer(in);
-    }
-
-    setPixmap(QPixmap::fromImage(img));
+    setPixmap(pix);
     setPos(pos_);
     setRotation(rot);
     return true;
-}
-
-void ImageItem::setCmykSourceData(const ImageUtils::RawPixelBuffer &data)
-{
-    m_rawCmykMat = data;
-    m_isCmykSource = true;
 }

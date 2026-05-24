@@ -6,4 +6,5 @@ SUBDIRS += \
     LittleCMSTest \
     TiffMerge \
     TiffReader \
+    TiffValidator \
     WidgetTest

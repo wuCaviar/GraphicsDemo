@@ -129,6 +129,15 @@ void ResizeHandleItem::updateHandlePositions()
     if (m_selectionPolygon.size() < 4)
         return;
 
+    // 单目标且不可缩放时，只显示选中框，不绘制缩放手柄
+    if (!isGroupMode() && m_target) {
+        auto *igi = dynamic_cast<IGraphicsItem *>(m_target);
+        if (igi && !igi->isResizable()) {
+            update();
+            return;
+        }
+    }
+
     const QPointF &tl = m_selectionPolygon[0];
     const QPointF &tr = m_selectionPolygon[1];
     const QPointF &br = m_selectionPolygon[2];
@@ -365,6 +374,10 @@ void ResizeHandleItem::applyResize(HandleRole role, const QPointF &scenePos)
     if (!m_target)
         return;
 
+    auto *igi = dynamic_cast<IGraphicsItem *>(m_target);
+    if (igi && !igi->isResizable())
+        return;
+
     QPointF localPress = m_target->mapFromScene(m_pressPos);
     QPointF localCurrent = m_target->mapFromScene(scenePos);
     QPointF delta = localCurrent - localPress;
@@ -401,7 +414,6 @@ void ResizeHandleItem::applyResize(HandleRole role, const QPointF &scenePos)
 
     QRectF newRect(left, top, right - left, bottom - top);
 
-    auto *igi = dynamic_cast<IGraphicsItem *>(m_target);
     if (igi && igi->supportsSetGeometryRect()) {
         setItemGeometry(m_target, newRect);
     } else {

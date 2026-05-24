@@ -11,7 +11,7 @@ public:
 public:
     virtual QString name() const override;
     // 工作线程中调用，对加载完成的 ImportResult 做后处理（色彩校正、元数据提取等）
-    virtual void process(ImageUtils::ImportResult &result) override;
+    // virtual void process(ImageUtils::ImportResult &result) override;
 
 };
 

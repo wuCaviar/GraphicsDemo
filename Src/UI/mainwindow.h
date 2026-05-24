@@ -60,6 +60,7 @@ private slots:
     void onGroup();
     void onUngroup();
     void onAlignLayoutDialog();
+    void onFitCanvasToItems();
     void onSettings();
     void onAbout();
     void onAlignLeft();
@@ -130,7 +131,10 @@ private:
 
     NetWorkUtils *m_pNetWorkUtils = nullptr;
 
-    ImageUtils::ImageImportPipeline m_importPipeline;
+    bool m_exporting = false; // 防止重复导出
+
+    ImageUtils::ImageImportPipeline m_importSinglePipeline; // 单图导入处理管线
+    ImageUtils::ImageImportPipeline m_importMultiPipeline;  // 批量导入处理管线
     ImageUtils::ImageExportPipeline m_exportPipeline;
 
     QAction *m_undoAction = nullptr;

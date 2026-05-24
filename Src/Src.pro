@@ -19,6 +19,7 @@ QMAKE_CXXFLAGS += -Wall
 
 HEADERS += \
     App/SingleInstance.h \
+    UI/FitCanvasDlg.h \
     UI/MergeTiffProcessor.h \
     UI/mainwindow.h \
     UI/qatgraphicsview.h \
@@ -60,6 +61,7 @@ HEADERS += \
 SOURCES += \
     App/SingleInstance.cpp \
     App/main.cpp \
+    UI/FitCanvasDlg.cpp \
     UI/MergeTiffProcessor.cpp \
     UI/mainwindow.cpp \
     UI/qatgraphicsview.cpp \
@@ -95,6 +97,7 @@ SOURCES += \
     Tiff/tifffile.cpp \
 
 FORMS += \
+    UI/FitCanvasDlg.ui \
     UI/mainwindow.ui \
 
 RESOURCES += \
