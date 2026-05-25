@@ -1,4 +1,5 @@
 #include "colortransform.h"
+#include "AppConfig.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -74,31 +75,17 @@ QString QATColorManager::errorString() const
 
 bool QATColorManager::loadProfiles()
 {
-#if defined(Q_OS_WIN)
-    QString path = QCoreApplication::applicationDirPath();
-#elif defined(Q_OS_MACOS)
-    QString path = "/Volumes/Caviar/Test/GraphicsDemo/Bin";
-#endif
+    AppConfig &cfg = AppConfig::instance();
 
     m_srgb = cmsOpenProfileFromFile(
-        QString("%1%2")
-            .arg(path)
-            .arg("/../ICC Profile/RGB/SRGB IEC61966-2.1.icc")
-            .toStdString()
-            .c_str(),
-        "r");
+        cfg.srgbIccPath().toStdString().c_str(), "r");
     if (!m_srgb) {
         m_ok = false;
         return false;
     }
 
     m_cmyk = cmsOpenProfileFromFile(
-        QString("%1%2")
-            .arg(path)
-            .arg("/../ICC Profile/CMYK/JapanColor2001Coated.icc")
-            .toStdString()
-            .c_str(),
-        "r");
+        cfg.cmykIccPath().toStdString().c_str(), "r");
     if (!m_cmyk) {
         cmsCloseProfile(m_srgb);
         m_srgb = nullptr;

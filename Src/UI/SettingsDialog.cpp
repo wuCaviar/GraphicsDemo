@@ -12,7 +12,7 @@
 #include <QPushButton>
 #include <QSpinBox>
 #include <QVBoxLayout>
-#include "../Utils/NetWorkDefs.h"
+#include "AppConfig.h"
 
 /*
     网点曲线  *.p  icc
@@ -153,7 +153,7 @@ void SettingsDialog::setOutputPath(const QString &path)
 
 void SettingsDialog::loadConfig()
 {
-    QFile file(ConfigPath);
+    QFile file(AppConfig::instance().ripConfigPath());
     if (!file.open(QIODevice::ReadOnly))
         return;
 
@@ -188,11 +188,18 @@ void SettingsDialog::loadConfig()
     QDomElement outEl = root.firstChildElement(QLatin1String("OutInfo"));
     if (!outEl.isNull())
         m_outputPathEdit->setText(outEl.attribute(QLatin1String("OutPath")));
+
+    // 同步到 AppConfig
+    AppConfig &cfg = AppConfig::instance();
+    cfg.setRipResolutionX(m_resolutionXSpin->value());
+    cfg.setRipResolutionY(m_resolutionYSpin->value());
+    cfg.setDotCurveIccPath(m_dotCurveEdit->text());
+    cfg.setProofIccPath(m_colorCurveEdit->text());
 }
 
 void SettingsDialog::saveConfig()
 {
-    QFile file(ConfigPath);
+    QFile file(AppConfig::instance().ripConfigPath());
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
         return;
 
@@ -223,4 +230,11 @@ void SettingsDialog::saveConfig()
     QTextStream ts(&file);
     doc.save(ts, 4);
     file.close();
+
+    // 同步到 AppConfig
+    AppConfig &cfg = AppConfig::instance();
+    cfg.setRipResolutionX(m_resolutionXSpin->value());
+    cfg.setRipResolutionY(m_resolutionYSpin->value());
+    cfg.setDotCurveIccPath(m_dotCurveEdit->text());
+    cfg.setProofIccPath(m_colorCurveEdit->text());
 }

@@ -57,15 +57,11 @@ QRectF ImageItem::geometryRect() const
     return boundingRect();
 }
 
-void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
+                      QWidget *widget)
 {
-    if (m_rect.isValid() && !pixmap().isNull()) {
-        painter->drawPixmap(m_rect, pixmap(), QRectF(pixmap().rect()));
-    } else {
-        QGraphicsPixmapItem::paint(painter, option, widget);
-    }
+    QGraphicsPixmapItem::paint(painter, option, widget);
 }
-
 
 void ImageItem::serialize(QDataStream &out) const
 {
@@ -81,7 +77,7 @@ bool ImageItem::deserialize(QDataStream &in)
     QPointF pos_;
     in >> pix >> m_pen >> pos_ >> rot >> m_filePath;
     in >> m_rect >> m_originalSize >> m_dpiX >> m_dpiY >> m_isCmykSource
-       >> m_isMultiPage;
+        >> m_isMultiPage;
     if (in.status() != QDataStream::Ok)
         return false;
 

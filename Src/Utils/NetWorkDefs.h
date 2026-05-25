@@ -3,32 +3,18 @@
 
 #include <QtGlobal>
 #include <QString>
+#include <QCoreApplication>
 
 #define USE_NEW_RIP
 
 #if defined(Q_OS_MACOS)
-static const QString RIP_EXE_PATH = QStringLiteral("");
-
-static const QString ConfigPath =
-    QStringLiteral("/Volumes/Caviar/Test/GraphicsDemo/Bin/ripconfig.xml");
-
 #    define RIP_PROGRESS_MAX 100
-
 #elif defined(Q_OS_WIN)
-
 #    if defined(USE_NEW_RIP)
-static const QString RIP_EXE_PATH =
-    QStringLiteral("D:/WorkSpace/Caviar/FileRip/FileRIP0523.exe");
 #        define RIP_PROGRESS_MAX 10000
 #    else
-static const QString RIP_EXE_PATH =
-    QStringLiteral("D:/WorkSpace/Caviar/FileRip/FileRIP.exe");
 #        define RIP_PROGRESS_MAX 100
 #    endif
-
-static const QString ConfigPath =
-    QStringLiteral("D:/WorkSpace/Caviar/FileRip/ripconfig.xml");
-
 #endif
 
 #define NETWORK_ROOT "http://127.0.0.1:9201"

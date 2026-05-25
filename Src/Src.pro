@@ -19,6 +19,7 @@ QMAKE_CXXFLAGS += -Wall
 
 HEADERS += \
     App/SingleInstance.h \
+    App/AppConfig.h \
     UI/FitCanvasDlg.h \
     UI/MergeTiffProcessor.h \
     UI/mainwindow.h \
@@ -55,11 +56,13 @@ HEADERS += \
     QCommonDefs.h \
     Utils/NetWorkDefs.h \
     Utils/NetWorkUtils.h \
+    Utils/ProjectFile.h \
     Tiff/tifffile.h \
     version.h \
 
 SOURCES += \
     App/SingleInstance.cpp \
+    App/AppConfig.cpp \
     App/main.cpp \
     UI/FitCanvasDlg.cpp \
     UI/MergeTiffProcessor.cpp \
@@ -94,6 +97,7 @@ SOURCES += \
     NetWork/QHttp.cpp \
     Action/QATActionBase.cpp \
     Utils/NetWorkUtils.cpp \
+    Utils/ProjectFile.cpp \
     Tiff/tifffile.cpp \
 
 FORMS += \

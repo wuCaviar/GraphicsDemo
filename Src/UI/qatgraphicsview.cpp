@@ -38,7 +38,7 @@
 QAtGraphicsView::QAtGraphicsView(QWidget *parent) : QGraphicsView(parent)
 {
     m_scene = new GraphicsScene(this);
-    m_scene->setBackgroundBrush(QColor(255, 255, 255));
+    m_scene->setBackgroundBrush(QColor(171, 171, 171));
     setScene(m_scene);
     setDragMode(RubberBandDrag);
     setRenderHint(QPainter::Antialiasing);

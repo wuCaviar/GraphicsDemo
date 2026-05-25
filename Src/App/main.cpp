@@ -1,10 +1,12 @@
 #include <QApplication>
 #include <QTranslator>
 #include <QLocale>
+#include <QSettings>
 #include <QTimer>
 
 #include "mainwindow.h"
 #include "SingleInstance.h"
+#include "AppConfig.h"
 
 int main(int argc, char *argv[])
 {
@@ -21,6 +23,9 @@ int main(int argc, char *argv[])
             break;
         }
     }
+
+    // 加载全局配置
+    AppConfig::instance().loadConfig();
 
     QString name = "com.athc.darwingtools";
     SingleInstance instance;

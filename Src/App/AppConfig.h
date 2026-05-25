@@ -1,0 +1,62 @@
+#ifndef APPCONFIG_H
+#define APPCONFIG_H
+
+#include <QString>
+
+class AppConfig
+{
+public:
+    static AppConfig &instance();
+
+    // 从 config.xml 加载配置，加载失败保留默认值
+    void loadConfig();
+
+    // -- RIP 可执行文件路径 (config.xml: /Config/Rip/ExePath) --
+    QString ripExePath() const { return m_ripExePath; }
+    void setRipExePath(const QString &path) { m_ripExePath = path; }
+
+    // -- RIP 配置文件路径 (config.xml: /Config/Rip/ConfigPath) --
+    QString ripConfigPath() const { return m_ripConfigPath; }
+    void setRipConfigPath(const QString &path) { m_ripConfigPath = path; }
+
+    // -- ICC Profile 基础目录 --
+    // Windows: applicationDirPath()
+    // macOS:   /Volumes/Caviar/Test/GraphicsDemo/Bin
+    QString iccProfileBasePath() const;
+
+    // -- 具体 ICC 文件路径 --
+    QString srgbIccPath() const;
+    QString cmykIccPath() const;
+
+    // -- RIP 配置中的 ICC (从 ripconfig.xml 读取，SettingsDialog 维护) --
+    QString dotCurveIccPath() const { return m_dotCurveIccPath; }
+    void setDotCurveIccPath(const QString &path) { m_dotCurveIccPath = path; }
+
+    QString proofIccPath() const { return m_proofIccPath; }
+    void setProofIccPath(const QString &path) { m_proofIccPath = path; }
+
+    // -- RIP 分辨率 (从 ripconfig.xml 读取) --
+    int ripResolutionX() const { return m_ripResolutionX; }
+    void setRipResolutionX(int x) { m_ripResolutionX = x; }
+    int ripResolutionY() const { return m_ripResolutionY; }
+    void setRipResolutionY(int y) { m_ripResolutionY = y; }
+
+    // -- 网络服务根地址 --
+    QString networkRoot() const { return m_networkRoot; }
+    void setNetworkRoot(const QString &url) { m_networkRoot = url; }
+
+private:
+    AppConfig() = default;
+    ~AppConfig() = default;
+    Q_DISABLE_COPY(AppConfig)
+
+    QString m_ripExePath;
+    QString m_ripConfigPath;
+    QString m_dotCurveIccPath;
+    QString m_proofIccPath;
+    int m_ripResolutionX = 300;
+    int m_ripResolutionY = 300;
+    QString m_networkRoot = QStringLiteral("http://127.0.0.1:9201");
+};
+
+#endif // APPCONFIG_H

@@ -5,8 +5,11 @@
 #include <QList>
 #include <QPixmap>
 #include <QStringList>
+#include <functional>
 #include <memory>
 #include <vector>
+
+#include <tiff.h>
 
 namespace ImageUtils {
 
@@ -70,21 +73,24 @@ struct ExportWorkerResult
     bool success = false;
 };
 
+// ========== 进度回调（线程安全） ==========
+
+using ProgressCallback = std::function<void(int)>;
+
 // ========== 线程池入口函数（线程安全） ==========
 
 ImportWorkerResult runImportWorker(const QString &filePath);
 
-// 从源 TIFF 直接复制数据到输出 TIFF，保留原始像素和所有 tag
-ExportWorkerResult exportFromSourceTiff(const QString &sourcePath,
-                                        const QString &outputPath);
+// ========== TIFF 导出设置 ==========
 
-// 场景渲染导出（非 TIFF 源或混合场景）
-ExportWorkerResult exportFromScene(const QString &outputPath,
-                                   QImage image,
-                                   const QRectF &exportRect,
-                                   int dpi);
+struct TiffExportSettings
+{
+    int dpi = 300;
+    uint16_t compression = COMPRESSION_NONE; // libtiff compression constant
+    QString iccProfilePath;                   // empty = use built-in default
+};
 
-// ========== 多源 TIFF 并行导出 ==========
+// ========== 源 TIFF 输入描述 ==========
 
 struct SourceTiffInput
 {
@@ -93,12 +99,28 @@ struct SourceTiffInput
     int zOrder = 0;
 };
 
-// 并行读取多个源 TIFF 的原始 CMYK 数据，按 z-order 合成为一张输出 TIFF
-ExportWorkerResult exportFromMultipleSourceTiffs(
-    const QString &outputPath,
-    const QList<SourceTiffInput> &sources,
-    const QSize &outputSize,
-    int dpi);
+// ========== 预渲染 CMYK 图层 ==========
+
+struct CmykOverlay
+{
+    std::vector<uint8_t> data; // CMYK 像素 (width * height * 4)
+    uint32_t width = 0;
+    uint32_t height = 0;
+    QRectF outputRect; // 在输出图像中的像素坐标
+    int zOrder = 0;
+};
+
+// ========== 统一 TIFF 导出 ==========
+
+// 并行读取所有源 TIFF 的像素数据（自动处理不同色域和压缩方式，统一转换为 CMYK），
+// 按 z-order 合成为一张输出 TIFF。所有 tag 值来自 TiffExportSettings，不从源 TIFF 复制。
+// overlays: 预先渲染好的 CMYK 图层（如矢量图元），与 TIFF 源一起按 z-order 合成。
+ExportWorkerResult exportTiff(const QString &outputPath,
+                              const QList<SourceTiffInput> &sources,
+                              const QList<CmykOverlay> &overlays,
+                              const QSize &outputSize,
+                              const TiffExportSettings &settings,
+                              ProgressCallback progress = nullptr);
 
 } // namespace ImageUtils
 
