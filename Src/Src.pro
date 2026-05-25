@@ -3,7 +3,7 @@ TEMPLATE = app
 
 QT += core gui widgets network xml concurrent
 
-TARGET = GraphicsDemo
+TARGET = ATGraphics
 
 DEFINES += QTCOLORWIDGETS_STATICALLY_LINKED
 
