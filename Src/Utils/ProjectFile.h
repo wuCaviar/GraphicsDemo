@@ -3,10 +3,38 @@
 
 #include "IGraphicsItem.h"
 
+#include <QByteArray>
 #include <QDomDocument>
 #include <QGraphicsItem>
-#include <QString>
 #include <QList>
+#include <QString>
+
+// ---- 并发序列化/反序列化的数据结构 ----
+
+struct SerializedItem {
+    int itemType = 0;
+    double zValue = 0;
+    double posX = 0;
+    double posY = 0;
+    double rotation = 0;
+    QByteArray base64Data; // QDataStream 序列化后 Base64 编码
+};
+
+struct DeserialTask {
+    QByteArray base64Data;
+    int itemType = 0;
+    double zValue = 0;
+    double posX = 0;
+    double posY = 0;
+    double rotation = 0;
+};
+
+// ---- 线程安全的 Worker 函数（供 QtConcurrent::mapped 使用） ----
+
+SerializedItem serializeItemWorker(QGraphicsItem *item);
+IGraphicsItem *deserializeItemWorker(const DeserialTask &task);
+
+// ---- 工程文件类 ----
 
 class ProjectFile
 {
@@ -24,10 +52,20 @@ public:
         double dpi = 96.0;
     };
 
+    // 从已序列化的 item 列表组装并保存 XML（在主线程调用）
+    bool saveFromSerialized(const QString &filePath, const ProjectInfo &info,
+                            const CanvasInfo &canvas,
+                            const QList<SerializedItem> &items);
+
+    // 解析 XML 文件，提取 DeserialTask 列表供并行反序列化
+    bool parseForDeserialize(const QString &filePath, ProjectInfo &info,
+                             CanvasInfo &canvas,
+                             QList<DeserialTask> &tasks);
+
+    // 同步版本的 save/load（内部串行，不推荐大数据量使用）
     bool save(const QString &filePath, const ProjectInfo &info,
               const CanvasInfo &canvas, const QList<QGraphicsItem *> &items);
 
-    // 返回新创建的图元列表（调用者负责管理生命周期）
     bool load(const QString &filePath, ProjectInfo &info, CanvasInfo &canvas,
               QList<QGraphicsItem *> &items);
 
@@ -36,9 +74,6 @@ public:
 private:
     QByteArray encrypt(const QByteArray &data, const QByteArray &key);
     QByteArray decrypt(const QByteArray &data, const QByteArray &key);
-
-    QDomElement serializeItem(QDomDocument &doc, QGraphicsItem *item, int id);
-    IGraphicsItem *deserializeItem(const QDomElement &el);
 
     QString m_lastError;
 };

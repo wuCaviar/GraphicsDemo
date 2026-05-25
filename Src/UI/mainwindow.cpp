@@ -901,14 +901,37 @@ void MainWindow::onOpenProject()
         if (btn == QMessageBox::Cancel)
             return;
         if (btn == QMessageBox::Yes) {
-            // 临时清空路径以检测用户是否在保存对话框中取消
-            QString previousPath = m_currentProjectPath;
-            m_currentProjectPath.clear();
-            onSaveProject();
-            if (m_currentProjectPath.isEmpty()) {
-                m_currentProjectPath = previousPath; // 恢复旧路径
-                return; // 用户取消了保存对话框
+            // 同步保存（保存完成后才继续打开流程）
+            CanvasItem *canvas = m_pView->canvasItem();
+            if (!canvas)
+                return;
+
+            QString savePath = QFileDialog::getSaveFileName(
+                this, tr("Save Project"), QString(),
+                tr("AT Project Files (*.atp);;All Files (*)"));
+            if (savePath.isEmpty())
+                return; // 用户取消保存 → 中止打开
+
+            if (!savePath.endsWith(QLatin1String(".atp"), Qt::CaseInsensitive))
+                savePath.append(QLatin1String(".atp"));
+
+            ProjectFile::ProjectInfo saveInfo;
+            saveInfo.name = QFileInfo(savePath).completeBaseName();
+            saveInfo.version = QStringLiteral("1.0.0");
+            saveInfo.author = QStringLiteral("Caviar");
+
+            ProjectFile::CanvasInfo saveCanvas;
+            saveCanvas.width = canvas->canvasSize().width();
+            saveCanvas.height = canvas->canvasSize().height();
+            saveCanvas.dpi = canvas->ppi();
+
+            ProjectFile pf;
+            if (!pf.save(savePath, saveInfo, saveCanvas, existingItems)) {
+                QMessageBox::warning(this, tr("Save Project"),
+                                     tr("Failed to save:\n%1").arg(pf.lastError()));
+                return;
             }
+            m_currentProjectPath = savePath;
         }
     }
 
@@ -918,43 +941,95 @@ void MainWindow::onOpenProject()
     if (path.isEmpty())
         return;
 
+    // ---- 阶段 1：主线程解析 XML（快速） ----
     ProjectFile pf;
     ProjectFile::ProjectInfo info;
     ProjectFile::CanvasInfo canvasInfo;
-    QList<QGraphicsItem *> loadedItems;
+    QList<DeserialTask> tasks;
 
-    if (!pf.load(path, info, canvasInfo, loadedItems)) {
+    if (!pf.parseForDeserialize(path, info, canvasInfo, tasks)) {
         QMessageBox::warning(this, tr("Open Project"),
                              tr("Failed to open project:\n%1").arg(pf.lastError()));
         return;
     }
 
-    // 清空当前画布
-    m_undoStack->clear();
-    m_pPropertyPanel->setItem(nullptr);
-    m_pView->resetCanvas(QSizeF(canvasInfo.width, canvasInfo.height));
+    if (tasks.isEmpty()) {
+        // 空工程 — 直接重建画布
+        m_undoStack->clear();
+        m_pPropertyPanel->setItem(nullptr);
+        m_pView->resetCanvas(QSizeF(canvasInfo.width, canvasInfo.height));
+        if (m_pView->canvasItem())
+            m_pView->canvasItem()->setPpi(canvasInfo.dpi);
+        m_pView->setEnabled(true);
+        m_hRuler->setPpi(canvasInfo.dpi);
+        m_vRuler->setPpi(canvasInfo.dpi);
+        m_hRuler->updateRuler();
+        m_vRuler->updateRuler();
+        _updateCanvasLabel();
+        _updatePosLabel(m_lastScenePos);
+        m_currentProjectPath = path;
+        m_pProgressMgr->resetAll();
+        setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
+        return;
+    }
 
-    if (m_pView->canvasItem())
-        m_pView->canvasItem()->setPpi(canvasInfo.dpi);
+    // ---- 阶段 2：并发反序列化图元 ----
+    const QString taskId = m_pProgressMgr->startTask(tr("Open Project"), tasks.size());
 
-    // 添加加载的图元
-    for (auto *item : loadedItems)
-        m_pView->scene()->addItem(item);
+    auto *watcher = new QFutureWatcher<IGraphicsItem *>(this);
 
-    m_pView->setEnabled(true);
+    connect(watcher, &QFutureWatcher<IGraphicsItem *>::progressValueChanged,
+            this, [this, taskId](int value) {
+                m_pProgressMgr->updateTask(taskId, value);
+            });
 
-    // 同步刻度尺
-    m_hRuler->setPpi(canvasInfo.dpi);
-    m_vRuler->setPpi(canvasInfo.dpi);
-    m_hRuler->updateRuler();
-    m_vRuler->updateRuler();
-    _updateCanvasLabel();
-    _updatePosLabel(m_lastScenePos);
+    connect(watcher, &QFutureWatcher<IGraphicsItem *>::finished, this,
+            [this, watcher, taskId, info, canvasInfo, path]() {
+                m_pProgressMgr->finishTask(taskId);
 
-    m_currentProjectPath = path;
-    m_pProgressMgr->resetAll();
+                // 收集反序列化结果
+                QList<QGraphicsItem *> loadedItems;
+                auto future = watcher->future();
+                for (int i = 0; i < future.resultCount(); ++i) {
+                    IGraphicsItem *igi = future.resultAt(i);
+                    if (igi) {
+                        auto *gi = dynamic_cast<QGraphicsItem *>(igi);
+                        if (gi)
+                            loadedItems.append(gi);
+                        else
+                            delete igi;
+                    }
+                }
 
-    setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
+                // 清空当前画布并重建
+                m_undoStack->clear();
+                m_pPropertyPanel->setItem(nullptr);
+                m_pView->resetCanvas(
+                    QSizeF(canvasInfo.width, canvasInfo.height));
+
+                if (m_pView->canvasItem())
+                    m_pView->canvasItem()->setPpi(canvasInfo.dpi);
+
+                for (auto *item : loadedItems)
+                    m_pView->scene()->addItem(item);
+
+                m_pView->setEnabled(true);
+
+                m_hRuler->setPpi(canvasInfo.dpi);
+                m_vRuler->setPpi(canvasInfo.dpi);
+                m_hRuler->updateRuler();
+                m_vRuler->updateRuler();
+                _updateCanvasLabel();
+                _updatePosLabel(m_lastScenePos);
+
+                m_currentProjectPath = path;
+                setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
+
+                watcher->deleteLater();
+            });
+
+    auto future = QtConcurrent::mapped(tasks, deserializeItemWorker);
+    watcher->setFuture(future);
 }
 
 void MainWindow::onSaveProject()
@@ -989,15 +1064,44 @@ void MainWindow::onSaveProject()
 
     auto items = ::filterSelectableItems(m_pView->scene()->items());
 
-    ProjectFile pf;
-    if (!pf.save(path, info, canvasInfo, items)) {
-        QMessageBox::warning(this, tr("Save Project"),
-                             tr("Failed to save project:\n%1").arg(pf.lastError()));
-        return;
-    }
+    // ---- 并发序列化 ----
+    const QString taskId = m_pProgressMgr->startTask(tr("Save Project"), items.size());
 
-    m_currentProjectPath = path;
-    setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
+    auto *watcher = new QFutureWatcher<SerializedItem>(this);
+
+    connect(watcher, &QFutureWatcher<SerializedItem>::progressValueChanged,
+            this, [this, taskId](int value) {
+                m_pProgressMgr->updateTask(taskId, value);
+            });
+
+    connect(watcher, &QFutureWatcher<SerializedItem>::finished, this,
+            [this, watcher, taskId, path, info, canvasInfo]() {
+                m_pProgressMgr->finishTask(taskId);
+
+                // 收集序列化结果
+                QList<SerializedItem> results;
+                auto future = watcher->future();
+                for (int i = 0; i < future.resultCount(); ++i)
+                    results.append(future.resultAt(i));
+
+                // 主线程组装 XML 并写入文件
+                ProjectFile pf;
+                if (!pf.saveFromSerialized(path, info, canvasInfo, results)) {
+                    QMessageBox::warning(
+                        this, tr("Save Project"),
+                        tr("Failed to save project:\n%1").arg(pf.lastError()));
+                    watcher->deleteLater();
+                    return;
+                }
+
+                m_currentProjectPath = path;
+                setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
+
+                watcher->deleteLater();
+            });
+
+    auto future = QtConcurrent::mapped(items, serializeItemWorker);
+    watcher->setFuture(future);
 }
 
 void MainWindow::onImportImage()

@@ -1,6 +1,5 @@
 #include "ProjectFile.h"
 
-#include <QBuffer>
 #include <QDataStream>
 #include <QFile>
 #include <QFileInfo>
@@ -8,9 +7,60 @@
 static const QByteArray kFileMagic = QByteArrayLiteral("ATP\x00");
 static const int kFileHeaderSize = 4;
 
-// ---- encryption -----------------------------------------------------------
+// ---- thread-safe worker functions ------------------------------------------
 
-QByteArray ProjectFile::encrypt(const QByteArray &data, const QByteArray &key)
+SerializedItem serializeItemWorker(QGraphicsItem *item)
+{
+    SerializedItem result;
+    auto *igi = dynamic_cast<IGraphicsItem *>(item);
+
+    result.itemType = igi ? static_cast<int>(igi->itemType()) : 0;
+    result.zValue = item->zValue();
+    result.posX = item->pos().x();
+    result.posY = item->pos().y();
+    result.rotation = item->rotation();
+
+    if (igi) {
+        QByteArray binary;
+        QDataStream out(&binary, QIODevice::WriteOnly);
+        out << static_cast<int>(igi->itemType());
+        igi->serialize(out);
+        result.base64Data = binary.toBase64();
+    }
+
+    return result;
+}
+
+IGraphicsItem *deserializeItemWorker(const DeserialTask &task)
+{
+    auto itemType = static_cast<IGraphicsItem::ItemType>(task.itemType);
+    IGraphicsItem *igi = createItemByType(itemType);
+    if (!igi)
+        return nullptr;
+
+    QByteArray binary = QByteArray::fromBase64(task.base64Data);
+    QDataStream in(&binary, QIODevice::ReadOnly);
+
+    int storedType = 0;
+    in >> storedType;
+    if (storedType != task.itemType || !igi->deserialize(in)) {
+        delete igi;
+        return nullptr;
+    }
+
+    auto *gi = dynamic_cast<QGraphicsItem *>(igi);
+    if (gi) {
+        gi->setZValue(task.zValue);
+        gi->setPos(task.posX, task.posY);
+        gi->setRotation(task.rotation);
+    }
+
+    return igi;
+}
+
+// ---- encryption ------------------------------------------------------------
+
+static QByteArray xorData(const QByteArray &data, const QByteArray &key)
 {
     if (key.isEmpty())
         return data;
@@ -21,20 +71,26 @@ QByteArray ProjectFile::encrypt(const QByteArray &data, const QByteArray &key)
     return result;
 }
 
-QByteArray ProjectFile::decrypt(const QByteArray &data, const QByteArray &key)
+QByteArray ProjectFile::encrypt(const QByteArray &data, const QByteArray &key)
 {
-    return encrypt(data, key); // XOR is symmetric
+    return xorData(data, key);
 }
 
-// ---- save ------------------------------------------------------------------
+QByteArray ProjectFile::decrypt(const QByteArray &data, const QByteArray &key)
+{
+    return xorData(data, key);
+}
 
-bool ProjectFile::save(const QString &filePath, const ProjectInfo &info,
-                       const CanvasInfo &canvas,
-                       const QList<QGraphicsItem *> &items)
+// ---- save (from pre-serialized items) --------------------------------------
+
+bool ProjectFile::saveFromSerialized(const QString &filePath,
+                                     const ProjectInfo &info,
+                                     const CanvasInfo &canvas,
+                                     const QList<SerializedItem> &items)
 {
     m_lastError.clear();
 
-    // 1. Build XML document
+    // Build XML document
     QDomDocument doc;
     QDomProcessingInstruction pi =
         doc.createProcessingInstruction(QStringLiteral("xml"),
@@ -74,20 +130,30 @@ bool ProjectFile::save(const QString &filePath, const ProjectInfo &info,
     canvasEl.appendChild(itemsEl);
 
     int id = 0;
-    for (auto *gi : items) {
-        auto *igi = dynamic_cast<IGraphicsItem *>(gi);
-        if (!igi)
-            continue;
-        itemsEl.appendChild(serializeItem(doc, gi, ++id));
+    for (const auto &si : items) {
+        QDomElement itemEl = doc.createElement(QStringLiteral("Item"));
+        itemEl.setAttribute(QStringLiteral("ID"), ++id);
+        itemEl.setAttribute(QStringLiteral("Type"), si.itemType);
+        itemEl.setAttribute(QStringLiteral("Z"), si.zValue);
+        itemEl.setAttribute(QStringLiteral("X"), si.posX);
+        itemEl.setAttribute(QStringLiteral("Y"), si.posY);
+        itemEl.setAttribute(QStringLiteral("Rot"), si.rotation);
+
+        if (!si.base64Data.isEmpty()) {
+            QDomElement dataEl = doc.createElement(QStringLiteral("Data"));
+            dataEl.appendChild(doc.createTextNode(QString::fromLatin1(si.base64Data)));
+            itemEl.appendChild(dataEl);
+        }
+
+        itemsEl.appendChild(itemEl);
     }
 
     QByteArray xmlData = doc.toByteArray();
 
-    // 2. Encrypt with key derived from project name
+    // Encrypt and write
     QByteArray key = QByteArrayLiteral("ATGraphics") + info.name.toUtf8();
     QByteArray encrypted = encrypt(xmlData, key);
 
-    // 3. Write file (magic + encrypted payload)
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly)) {
         m_lastError = QStringLiteral("Cannot write file: %1").arg(filePath);
@@ -101,13 +167,14 @@ bool ProjectFile::save(const QString &filePath, const ProjectInfo &info,
     return true;
 }
 
-// ---- load ------------------------------------------------------------------
+// ---- parse for deserialize -------------------------------------------------
 
-bool ProjectFile::load(const QString &filePath, ProjectInfo &info,
-                       CanvasInfo &canvas, QList<QGraphicsItem *> &items)
+bool ProjectFile::parseForDeserialize(const QString &filePath,
+                                      ProjectInfo &info, CanvasInfo &canvas,
+                                      QList<DeserialTask> &tasks)
 {
     m_lastError.clear();
-    items.clear();
+    tasks.clear();
 
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) {
@@ -115,7 +182,6 @@ bool ProjectFile::load(const QString &filePath, ProjectInfo &info,
         return false;
     }
 
-    // 1. Check magic header
     QByteArray header = file.read(kFileHeaderSize);
     if (header.size() != kFileHeaderSize || header != kFileMagic) {
         m_lastError = QStringLiteral("Invalid project file format");
@@ -125,55 +191,45 @@ bool ProjectFile::load(const QString &filePath, ProjectInfo &info,
     QByteArray encrypted = file.readAll();
     file.close();
 
-    // 2. Derive key from file name (as a close approximation to project name)
-    //    The key is derived from the project info after decryption — use a
-    //    two-pass approach: first try with a default key, extract project name,
-    //    then re-decrypt.
-
-    // For simplicity, use the stored file's base name as the key approximation
     QFileInfo fi(filePath);
-    QString baseName = fi.completeBaseName();
-    QByteArray key = QByteArrayLiteral("ATGraphics") + baseName.toUtf8();
+    QByteArray key = QByteArrayLiteral("ATGraphics") + fi.completeBaseName().toUtf8();
 
     QByteArray xmlData = decrypt(encrypted, key);
 
-    // 3. Parse XML
+    // Parse XML
     QDomDocument doc;
-    auto parseXml = [&](const QByteArray &data) -> bool {
-        auto result = doc.setContent(data);
-        if (!result) {
-            m_lastError = QStringLiteral("XML parse error at line %1: %2")
-                              .arg(result.errorLine)
-                              .arg(result.errorMessage);
-            return false;
-        }
-        return true;
-    };
-
-    if (!parseXml(xmlData)) {
-        // Try with empty key as fallback
+    auto parseResult = doc.setContent(xmlData);
+    if (!parseResult) {
+        // Try with empty key
         key.clear();
         xmlData = decrypt(encrypted, key);
-        if (!parseXml(xmlData))
+        parseResult = doc.setContent(xmlData);
+        if (!parseResult) {
+            m_lastError = QStringLiteral("XML parse error at line %1: %2")
+                              .arg(parseResult.errorLine)
+                              .arg(parseResult.errorMessage);
             return false;
+        }
     }
 
     QDomElement root = doc.documentElement();
     if (root.tagName() != QStringLiteral("Project")) {
-        m_lastError = QStringLiteral("Unexpected root element: %1").arg(root.tagName());
+        m_lastError =
+            QStringLiteral("Unexpected root element: %1").arg(root.tagName());
         return false;
     }
 
-    // Parse <Information>
+    // <Information>
     QDomElement infoEl = root.firstChildElement(QStringLiteral("Information"));
     if (!infoEl.isNull()) {
         info.name = infoEl.firstChildElement(QStringLiteral("Name")).text();
         info.version = infoEl.firstChildElement(QStringLiteral("Version")).text();
         info.author = infoEl.firstChildElement(QStringLiteral("Author")).text();
-        info.description = infoEl.firstChildElement(QStringLiteral("Description")).text();
+        info.description =
+            infoEl.firstChildElement(QStringLiteral("Description")).text();
     }
 
-    // Parse <Canvas>
+    // <Canvas>
     QDomElement canvasEl = root.firstChildElement(QStringLiteral("Canvas"));
     if (!canvasEl.isNull()) {
         canvas.width =
@@ -184,85 +240,64 @@ bool ProjectFile::load(const QString &filePath, ProjectInfo &info,
             canvasEl.firstChildElement(QStringLiteral("Dpi")).text().toDouble();
     }
 
-    // Parse <Items>
+    // <Items> → extract DeserialTask list
     QDomElement itemsEl = canvasEl.firstChildElement(QStringLiteral("Items"));
     if (!itemsEl.isNull()) {
         QDomNodeList itemNodes = itemsEl.elementsByTagName(QStringLiteral("Item"));
         for (int i = 0; i < itemNodes.count(); ++i) {
-            QDomElement itemEl = itemNodes.at(i).toElement();
-            IGraphicsItem *igi = deserializeItem(itemEl);
-            if (igi) {
-                auto *gi = dynamic_cast<QGraphicsItem *>(igi);
-                if (gi)
-                    items.append(gi);
-                else
-                    delete igi;
-            }
+            QDomElement el = itemNodes.at(i).toElement();
+
+            DeserialTask task;
+            task.itemType = el.attribute(QStringLiteral("Type")).toInt();
+            task.zValue = el.attribute(QStringLiteral("Z")).toDouble();
+            task.posX = el.attribute(QStringLiteral("X")).toDouble();
+            task.posY = el.attribute(QStringLiteral("Y")).toDouble();
+            task.rotation = el.attribute(QStringLiteral("Rot")).toDouble();
+
+            QDomElement dataEl = el.firstChildElement(QStringLiteral("Data"));
+            if (!dataEl.isNull())
+                task.base64Data = dataEl.text().toLatin1();
+
+            tasks.append(task);
         }
     }
 
     return true;
 }
 
-// ---- item serialization helpers --------------------------------------------
+// ---- synchronous save (fallback) -------------------------------------------
 
-QDomElement ProjectFile::serializeItem(QDomDocument &doc, QGraphicsItem *item,
-                                       int id)
+bool ProjectFile::save(const QString &filePath, const ProjectInfo &info,
+                       const CanvasInfo &canvas,
+                       const QList<QGraphicsItem *> &items)
 {
-    auto *igi = dynamic_cast<IGraphicsItem *>(item);
-    QDomElement el = doc.createElement(QStringLiteral("Item"));
-
-    el.setAttribute(QStringLiteral("ID"), id);
-    el.setAttribute(QStringLiteral("Type"), static_cast<int>(igi ? igi->itemType() : 0));
-    el.setAttribute(QStringLiteral("Z"), item->zValue());
-    el.setAttribute(QStringLiteral("X"), item->pos().x());
-    el.setAttribute(QStringLiteral("Y"), item->pos().y());
-    el.setAttribute(QStringLiteral("Rot"), item->rotation());
-
-    if (igi) {
-        // Serialize item data via QDataStream → Base64
-        QByteArray binary;
-        QDataStream out(&binary, QIODevice::WriteOnly);
-        out << static_cast<int>(igi->itemType());
-        igi->serialize(out);
-
-        QDomElement dataEl = doc.createElement(QStringLiteral("Data"));
-        dataEl.appendChild(doc.createTextNode(binary.toBase64()));
-        el.appendChild(dataEl);
-    }
-
-    return el;
+    QList<SerializedItem> serialized;
+    serialized.reserve(items.size());
+    for (auto *item : items)
+        serialized.append(serializeItemWorker(item));
+    return saveFromSerialized(filePath, info, canvas, serialized);
 }
 
-IGraphicsItem *ProjectFile::deserializeItem(const QDomElement &el)
+// ---- synchronous load (fallback) -------------------------------------------
+
+bool ProjectFile::load(const QString &filePath, ProjectInfo &info,
+                       CanvasInfo &canvas, QList<QGraphicsItem *> &items)
 {
-    int typeVal = el.attribute(QStringLiteral("Type")).toInt();
-    auto itemType = static_cast<IGraphicsItem::ItemType>(typeVal);
+    QList<DeserialTask> tasks;
+    if (!parseForDeserialize(filePath, info, canvas, tasks))
+        return false;
 
-    IGraphicsItem *igi = createItemByType(itemType);
-    if (!igi)
-        return nullptr;
-
-    QDomElement dataEl = el.firstChildElement(QStringLiteral("Data"));
-    if (!dataEl.isNull()) {
-        QByteArray binary = QByteArray::fromBase64(dataEl.text().toUtf8());
-        QDataStream in(&binary, QIODevice::ReadOnly);
-
-        int storedType;
-        in >> storedType;
-        if (storedType != typeVal || !igi->deserialize(in)) {
-            delete igi;
-            return nullptr;
+    items.clear();
+    items.reserve(tasks.size());
+    for (const auto &task : tasks) {
+        IGraphicsItem *igi = deserializeItemWorker(task);
+        if (igi) {
+            auto *gi = dynamic_cast<QGraphicsItem *>(igi);
+            if (gi)
+                items.append(gi);
+            else
+                delete igi;
         }
     }
-
-    auto *gi = dynamic_cast<QGraphicsItem *>(igi);
-    if (gi) {
-        gi->setZValue(el.attribute(QStringLiteral("Z")).toDouble());
-        gi->setPos(el.attribute(QStringLiteral("X")).toDouble(),
-                   el.attribute(QStringLiteral("Y")).toDouble());
-        gi->setRotation(el.attribute(QStringLiteral("Rot")).toDouble());
-    }
-
-    return igi;
+    return true;
 }
