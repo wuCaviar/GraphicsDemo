@@ -537,7 +537,15 @@ ExportWorkerResult exportTiff(const QString &outputPath,
     TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_SEPARATED);
     TIFFSetField(tif, TIFFTAG_INKSET, INKSET_CMYK);
     TIFFSetField(tif, TIFFTAG_NUMBEROFINKS, 4);
+    const char inkNames[] =
+        "Cyan\0Magenta\0Yellow\0Black\0\0";
 
+    const uint16_t inkNamesLen =
+        sizeof(inkNames) - 1;
+
+    TIFFSetField(tif, TIFFTAG_INKNAMES,
+                 inkNamesLen,
+                 inkNames);
     // Data layout
     TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
     TIFFSetField(tif, TIFFTAG_COMPRESSION, settings.compression);

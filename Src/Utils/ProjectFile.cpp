@@ -9,53 +9,57 @@ static const int kFileHeaderSize = 4;
 
 // ---- thread-safe worker functions ------------------------------------------
 
-SerializedItem serializeItemWorker(QGraphicsItem *item)
+SerializedItem serializeItemWorker(const SerializeInput &input)
 {
     SerializedItem result;
-    auto *igi = dynamic_cast<IGraphicsItem *>(item);
-
-    result.itemType = igi ? static_cast<int>(igi->itemType()) : 0;
-    result.zValue = item->zValue();
-    result.posX = item->pos().x();
-    result.posY = item->pos().y();
-    result.rotation = item->rotation();
-
-    if (igi) {
-        QByteArray binary;
-        QDataStream out(&binary, QIODevice::WriteOnly);
-        out << static_cast<int>(igi->itemType());
-        igi->serialize(out);
-        result.base64Data = binary.toBase64();
-    }
-
+    result.itemType = input.itemType;
+    result.zValue = input.zValue;
+    result.posX = input.posX;
+    result.posY = input.posY;
+    result.rotation = input.rotation;
+    result.base64Data = input.binary.toBase64();
     return result;
 }
 
-IGraphicsItem *deserializeItemWorker(const DeserialTask &task)
+DeserializedItem deserializeItemWorker(const DeserialTask &task)
 {
-    auto itemType = static_cast<IGraphicsItem::ItemType>(task.itemType);
+    DeserializedItem result;
+    result.itemType = task.itemType;
+    result.binary = QByteArray::fromBase64(task.base64Data);
+    result.zValue = task.zValue;
+    result.posX = task.posX;
+    result.posY = task.posY;
+    result.rotation = task.rotation;
+    return result;
+}
+
+QGraphicsItem *createItemFromDeserialized(const DeserializedItem &data)
+{
+    auto itemType = static_cast<IGraphicsItem::ItemType>(data.itemType);
     IGraphicsItem *igi = createItemByType(itemType);
     if (!igi)
         return nullptr;
 
-    QByteArray binary = QByteArray::fromBase64(task.base64Data);
+    QByteArray binary = data.binary; // mutable copy for QDataStream
     QDataStream in(&binary, QIODevice::ReadOnly);
 
     int storedType = 0;
     in >> storedType;
-    if (storedType != task.itemType || !igi->deserialize(in)) {
+    if (storedType != data.itemType || !igi->deserialize(in)) {
         delete igi;
         return nullptr;
     }
 
     auto *gi = dynamic_cast<QGraphicsItem *>(igi);
     if (gi) {
-        gi->setZValue(task.zValue);
-        gi->setPos(task.posX, task.posY);
-        gi->setRotation(task.rotation);
+        gi->setZValue(data.zValue);
+        gi->setPos(data.posX, data.posY);
+        gi->setRotation(data.rotation);
+        return gi;
     }
 
-    return igi;
+    delete igi;
+    return nullptr;
 }
 
 // ---- encryption ------------------------------------------------------------
@@ -273,8 +277,23 @@ bool ProjectFile::save(const QString &filePath, const ProjectInfo &info,
 {
     QList<SerializedItem> serialized;
     serialized.reserve(items.size());
-    for (auto *item : items)
-        serialized.append(serializeItemWorker(item));
+    for (auto *item : items) {
+        SerializeInput input;
+        auto *igi = dynamic_cast<IGraphicsItem *>(item);
+        input.itemType = igi ? static_cast<int>(igi->itemType()) : 0;
+        input.zValue = item->zValue();
+        input.posX = item->pos().x();
+        input.posY = item->pos().y();
+        input.rotation = item->rotation();
+        if (igi) {
+            QByteArray binary;
+            QDataStream out(&binary, QIODevice::WriteOnly);
+            out << static_cast<int>(igi->itemType());
+            igi->serialize(out);
+            input.binary = binary;
+        }
+        serialized.append(serializeItemWorker(input));
+    }
     return saveFromSerialized(filePath, info, canvas, serialized);
 }
 
@@ -290,14 +309,10 @@ bool ProjectFile::load(const QString &filePath, ProjectInfo &info,
     items.clear();
     items.reserve(tasks.size());
     for (const auto &task : tasks) {
-        IGraphicsItem *igi = deserializeItemWorker(task);
-        if (igi) {
-            auto *gi = dynamic_cast<QGraphicsItem *>(igi);
-            if (gi)
-                items.append(gi);
-            else
-                delete igi;
-        }
+        DeserializedItem di = deserializeItemWorker(task);
+        QGraphicsItem *item = createItemFromDeserialized(di);
+        if (item)
+            items.append(item);
     }
     return true;
 }

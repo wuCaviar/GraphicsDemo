@@ -29,10 +29,33 @@ struct DeserialTask {
     double rotation = 0;
 };
 
+// Worker 产出的纯数据结构（不含 QGraphicsItem，线程安全）
+struct DeserializedItem {
+    int itemType = 0;
+    QByteArray binary;   // 已从 Base64 解码
+    double zValue = 0;
+    double posX = 0;
+    double posY = 0;
+    double rotation = 0;
+};
+
+// 序列化输入快照（在主线程采集，线程安全）
+struct SerializeInput {
+    int itemType = 0;
+    QByteArray binary;    // 已在主线程通过 serialize() 生成
+    double zValue = 0;
+    double posX = 0;
+    double posY = 0;
+    double rotation = 0;
+};
+
 // ---- 线程安全的 Worker 函数（供 QtConcurrent::mapped 使用） ----
 
-SerializedItem serializeItemWorker(QGraphicsItem *item);
-IGraphicsItem *deserializeItemWorker(const DeserialTask &task);
+SerializedItem serializeItemWorker(const SerializeInput &input);
+DeserializedItem deserializeItemWorker(const DeserialTask &task);
+
+// 在主线程从 DeserializedItem 创建 QGraphicsItem
+QGraphicsItem *createItemFromDeserialized(const DeserializedItem &data);
 
 // ---- 工程文件类 ----
 

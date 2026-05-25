@@ -973,32 +973,30 @@ void MainWindow::onOpenProject()
         return;
     }
 
-    // ---- 阶段 2：并发反序列化图元 ----
+    // ---- 阶段 2：并发 Base64 解码（纯 CPU，不创建 QGraphicsItem） ----
     const QString taskId = m_pProgressMgr->startTask(tr("Open Project"), tasks.size());
 
-    auto *watcher = new QFutureWatcher<IGraphicsItem *>(this);
+    // 禁用视图，防止用户在加载期间操作画布
+    m_pView->setEnabled(false);
 
-    connect(watcher, &QFutureWatcher<IGraphicsItem *>::progressValueChanged,
+    auto *watcher = new QFutureWatcher<DeserializedItem>(this);
+
+    connect(watcher, &QFutureWatcher<DeserializedItem>::progressValueChanged,
             this, [this, taskId](int value) {
                 m_pProgressMgr->updateTask(taskId, value);
             });
 
-    connect(watcher, &QFutureWatcher<IGraphicsItem *>::finished, this,
+    connect(watcher, &QFutureWatcher<DeserializedItem>::finished, this,
             [this, watcher, taskId, info, canvasInfo, path]() {
                 m_pProgressMgr->finishTask(taskId);
 
-                // 收集反序列化结果
+                // 在主线程创建 QGraphicsItem（安全的做法）
                 QList<QGraphicsItem *> loadedItems;
                 auto future = watcher->future();
                 for (int i = 0; i < future.resultCount(); ++i) {
-                    IGraphicsItem *igi = future.resultAt(i);
-                    if (igi) {
-                        auto *gi = dynamic_cast<QGraphicsItem *>(igi);
-                        if (gi)
-                            loadedItems.append(gi);
-                        else
-                            delete igi;
-                    }
+                    QGraphicsItem *item = createItemFromDeserialized(future.resultAt(i));
+                    if (item)
+                        loadedItems.append(item);
                 }
 
                 // 清空当前画布并重建
@@ -1064,8 +1062,31 @@ void MainWindow::onSaveProject()
 
     auto items = ::filterSelectableItems(m_pView->scene()->items());
 
-    // ---- 并发序列化 ----
-    const QString taskId = m_pProgressMgr->startTask(tr("Save Project"), items.size());
+    // ---- 在主线程采集快照（线程安全），然后并发 Base64 编码 ----
+    QList<SerializeInput> inputs;
+    inputs.reserve(items.size());
+    for (auto *item : items) {
+        SerializeInput input;
+        auto *igi = dynamic_cast<IGraphicsItem *>(item);
+        input.itemType = igi ? static_cast<int>(igi->itemType()) : 0;
+        input.zValue = item->zValue();
+        input.posX = item->pos().x();
+        input.posY = item->pos().y();
+        input.rotation = item->rotation();
+        if (igi) {
+            QByteArray binary;
+            QDataStream out(&binary, QIODevice::WriteOnly);
+            out << static_cast<int>(igi->itemType());
+            igi->serialize(out);
+            input.binary = binary;
+        }
+        inputs.append(input);
+    }
+
+    // ---- 并发序列化（禁用视图防止用户在序列化期间修改图元） ----
+    const QString taskId = m_pProgressMgr->startTask(tr("Save Project"), inputs.size());
+
+    m_pView->setEnabled(false);
 
     auto *watcher = new QFutureWatcher<SerializedItem>(this);
 
@@ -1090,6 +1111,7 @@ void MainWindow::onSaveProject()
                     QMessageBox::warning(
                         this, tr("Save Project"),
                         tr("Failed to save project:\n%1").arg(pf.lastError()));
+                    m_pView->setEnabled(true);
                     watcher->deleteLater();
                     return;
                 }
@@ -1097,10 +1119,11 @@ void MainWindow::onSaveProject()
                 m_currentProjectPath = path;
                 setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
 
+                m_pView->setEnabled(true);
                 watcher->deleteLater();
             });
 
-    auto future = QtConcurrent::mapped(items, serializeItemWorker);
+    auto future = QtConcurrent::mapped(inputs, serializeItemWorker);
     watcher->setFuture(future);
 }
 
