@@ -780,12 +780,12 @@ void MainWindow::_updateCanvasLabel()
     bool isMm = m_hRuler->unit() == RulerBar::Millimeter;
     if (isMm) {
         qreal kPxToMm = 25.4 / ppi;
-        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm \u00b7 %3 PPI")
+        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm \u00b7 %3 DPI")
                                    .arg(sz.width() * kPxToMm, 0, 'f', 1)
                                    .arg(sz.height() * kPxToMm, 0, 'f', 1)
                                    .arg(ppi, 0, 'f', 0));
     } else {
-        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 px \u00b7 %3 PPI")
+        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 px \u00b7 %3 DPI")
                                    .arg(sz.width(), 0, 'f', 1)
                                    .arg(sz.height(), 0, 'f', 1)
                                    .arg(ppi, 0, 'f', 0));

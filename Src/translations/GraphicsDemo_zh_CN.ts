@@ -27,164 +27,160 @@
 <context>
     <name>AlignLayoutDialog</name>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="47"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="48"/>
         <source>Align &amp; Distribute</source>
         <translation>对齐与分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="65"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="67"/>
         <source>Horizontal</source>
         <translation>水平</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="71"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="74"/>
         <source>Align left edges</source>
         <translation>左边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="73"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="76"/>
         <source>Align horizontal centers</source>
         <translation>水平居中对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="74"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="77"/>
         <source>Align right edges</source>
         <translation>右边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="77"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="80"/>
         <source>Stretch to same width, align left &amp; right</source>
         <translation>拉伸至同宽，左右对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="80"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="83"/>
         <source>Stretch horizontally, scale proportionally</source>
         <translation>水平拉伸，等比缩放</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="92"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="95"/>
         <source>Left edges equally spaced</source>
         <translation>左边缘等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="94"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="97"/>
         <source>Horizontal centers equally spaced</source>
         <translation>水平中心等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="96"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="99"/>
         <source>Right edges equally spaced</source>
         <translation>右边缘等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="98"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="101"/>
         <source>Equal horizontal gaps</source>
         <translation>水平等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="100"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="103"/>
         <source>Custom horizontal gap spacing</source>
         <translation>自定义水平间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="117"/>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="178"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="120"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="183"/>
         <source>Gap:</source>
         <translation>间距:</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="116"/>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="177"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="119"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="182"/>
         <source>Gap value for Custom Gap distribution</source>
         <translation>自定义间距分布的值</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="125"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="128"/>
         <source>Vertical</source>
         <translation>垂直</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="131"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="135"/>
         <source>Align top edges</source>
         <translation>顶部边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="133"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="137"/>
         <source>Align vertical centers</source>
         <translation>垂直居中对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="135"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="139"/>
         <source>Align bottom edges</source>
         <translation>底部边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="138"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="142"/>
         <source>Stretch to same height, align top &amp; bottom</source>
         <translation>拉伸至同高，上下对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="141"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="145"/>
         <source>Stretch vertically, scale proportionally</source>
         <translation>垂直拉伸，等比缩放</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="153"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="157"/>
         <source>Top edges equally spaced</source>
         <translation>顶部边缘等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="155"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="159"/>
         <source>Vertical centers equally spaced</source>
         <translation>垂直中心等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="157"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="161"/>
         <source>Bottom edges equally spaced</source>
         <translation>底部边缘等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="159"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="163"/>
         <source>Equal vertical gaps</source>
         <translation>垂直等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="161"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="165"/>
         <source>Custom vertical gap spacing</source>
         <translation>自定义垂直间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="186"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="191"/>
         <source>Page</source>
         <translation>页面</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="190"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="196"/>
         <source>Center horizontally on canvas</source>
         <translation>在画布上水平居中</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="192"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="198"/>
         <source>Center vertically on canvas</source>
         <translation>在画布上垂直居中</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="114"/>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="175"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="117"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="179"/>
         <source> px</source>
-        <translation> 像素</translation>
+        <translation> px</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="200"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="206"/>
         <source>Selected: 0 items</source>
         <translation>已选中: 0 个图元</translation>
     </message>
     <message>
-        <source>Close</source>
-        <translation type="vanished">关闭</translation>
-    </message>
-    <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="279"/>
+        <location filename="../UI/AlignLayoutDialog.cpp" line="285"/>
         <source>Selected: %1 item(s)</source>
         <translation>已选中: %1 个图元</translation>
     </message>
@@ -455,205 +451,51 @@
     </message>
 </context>
 <context>
-    <name>ExportImageDialog</name>
+    <name>FitCanvasDlg</name>
     <message>
-        <source>Export Image - Parameters</source>
-        <translation type="vanished">导出图片 - 参数设置</translation>
+        <location filename="../UI/FitCanvasDlg.ui" line="14"/>
+        <source>Form</source>
+        <translation>渐变编辑器</translation>
     </message>
     <message>
-        <source>DPI:</source>
-        <translation type="vanished">DPI:</translation>
+        <location filename="../UI/FitCanvasDlg.ui" line="26"/>
+        <source>TextLabel</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Color Space:</source>
-        <translation type="vanished">颜色空间:</translation>
+        <location filename="../UI/FitCanvasDlg.ui" line="45"/>
+        <source>px</source>
+        <translation>px</translation>
     </message>
     <message>
-        <source>Transparency:</source>
-        <translation type="vanished">透明度处理:</translation>
+        <location filename="../UI/FitCanvasDlg.cpp" line="60"/>
+        <source>No need</source>
+        <translation>不需要</translation>
     </message>
     <message>
-        <source>Keep Original</source>
-        <translation type="vanished">保持原样</translation>
+        <location filename="../UI/FitCanvasDlg.cpp" line="61"/>
+        <source>Adaptation</source>
+        <translation>自适应</translation>
     </message>
     <message>
-        <source>Convert to sRGB</source>
-        <translation type="vanished">转换为 sRGB</translation>
+        <location filename="../UI/FitCanvasDlg.cpp" line="62"/>
+        <source>Custom width</source>
+        <translation>自定义宽度</translation>
     </message>
     <message>
-        <source>Convert to Adobe RGB</source>
-        <translation type="vanished">转换为 Adobe RGB</translation>
+        <location filename="../UI/FitCanvasDlg.cpp" line="63"/>
+        <source>Custom height</source>
+        <translation>自定义高度</translation>
     </message>
     <message>
-        <source>Convert to CMYK (TIFF only)</source>
-        <translation type="vanished">转换为 CMYK (仅 TIFF)</translation>
+        <location filename="../UI/FitCanvasDlg.cpp" line="77"/>
+        <source>Width:</source>
+        <translation>宽度:</translation>
     </message>
     <message>
-        <source>Keep Transparency</source>
-        <translation type="vanished">保留透明度</translation>
-    </message>
-    <message>
-        <source>Flatten on White</source>
-        <translation type="vanished">白色背景合并</translation>
-    </message>
-    <message>
-        <source>TIFF Professional Options</source>
-        <translation type="vanished">TIFF 专业选项</translation>
-    </message>
-    <message>
-        <source>Compression:</source>
-        <translation type="vanished">压缩方式:</translation>
-    </message>
-    <message>
-        <source>None</source>
-        <translation type="vanished">无</translation>
-    </message>
-    <message>
-        <source>LZW</source>
-        <translation type="vanished">LZW</translation>
-    </message>
-    <message>
-        <source>ZIP/Deflate</source>
-        <translation type="vanished">ZIP/Deflate</translation>
-    </message>
-    <message>
-        <source>JPEG</source>
-        <translation type="vanished">JPEG</translation>
-    </message>
-    <message>
-        <source>PackBits</source>
-        <translation type="vanished">PackBits</translation>
-    </message>
-    <message>
-        <source>Byte Order:</source>
-        <translation type="vanished">字节序:</translation>
-    </message>
-    <message>
-        <source>Little Endian (PC)</source>
-        <translation type="vanished">小端序 (PC)</translation>
-    </message>
-    <message>
-        <source>Big Endian (Mac)</source>
-        <translation type="vanished">大端序 (Mac)</translation>
-    </message>
-    <message>
-        <source>Bit Depth:</source>
-        <translation type="vanished">位深度:</translation>
-    </message>
-    <message>
-        <source>8-bit</source>
-        <translation type="vanished">8 位</translation>
-    </message>
-    <message>
-        <source>16-bit</source>
-        <translation type="vanished">16 位</translation>
-    </message>
-    <message>
-        <source>Pixel Order:</source>
-        <translation type="vanished">像素排列:</translation>
-    </message>
-    <message>
-        <source>Interleaved (RGBRGB)</source>
-        <translation type="vanished">交错排列 (RGBRGB)</translation>
-    </message>
-    <message>
-        <source>Per-channel (RRGGBB)</source>
-        <translation type="vanished">分通道排列 (RRGGBB)</translation>
-    </message>
-    <message>
-        <source>Predictor:</source>
-        <translation type="vanished">预测器:</translation>
-    </message>
-    <message>
-        <source>Horizontal Differencing</source>
-        <translation type="vanished">水平差分</translation>
-    </message>
-    <message>
-        <source>JPEG Quality:</source>
-        <translation type="vanished">JPEG 质量:</translation>
-    </message>
-    <message>
-        <source>Embed ICC Profile</source>
-        <translation type="vanished">嵌入 ICC 色彩配置</translation>
-    </message>
-    <message>
-        <source>Preserve Metadata</source>
-        <translation type="vanished">保留元数据</translation>
-    </message>
-    <message>
-        <source>Export the image with the selected settings</source>
-        <translation type="vanished">使用当前设置导出图片</translation>
-    </message>
-</context>
-<context>
-    <name>GradientDialog</name>
-    <message>
-        <source>Gradient Editor</source>
-        <translation type="vanished">渐变编辑器</translation>
-    </message>
-    <message>
-        <source>Colors</source>
-        <translation type="vanished">颜色</translation>
-    </message>
-    <message>
-        <source>Start Color:</source>
-        <translation type="vanished">起始颜色:</translation>
-    </message>
-    <message>
-        <source>End Color:</source>
-        <translation type="vanished">终止颜色:</translation>
-    </message>
-    <message>
-        <source>Direction</source>
-        <translation type="vanished">方向</translation>
-    </message>
-    <message>
-        <source>Left → Right</source>
-        <translation type="vanished">左 → 右</translation>
-    </message>
-    <message>
-        <source>Right → Left</source>
-        <translation type="vanished">右 → 左</translation>
-    </message>
-    <message>
-        <source>Top → Bottom</source>
-        <translation type="vanished">上 → 下</translation>
-    </message>
-    <message>
-        <source>Bottom → Top</source>
-        <translation type="vanished">下 → 上</translation>
-    </message>
-    <message>
-        <source>Diagonal ↘</source>
-        <translation type="vanished">对角线 ↘</translation>
-    </message>
-    <message>
-        <source>Diagonal ↗</source>
-        <translation type="vanished">对角线 ↗</translation>
-    </message>
-    <message>
-        <source>Direction:</source>
-        <translation type="vanished">方向:</translation>
-    </message>
-    <message>
-        <source>Preview</source>
-        <translation type="vanished">预览</translation>
-    </message>
-    <message>
-        <source>OK</source>
-        <translation type="vanished">确定</translation>
-    </message>
-    <message>
-        <source>Cancel</source>
-        <translation type="vanished">取消</translation>
-    </message>
-    <message>
-        <source>Start Color</source>
-        <translation type="vanished">起始颜色</translation>
-    </message>
-    <message>
-        <source>End Color</source>
-        <translation type="vanished">终止颜色</translation>
+        <location filename="../UI/FitCanvasDlg.cpp" line="81"/>
+        <source>Height:</source>
+        <translation>高度:</translation>
     </message>
 </context>
 <context>
@@ -665,998 +507,841 @@
     </message>
 </context>
 <context>
-    <name>ImageUtils::ExportImageDialog</name>
+    <name>ImageArrangementDialog</name>
     <message>
-        <source>Export Image - Parameters</source>
-        <translation type="vanished">导出图片 - 参数设置</translation>
+        <location filename="../UI/ImageArrangementDialog.cpp" line="19"/>
+        <source>Image Arrangement</source>
+        <translation>图片排列</translation>
     </message>
     <message>
-        <source>DPI:</source>
-        <translation type="vanished">DPI:</translation>
+        <location filename="../UI/ImageArrangementDialog.cpp" line="29"/>
+        <source>Arrangement</source>
+        <translation>排列方式</translation>
     </message>
     <message>
-        <source>Keep Original</source>
-        <translation type="vanished">保持原样</translation>
+        <location filename="../UI/ImageArrangementDialog.cpp" line="32"/>
+        <source>Horizontal</source>
+        <translation>水平</translation>
     </message>
     <message>
-        <source>Convert to sRGB</source>
-        <translation type="vanished">转换为 sRGB</translation>
+        <location filename="../UI/ImageArrangementDialog.cpp" line="33"/>
+        <source>Vertical</source>
+        <translation>垂直</translation>
     </message>
     <message>
-        <source>Convert to Adobe RGB</source>
-        <translation type="vanished">转换为 Adobe RGB</translation>
+        <location filename="../UI/ImageArrangementDialog.cpp" line="44"/>
+        <source>File order (drag to reorder):</source>
+        <translation>文件顺序（拖拽调整）:</translation>
     </message>
     <message>
-        <source>Convert to CMYK (TIFF only)</source>
-        <translation type="vanished">转换为 CMYK (仅 TIFF)</translation>
+        <location filename="../UI/ImageArrangementDialog.cpp" line="58"/>
+        <source>OK</source>
+        <translation>确定</translation>
     </message>
     <message>
-        <source>Color Space:</source>
-        <translation type="vanished">颜色空间:</translation>
-    </message>
-    <message>
-        <source>Keep Transparency</source>
-        <translation type="vanished">保留透明度</translation>
-    </message>
-    <message>
-        <source>Flatten on White</source>
-        <translation type="vanished">白色背景合并</translation>
-    </message>
-    <message>
-        <source>Transparency:</source>
-        <translation type="vanished">透明度处理:</translation>
-    </message>
-    <message>
-        <source>Export the image with the selected settings</source>
-        <translation type="vanished">使用当前设置导出图片</translation>
-    </message>
-    <message>
-        <source>TIFF Professional Options</source>
-        <translation type="vanished">TIFF 专业选项</translation>
-    </message>
-    <message>
-        <source>None</source>
-        <translation type="vanished">无</translation>
-    </message>
-    <message>
-        <source>LZW</source>
-        <translation type="vanished">LZW</translation>
-    </message>
-    <message>
-        <source>ZIP/Deflate</source>
-        <translation type="vanished">ZIP/Deflate</translation>
-    </message>
-    <message>
-        <source>JPEG</source>
-        <translation type="vanished">JPEG</translation>
-    </message>
-    <message>
-        <source>PackBits</source>
-        <translation type="vanished">PackBits</translation>
-    </message>
-    <message>
-        <source>Compression:</source>
-        <translation type="vanished">压缩方式:</translation>
-    </message>
-    <message>
-        <source>Little Endian (PC)</source>
-        <translation type="vanished">小端序 (PC)</translation>
-    </message>
-    <message>
-        <source>Big Endian (Mac)</source>
-        <translation type="vanished">大端序 (Mac)</translation>
-    </message>
-    <message>
-        <source>Byte Order:</source>
-        <translation type="vanished">字节序:</translation>
-    </message>
-    <message>
-        <source>8-bit</source>
-        <translation type="vanished">8 位</translation>
-    </message>
-    <message>
-        <source>16-bit</source>
-        <translation type="vanished">16 位</translation>
-    </message>
-    <message>
-        <source>Bit Depth:</source>
-        <translation type="vanished">位深度:</translation>
-    </message>
-    <message>
-        <source>Interleaved (RGBRGB)</source>
-        <translation type="vanished">交错排列 (RGBRGB)</translation>
-    </message>
-    <message>
-        <source>Per-channel (RRGGBB)</source>
-        <translation type="vanished">分通道排列 (RRGGBB)</translation>
-    </message>
-    <message>
-        <source>Pixel Order:</source>
-        <translation type="vanished">像素排列:</translation>
-    </message>
-    <message>
-        <source>Horizontal Differencing</source>
-        <translation type="vanished">水平差分</translation>
-    </message>
-    <message>
-        <source>Predictor:</source>
-        <translation type="vanished">预测器:</translation>
-    </message>
-    <message>
-        <source>JPEG Quality:</source>
-        <translation type="vanished">JPEG 质量:</translation>
-    </message>
-    <message>
-        <source>Embed ICC Profile</source>
-        <translation type="vanished">嵌入 ICC 色彩配置</translation>
-    </message>
-    <message>
-        <source>Preserve Metadata</source>
-        <translation type="vanished">保留元数据</translation>
-    </message>
-    <message>
-        <source>PNG Options</source>
-        <translation type="vanished">PNG 选项</translation>
-    </message>
-    <message>
-        <source>Compression (0-9):</source>
-        <translation type="vanished">压缩率 (0-9):</translation>
-    </message>
-    <message>
-        <source>JPEG Options</source>
-        <translation type="vanished">JPEG 选项</translation>
-    </message>
-    <message>
-        <source>Quality:</source>
-        <translation type="vanished">质量:</translation>
-    </message>
-</context>
-<context>
-    <name>ImageUtils::ImportImageDialog</name>
-    <message>
-        <source>Import Image - Parameters</source>
-        <translation type="vanished">导入图片 - 参数设置</translation>
-    </message>
-    <message>
-        <source>Use Image DPI</source>
-        <translation type="vanished">使用图片 DPI</translation>
-    </message>
-    <message>
-        <source>Force DPI</source>
-        <translation type="vanished">强制指定 DPI</translation>
-    </message>
-    <message>
-        <source>Ignore DPI (72 DPI)</source>
-        <translation type="vanished">忽略 DPI (使用 72 DPI)</translation>
-    </message>
-    <message>
-        <source>DPI Policy:</source>
-        <translation type="vanished">DPI 策略:</translation>
-    </message>
-    <message>
-        <source> DPI</source>
-        <translation type="vanished"> DPI</translation>
-    </message>
-    <message>
-        <source>Forced DPI:</source>
-        <translation type="vanished">强制 DPI:</translation>
-    </message>
-    <message>
-        <source>Keep Original</source>
-        <translation type="vanished">保持原样</translation>
-    </message>
-    <message>
-        <source>Convert to sRGB</source>
-        <translation type="vanished">转换为 sRGB</translation>
-    </message>
-    <message>
-        <source>Convert to Adobe RGB</source>
-        <translation type="vanished">转换为 Adobe RGB</translation>
-    </message>
-    <message>
-        <source>Color Space:</source>
-        <translation type="vanished">颜色空间:</translation>
-    </message>
-    <message>
-        <source>Keep Alpha</source>
-        <translation type="vanished">保留 Alpha</translation>
-    </message>
-    <message>
-        <source>Discard Alpha (replace with white)</source>
-        <translation type="vanished">丢弃 Alpha (白色填充)</translation>
-    </message>
-    <message>
-        <source>Premultiply Alpha</source>
-        <translation type="vanished">预乘 Alpha</translation>
-    </message>
-    <message>
-        <source>Alpha Handling:</source>
-        <translation type="vanished">Alpha 通道处理:</translation>
-    </message>
-    <message>
-        <source>Enable Scaling</source>
-        <translation type="vanished">启用缩放</translation>
-    </message>
-    <message>
-        <source>Scale:</source>
-        <translation type="vanished">缩放比例:</translation>
-    </message>
-    <message>
-        <source>Preserve TIFF Metadata</source>
-        <translation type="vanished">保留 TIFF 元数据</translation>
-    </message>
-    <message>
-        <source>Import the image with the selected settings</source>
-        <translation type="vanished">使用当前设置导入图片</translation>
-    </message>
-</context>
-<context>
-    <name>ImportImageDialog</name>
-    <message>
-        <source>Import Image - Parameters</source>
-        <translation type="vanished">导入图片 - 参数设置</translation>
-    </message>
-    <message>
-        <source>DPI Policy:</source>
-        <translation type="vanished">DPI 策略:</translation>
-    </message>
-    <message>
-        <source>Use Image DPI</source>
-        <translation type="vanished">使用图片 DPI</translation>
-    </message>
-    <message>
-        <source>Force DPI</source>
-        <translation type="vanished">强制指定 DPI</translation>
-    </message>
-    <message>
-        <source>Ignore DPI (72 DPI)</source>
-        <translation type="vanished">忽略 DPI (使用 72 DPI)</translation>
-    </message>
-    <message>
-        <source>Forced DPI:</source>
-        <translation type="vanished">强制 DPI:</translation>
-    </message>
-    <message>
-        <source>Color Space:</source>
-        <translation type="vanished">颜色空间:</translation>
-    </message>
-    <message>
-        <source>Keep Original</source>
-        <translation type="vanished">保持原样</translation>
-    </message>
-    <message>
-        <source>Convert to sRGB</source>
-        <translation type="vanished">转换为 sRGB</translation>
-    </message>
-    <message>
-        <source>Convert to Adobe RGB</source>
-        <translation type="vanished">转换为 Adobe RGB</translation>
-    </message>
-    <message>
-        <source>Alpha Handling:</source>
-        <translation type="vanished">Alpha 通道处理:</translation>
-    </message>
-    <message>
-        <source>Keep Alpha</source>
-        <translation type="vanished">保留 Alpha</translation>
-    </message>
-    <message>
-        <source>Discard Alpha (replace with white)</source>
-        <translation type="vanished">丢弃 Alpha (白色填充)</translation>
-    </message>
-    <message>
-        <source>Premultiply Alpha</source>
-        <translation type="vanished">预乘 Alpha</translation>
-    </message>
-    <message>
-        <source>Enable Scaling</source>
-        <translation type="vanished">启用缩放</translation>
-    </message>
-    <message>
-        <source>Scale:</source>
-        <translation type="vanished">缩放比例:</translation>
-    </message>
-    <message>
-        <source>Preserve TIFF Metadata</source>
-        <translation type="vanished">保留 TIFF 元数据</translation>
-    </message>
-    <message>
-        <source>Import the image with the selected settings</source>
-        <translation type="vanished">使用当前设置导入图片</translation>
+        <location filename="../UI/ImageArrangementDialog.cpp" line="59"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
     </message>
 </context>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="88"/>
+        <location filename="../UI/mainwindow.cpp" line="98"/>
         <source>AT Drawing Tools</source>
         <translation>AT 绘图工具</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="166"/>
+        <location filename="../UI/mainwindow.cpp" line="176"/>
         <source>&amp;File</source>
         <translation>文件(&amp;F)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="169"/>
+        <location filename="../UI/mainwindow.cpp" line="179"/>
         <source>&amp;New...</source>
         <translation>新建(&amp;N)...</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="177"/>
+        <location filename="../UI/mainwindow.cpp" line="187"/>
+        <source>&amp;Open Project...</source>
+        <translation>打开项目(&amp;O)...</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="189"/>
+        <source>Open a project file</source>
+        <translation>打开项目文件</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="193"/>
+        <source>&amp;Save Project...</source>
+        <translation>保存项目(&amp;S)...</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="195"/>
+        <source>Save the current project</source>
+        <translation>保存当前项目</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="201"/>
         <source>&amp;Import Image...</source>
         <translation>导入图片(&amp;I)...</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="183"/>
+        <location filename="../UI/mainwindow.cpp" line="207"/>
         <source>&amp;Export Image...</source>
         <translation>导出图片(&amp;E)...</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="190"/>
+        <location filename="../UI/mainwindow.cpp" line="214"/>
         <source>E&amp;xit</source>
         <translation>退出(&amp;X)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="196"/>
+        <location filename="../UI/mainwindow.cpp" line="220"/>
         <source>&amp;Edit</source>
         <translation>编辑(&amp;E)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="199"/>
+        <location filename="../UI/mainwindow.cpp" line="223"/>
         <source>&amp;Undo</source>
         <translation>撤销(&amp;U)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="205"/>
+        <location filename="../UI/mainwindow.cpp" line="229"/>
         <source>&amp;Redo</source>
         <translation>重做(&amp;R)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="213"/>
+        <location filename="../UI/mainwindow.cpp" line="237"/>
         <source>Cu&amp;t</source>
         <translation>剪切(&amp;T)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="219"/>
+        <location filename="../UI/mainwindow.cpp" line="243"/>
         <source>&amp;Copy</source>
         <translation>复制(&amp;C)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="225"/>
+        <location filename="../UI/mainwindow.cpp" line="249"/>
         <source>&amp;Paste</source>
         <translation>粘贴(&amp;P)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="233"/>
+        <location filename="../UI/mainwindow.cpp" line="257"/>
         <source>&amp;Delete</source>
         <translation>删除(&amp;D)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="239"/>
+        <location filename="../UI/mainwindow.cpp" line="263"/>
         <source>Select &amp;All</source>
         <translation>全选(&amp;A)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="245"/>
+        <location filename="../UI/mainwindow.cpp" line="269"/>
         <source>&amp;Arrange</source>
         <translation>排列(&amp;A)</translation>
     </message>
     <message>
-        <source>Bring to Front</source>
-        <translation type="vanished">置于顶层</translation>
-    </message>
-    <message>
-        <source>Send to Back</source>
-        <translation type="vanished">置于底层</translation>
-    </message>
-    <message>
-        <location filename="../UI/mainwindow.cpp" line="256"/>
+        <location filename="../UI/mainwindow.cpp" line="280"/>
         <source>&amp;Group</source>
         <translation>成组(&amp;G)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="261"/>
+        <location filename="../UI/mainwindow.cpp" line="285"/>
         <source>&amp;Ungroup</source>
         <translation>解散组(&amp;U)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="266"/>
-        <location filename="../UI/mainwindow.cpp" line="471"/>
+        <location filename="../UI/mainwindow.cpp" line="290"/>
+        <location filename="../UI/mainwindow.cpp" line="499"/>
         <source>Align</source>
         <translation>对齐</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="267"/>
+        <location filename="../UI/mainwindow.cpp" line="291"/>
         <source>Left</source>
         <translation>左对齐</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="269"/>
+        <location filename="../UI/mainwindow.cpp" line="293"/>
         <source>Right</source>
         <translation>右对齐</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="271"/>
+        <location filename="../UI/mainwindow.cpp" line="295"/>
         <source>Top</source>
         <translation>顶部对齐</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="273"/>
+        <location filename="../UI/mainwindow.cpp" line="297"/>
         <source>Bottom</source>
         <translation>底部对齐</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="275"/>
+        <location filename="../UI/mainwindow.cpp" line="299"/>
         <source>Center H</source>
         <translation>水平居中</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="277"/>
+        <location filename="../UI/mainwindow.cpp" line="301"/>
         <source>Center V</source>
         <translation>垂直居中</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="279"/>
+        <location filename="../UI/mainwindow.cpp" line="303"/>
         <source>Distribute</source>
         <translation>分布</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="280"/>
+        <location filename="../UI/mainwindow.cpp" line="304"/>
         <source>Horizontally</source>
         <translation>水平分布</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="282"/>
+        <location filename="../UI/mainwindow.cpp" line="306"/>
         <source>Vertically</source>
         <translation>垂直分布</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="286"/>
-        <location filename="../UI/mainwindow.cpp" line="479"/>
+        <location filename="../UI/mainwindow.cpp" line="310"/>
+        <location filename="../UI/mainwindow.cpp" line="507"/>
         <source>Align &amp;&amp; Layout...</source>
         <translation>对齐与布局(&amp;L)...</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="290"/>
+        <location filename="../UI/mainwindow.cpp" line="318"/>
         <source>Rotate</source>
         <translation>旋转</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="293"/>
+        <location filename="../UI/mainwindow.cpp" line="321"/>
         <source>90° Clockwise</source>
         <translation>顺时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="298"/>
+        <location filename="../UI/mainwindow.cpp" line="326"/>
         <source>90° Counter-clockwise</source>
         <translation>逆时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="302"/>
+        <location filename="../UI/mainwindow.cpp" line="330"/>
         <source>180°</source>
         <translation>旋转 180°</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="307"/>
+        <location filename="../UI/mainwindow.cpp" line="335"/>
         <source>&amp;Settings</source>
         <translation>设置(&amp;S)</translation>
     </message>
     <message>
-        <source>设置...</source>
-        <translation type="vanished">设置...</translation>
-    </message>
-    <message>
-        <location filename="../UI/mainwindow.cpp" line="312"/>
+        <location filename="../UI/mainwindow.cpp" line="340"/>
         <source>&amp;View</source>
         <translation>视图(&amp;V)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="324"/>
+        <location filename="../UI/mainwindow.cpp" line="352"/>
         <source>Show Grid</source>
         <translation>显示网格</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="332"/>
-        <location filename="../UI/mainwindow.cpp" line="340"/>
+        <location filename="../UI/mainwindow.cpp" line="360"/>
+        <location filename="../UI/mainwindow.cpp" line="368"/>
         <source>Ruler Unit: mm</source>
-        <translation>标尺单位: 毫米</translation>
+        <translation>标尺单位: mm</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="341"/>
+        <location filename="../UI/mainwindow.cpp" line="369"/>
         <source>Ruler Unit: px</source>
-        <translation>标尺单位: 像素</translation>
+        <translation>标尺单位: px</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="350"/>
+        <location filename="../UI/mainwindow.cpp" line="378"/>
         <source>Fit to Canvas</source>
         <translation>适配画布</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="357"/>
+        <location filename="../UI/mainwindow.cpp" line="385"/>
         <source>Reset Zoom (0)</source>
         <translation>重置缩放 (0)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="430"/>
+        <location filename="../UI/mainwindow.cpp" line="458"/>
         <source>Drawing Tools</source>
         <translation>绘图工具</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="455"/>
+        <location filename="../UI/mainwindow.cpp" line="483"/>
         <source>Select (V)</source>
         <translation>选择 (V)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="457"/>
+        <location filename="../UI/mainwindow.cpp" line="485"/>
         <source>Rectangle (R)</source>
         <translation>矩形 (R)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="459"/>
+        <location filename="../UI/mainwindow.cpp" line="487"/>
         <source>Ellipse (E)</source>
         <translation>椭圆 (E)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="461"/>
+        <location filename="../UI/mainwindow.cpp" line="489"/>
         <source>Line (L)</source>
         <translation>直线 (L)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="463"/>
+        <location filename="../UI/mainwindow.cpp" line="491"/>
         <source>Curve (C)</source>
         <translation>贝塞尔曲线 (C)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="465"/>
+        <location filename="../UI/mainwindow.cpp" line="493"/>
         <source>Freehand (F)</source>
         <translation>自由线条 (F)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="467"/>
+        <location filename="../UI/mainwindow.cpp" line="495"/>
         <source>Text (T)</source>
         <translation>文字 (T)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="379"/>
+        <location filename="../UI/mainwindow.cpp" line="407"/>
         <source>New</source>
         <translation>新建</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="248"/>
+        <location filename="../UI/mainwindow.cpp" line="271"/>
         <source>Bring Forward</source>
         <translation>置于上一层</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="249"/>
+        <location filename="../UI/mainwindow.cpp" line="273"/>
         <source>Bring selected items forward one step</source>
         <translation>将选中图元上移一层</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="251"/>
+        <location filename="../UI/mainwindow.cpp" line="275"/>
         <source>Send Backward</source>
         <translation>置于下一层</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="253"/>
+        <location filename="../UI/mainwindow.cpp" line="277"/>
         <source>Send selected items backward one step</source>
         <translation>将选中图元下移一层</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="386"/>
+        <location filename="../UI/mainwindow.cpp" line="414"/>
         <source>Import Image</source>
         <translation>导入图片</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="393"/>
-        <location filename="../UI/mainwindow.cpp" line="869"/>
+        <location filename="../UI/mainwindow.cpp" line="421"/>
+        <location filename="../UI/mainwindow.cpp" line="1368"/>
         <source>Export Image</source>
         <translation>导出图片</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="407"/>
-        <location filename="../UI/mainwindow.cpp" line="940"/>
+        <location filename="../UI/mainwindow.cpp" line="435"/>
+        <location filename="../UI/mainwindow.cpp" line="1632"/>
         <source>Cut</source>
         <translation>剪切</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="415"/>
+        <location filename="../UI/mainwindow.cpp" line="443"/>
         <source>Copy</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="423"/>
+        <location filename="../UI/mainwindow.cpp" line="451"/>
         <source>Paste</source>
         <translation>粘贴</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="488"/>
+        <location filename="../UI/mainwindow.cpp" line="516"/>
         <source>Group</source>
         <translation>成组</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="494"/>
-        <location filename="../UI/mainwindow.cpp" line="1081"/>
+        <location filename="../UI/mainwindow.cpp" line="522"/>
+        <location filename="../UI/mainwindow.cpp" line="1773"/>
         <source>Ungroup</source>
         <translation>解散组</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="370"/>
+        <location filename="../UI/mainwindow.cpp" line="398"/>
         <source>File &amp; Edit</source>
         <translation>文件与编辑</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="480"/>
+        <location filename="../UI/mainwindow.cpp" line="508"/>
         <source>Open Align &amp; Layout dialog</source>
         <translation>打开对齐与布局对话框</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="489"/>
+        <location filename="../UI/mainwindow.cpp" line="517"/>
         <source>Group selected items (Ctrl+G)</source>
         <translation>将选中图元成组 (Ctrl+G)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="495"/>
+        <location filename="../UI/mainwindow.cpp" line="523"/>
         <source>Ungroup selected items (Ctrl+Shift+G)</source>
         <translation>将选中图元解散组 (Ctrl+Shift+G)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="504"/>
+        <location filename="../UI/mainwindow.cpp" line="532"/>
         <source>Rotate 90° clockwise</source>
         <translation>顺时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="511"/>
+        <location filename="../UI/mainwindow.cpp" line="539"/>
         <source>Rotate 90° counter-clockwise</source>
         <translation>逆时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="709"/>
+        <location filename="../UI/mainwindow.cpp" line="698"/>
+        <source>Resize canvas</source>
+        <translation>调整画布尺寸</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="759"/>
         <source>X: %1 mm  Y: %2 mm</source>
         <translation>X: %1 mm  Y: %2 mm</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="711"/>
+        <location filename="../UI/mainwindow.cpp" line="761"/>
         <source>X: %1 px  Y: %2 px</source>
         <translation>X: %1 px  Y: %2 px</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="589"/>
+        <location filename="../UI/mainwindow.cpp" line="630"/>
         <source>%1%</source>
         <translation>%1%</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="629"/>
+        <location filename="../UI/mainwindow.cpp" line="670"/>
         <source>X: 0.0 px  Y: 0.0 px</source>
         <translation>X: 0.0 px  Y: 0.0 px</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="640"/>
+        <location filename="../UI/mainwindow.cpp" line="676"/>
         <source>100%</source>
         <translation>100%</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="733"/>
-        <source>Canvas: %1 × %2 mm · %3 PPI</source>
-        <translation>画布: %1 × %2 毫米 · %3 PPI</translation>
-    </message>
-    <message>
-        <location filename="../UI/mainwindow.cpp" line="738"/>
-        <source>Canvas: %1 × %2 px · %3 PPI</source>
-        <translation>画布: %1 × %2 像素 · %3 PPI</translation>
-    </message>
-    <message>
-        <source>Tool: Select</source>
-        <translation type="vanished">工具: 选择</translation>
-    </message>
-    <message>
-        <source>TIFF (*.tif *.tiff);;PNG (*.png);;JPEG (*.jpg);;BMP (*.bmp)</source>
-        <translation type="vanished">TIFF (*.tif *.tiff);;PNG (*.png);;JPEG (*.jpg);;BMP (*.bmp)</translation>
-    </message>
-    <message>
-        <location filename="../UI/mainwindow.cpp" line="1147"/>
+        <location filename="../UI/mainwindow.cpp" line="1839"/>
         <source>Align %1</source>
         <translation>对齐 %1</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="1164"/>
+        <location filename="../UI/mainwindow.cpp" line="1856"/>
         <source>Distribute %1</source>
         <translation>分布 %1</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="753"/>
+        <location filename="../UI/mainwindow.cpp" line="803"/>
         <source>Select</source>
         <translation>选择</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="759"/>
+        <location filename="../UI/mainwindow.cpp" line="809"/>
         <source>Rectangle</source>
         <translation>矩形</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="762"/>
+        <location filename="../UI/mainwindow.cpp" line="812"/>
         <source>Ellipse</source>
         <translation>椭圆</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="765"/>
+        <location filename="../UI/mainwindow.cpp" line="815"/>
         <source>Line</source>
         <translation>直线</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="768"/>
+        <location filename="../UI/mainwindow.cpp" line="818"/>
         <source>Bézier Curve</source>
         <translation>贝塞尔曲线</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="774"/>
+        <location filename="../UI/mainwindow.cpp" line="824"/>
         <source>Text</source>
         <translation>文字</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="777"/>
+        <location filename="../UI/mainwindow.cpp" line="827"/>
         <source>Image</source>
         <translation>图片</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="784"/>
+        <location filename="../UI/mainwindow.cpp" line="834"/>
         <source>Tool: %1</source>
         <translation>工具: %1</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="782"/>
+        <location filename="../UI/mainwindow.cpp" line="832"/>
         <source>Unknown</source>
         <translation>未知</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="869"/>
+        <location filename="../UI/mainwindow.cpp" line="783"/>
+        <source>Canvas: %1 × %2 mm · %3 DPI</source>
+        <translation>画布: %1 × %2 mm · %3 DPI</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="788"/>
+        <source>Canvas: %1 × %2 px · %3 DPI</source>
+        <translation>画布: %1 × %2 px · %3 DPI</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="914"/>
+        <location filename="../UI/mainwindow.cpp" line="956"/>
+        <location filename="../UI/mainwindow.cpp" line="968"/>
+        <location filename="../UI/mainwindow.cpp" line="995"/>
+        <source>Open Project</source>
+        <translation>打开项目</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="915"/>
+        <source>The current canvas has unsaved content.
+Do you want to save it before opening another project?</source>
+        <translation>打开项目</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="927"/>
+        <location filename="../UI/mainwindow.cpp" line="947"/>
+        <location filename="../UI/mainwindow.cpp" line="1056"/>
+        <location filename="../UI/mainwindow.cpp" line="1062"/>
+        <location filename="../UI/mainwindow.cpp" line="1106"/>
+        <location filename="../UI/mainwindow.cpp" line="1131"/>
+        <source>Save Project</source>
+        <translation>保存项目</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="928"/>
+        <location filename="../UI/mainwindow.cpp" line="957"/>
+        <location filename="../UI/mainwindow.cpp" line="1063"/>
+        <source>AT Project Files (*.atp);;All Files (*)</source>
+        <translation>AT 项目文件 (*.atp);;所有文件 (*)</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="948"/>
+        <source>Failed to save:
+%1</source>
+        <translation>AT 项目文件 (*.atp);;所有文件 (*)</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="969"/>
+        <source>Failed to open project:
+%1</source>
+        <translation>AT 项目文件 (*.atp);;所有文件 (*)</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="990"/>
+        <location filename="../UI/mainwindow.cpp" line="1043"/>
+        <location filename="../UI/mainwindow.cpp" line="1139"/>
+        <source>AT Drawing Tools - %1</source>
+        <translation>AT 绘图工具 - %1</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1057"/>
+        <source>No canvas to save. Create a new canvas first.</source>
+        <translation>没有画布可保存，请先创建画布。</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1132"/>
+        <source>Failed to save project:
+%1</source>
+        <translation>没有画布可保存，请先创建画布。</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1152"/>
+        <source>Import Images</source>
+        <translation>导入图片</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1153"/>
+        <source>Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;TIFF (*.tif *.tiff);;PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp);;All Files (*)</source>
+        <translation>图片文件 (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;TIFF (*.tif *.tiff);;PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp);;所有文件 (*)</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1188"/>
+        <location filename="../UI/mainwindow.cpp" line="1249"/>
+        <source>Import</source>
+        <translation>导入</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1322"/>
+        <source>Fit Canvas on Import</source>
+        <translation>导入时适配画布</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1361"/>
+        <location filename="../UI/mainwindow.cpp" line="1400"/>
+        <location filename="../UI/mainwindow.cpp" line="1423"/>
+        <location filename="../UI/mainwindow.cpp" line="1429"/>
+        <location filename="../UI/mainwindow.cpp" line="1568"/>
+        <source>Export</source>
+        <translation>导出</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1362"/>
+        <source>An export is already in progress.</source>
+        <translation>正在导出，请稍候。</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1368"/>
         <source>prn Files (*.prn)</source>
         <translation>prn 文件 (*.prn)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="1121"/>
+        <location filename="../UI/mainwindow.cpp" line="1400"/>
+        <source>No items to export.</source>
+        <translation>没有可导出的图元。</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1424"/>
+        <source>An image on the canvas has no source file and cannot be exported.</source>
+        <translation>画布上的图片没有源文件，无法导出。</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1430"/>
+        <source>Source file not found:
+%1</source>
+        <translation>画布上的图片没有源文件，无法导出。</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="1813"/>
         <source>&lt;h3&gt;AT Drawing Tools&lt;/h3&gt;&lt;p&gt;Current Version: %1&lt;/p&gt;&lt;p&gt;    Rip Version: %2&lt;/p&gt;</source>
         <translation>&lt;h3&gt;AT 绘图工具&lt;/h3&gt;&lt;p&gt;当前版本: %1&lt;/p&gt;&lt;p&gt;    Rip 版本: %2&lt;/p&gt;</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="1127"/>
+        <location filename="../UI/mainwindow.cpp" line="1819"/>
         <source>About AT Drawing Tools</source>
         <translation>关于 AT 绘图工具</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="1389"/>
+        <location filename="../UI/mainwindow.cpp" line="2017"/>
+        <source>RIP</source>
+        <translation>RIP</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="2182"/>
         <source>Rotate %1°</source>
         <translation>旋转 %1°</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="171"/>
-        <location filename="../UI/mainwindow.cpp" line="380"/>
+        <location filename="../UI/mainwindow.cpp" line="181"/>
+        <location filename="../UI/mainwindow.cpp" line="408"/>
         <source>Create a new canvas</source>
         <translation>创建新画布</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="179"/>
-        <location filename="../UI/mainwindow.cpp" line="387"/>
+        <location filename="../UI/mainwindow.cpp" line="203"/>
+        <location filename="../UI/mainwindow.cpp" line="415"/>
         <source>Import an image onto the canvas</source>
         <translation>导入图片到画布</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="185"/>
-        <location filename="../UI/mainwindow.cpp" line="394"/>
+        <location filename="../UI/mainwindow.cpp" line="209"/>
+        <location filename="../UI/mainwindow.cpp" line="422"/>
         <source>Export the canvas to an image file</source>
         <translation>导出画布为图片文件</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="192"/>
+        <location filename="../UI/mainwindow.cpp" line="216"/>
         <source>Exit the application</source>
         <translation>退出应用程序</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="201"/>
+        <location filename="../UI/mainwindow.cpp" line="225"/>
         <source>Undo the last action</source>
         <translation>撤销上一步操作</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="207"/>
+        <location filename="../UI/mainwindow.cpp" line="231"/>
         <source>Redo the last undone action</source>
         <translation>重做上一步被撤销的操作</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="215"/>
-        <location filename="../UI/mainwindow.cpp" line="409"/>
+        <location filename="../UI/mainwindow.cpp" line="239"/>
+        <location filename="../UI/mainwindow.cpp" line="437"/>
         <source>Cut the selected items to clipboard</source>
         <translation>将选中图元剪切到剪贴板</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="221"/>
-        <location filename="../UI/mainwindow.cpp" line="417"/>
+        <location filename="../UI/mainwindow.cpp" line="245"/>
+        <location filename="../UI/mainwindow.cpp" line="445"/>
         <source>Copy the selected items to clipboard</source>
         <translation>将选中图元复制到剪贴板</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="227"/>
-        <location filename="../UI/mainwindow.cpp" line="425"/>
+        <location filename="../UI/mainwindow.cpp" line="251"/>
+        <location filename="../UI/mainwindow.cpp" line="453"/>
         <source>Paste items from clipboard</source>
         <translation>从剪贴板粘贴图元</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="235"/>
+        <location filename="../UI/mainwindow.cpp" line="259"/>
         <source>Delete the selected items</source>
         <translation>删除选中图元</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="241"/>
+        <location filename="../UI/mainwindow.cpp" line="265"/>
         <source>Select all items on the canvas</source>
         <translation>选中画布上的所有图元</translation>
     </message>
     <message>
-        <source>Bring selected items to the front</source>
-        <translation type="vanished">将选中图元移到最前面</translation>
-    </message>
-    <message>
-        <source>Send selected items to the back</source>
-        <translation type="vanished">将选中图元移到最后面</translation>
-    </message>
-    <message>
-        <location filename="../UI/mainwindow.cpp" line="258"/>
+        <location filename="../UI/mainwindow.cpp" line="282"/>
         <source>Group selected items together</source>
         <translation>将选中的多个图元合并为一个组</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="263"/>
+        <location filename="../UI/mainwindow.cpp" line="287"/>
         <source>Ungroup selected items</source>
         <translation>解散选中的图元组</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="268"/>
+        <location filename="../UI/mainwindow.cpp" line="292"/>
         <source>Align selected items to the left edge</source>
         <translation>将选中图元沿左边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="270"/>
+        <location filename="../UI/mainwindow.cpp" line="294"/>
         <source>Align selected items to the right edge</source>
         <translation>将选中图元沿右边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="272"/>
+        <location filename="../UI/mainwindow.cpp" line="296"/>
         <source>Align selected items to the top edge</source>
         <translation>将选中图元沿顶部边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="274"/>
+        <location filename="../UI/mainwindow.cpp" line="298"/>
         <source>Align selected items to the bottom edge</source>
         <translation>将选中图元沿底部边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="276"/>
+        <location filename="../UI/mainwindow.cpp" line="300"/>
         <source>Align selected items to the horizontal center</source>
         <translation>将选中图元水平居中对齐</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="278"/>
+        <location filename="../UI/mainwindow.cpp" line="302"/>
         <source>Align selected items to the vertical center</source>
         <translation>将选中图元垂直居中对齐</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="281"/>
+        <location filename="../UI/mainwindow.cpp" line="305"/>
         <source>Distribute selected items evenly horizontally</source>
         <translation>将选中图元水平均匀分布</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="283"/>
+        <location filename="../UI/mainwindow.cpp" line="307"/>
         <source>Distribute selected items evenly vertically</source>
         <translation>将选中图元垂直均匀分布</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="288"/>
+        <location filename="../UI/mainwindow.cpp" line="312"/>
         <source>Open the Align &amp; Layout dialog</source>
         <translation>打开对齐与布局对话框</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="295"/>
+        <location filename="../UI/mainwindow.cpp" line="315"/>
+        <location filename="../UI/mainwindow.cpp" line="547"/>
+        <location filename="../UI/mainwindow.cpp" line="2090"/>
+        <source>Fit Canvas to Selection</source>
+        <translation>画布适配选中图元</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="316"/>
+        <location filename="../UI/mainwindow.cpp" line="548"/>
+        <source>Resize the canvas to fit the selected items</source>
+        <translation>调整画布尺寸以适配选中图元</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="323"/>
         <source>Rotate selected items 90 degrees clockwise</source>
         <translation>将选中图元顺时针旋转 90 度</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="300"/>
+        <location filename="../UI/mainwindow.cpp" line="328"/>
         <source>Rotate selected items 90 degrees counter-clockwise</source>
         <translation>将选中图元逆时针旋转 90 度</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="304"/>
+        <location filename="../UI/mainwindow.cpp" line="332"/>
         <source>Rotate selected items 180 degrees</source>
         <translation>将选中图元旋转 180 度</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="308"/>
+        <location filename="../UI/mainwindow.cpp" line="336"/>
         <source>&amp;Settings...</source>
         <translation>设置(&amp;S)...</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="309"/>
+        <location filename="../UI/mainwindow.cpp" line="337"/>
         <source>Open application settings</source>
         <translation>打开应用程序设置</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="318"/>
+        <location filename="../UI/mainwindow.cpp" line="346"/>
         <source>&amp;Help</source>
         <translation>帮助(&amp;H)</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="319"/>
+        <location filename="../UI/mainwindow.cpp" line="347"/>
         <source>&amp;About...</source>
         <translation>关于(&amp;A)...</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="320"/>
+        <location filename="../UI/mainwindow.cpp" line="348"/>
         <source>About this application</source>
         <translation>关于本应用程序</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="327"/>
+        <location filename="../UI/mainwindow.cpp" line="355"/>
         <source>Show or hide the grid</source>
         <translation>显示或隐藏网格</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="335"/>
+        <location filename="../UI/mainwindow.cpp" line="363"/>
         <source>Toggle ruler unit between millimeters and pixels</source>
-        <translation>在毫米与像素之间切换标尺单位</translation>
+        <translation>在mm与px之间切换标尺单位</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="351"/>
+        <location filename="../UI/mainwindow.cpp" line="379"/>
         <source>Fit the view to the canvas</source>
         <translation>将视图缩放到适合画布</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="359"/>
+        <location filename="../UI/mainwindow.cpp" line="387"/>
         <source>Reset zoom to 100%</source>
         <translation>将缩放重置为 100%</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="651"/>
+        <location filename="../UI/mainwindow.cpp" line="687"/>
         <source>Adjust zoom level</source>
         <translation>调整缩放级别</translation>
     </message>
     <message>
-        <source>Minimize</source>
-        <translation type="vanished">最小化</translation>
-    </message>
-    <message>
-        <source>Maximize</source>
-        <translation type="vanished">最大化</translation>
-    </message>
-    <message>
-        <source>Restore Down</source>
-        <translation type="vanished">向下还原</translation>
-    </message>
-    <message>
-        <source>Close</source>
-        <translation type="vanished">关闭</translation>
-    </message>
-    <message>
-        <location filename="../UI/mainwindow.cpp" line="503"/>
+        <location filename="../UI/mainwindow.cpp" line="531"/>
         <source>Rotate 90° CW</source>
         <translation>顺时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="510"/>
+        <location filename="../UI/mainwindow.cpp" line="538"/>
         <source>Rotate 90° CCW</source>
         <translation>逆时针旋转 90°</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="756"/>
+        <location filename="../UI/mainwindow.cpp" line="806"/>
         <source>Hand</source>
         <translation>手型</translation>
     </message>
     <message>
-        <location filename="../UI/mainwindow.cpp" line="771"/>
+        <location filename="../UI/mainwindow.cpp" line="821"/>
         <source>Freehand</source>
         <translation>自由线条</translation>
-    </message>
-    <message>
-        <location filename="../UI/mainwindow.cpp" line="632"/>
-        <source>Rip</source>
-        <translation>Rip</translation>
     </message>
     <message>
         <location filename="../UI/mainwindow.ui" line="14"/>
@@ -1682,12 +1367,6 @@
         <translation>预设尺寸:</translation>
     </message>
     <message>
-        <location filename="../UI/NewFileDialog.cpp" line="79"/>
-        <location filename="../UI/NewFileDialog.cpp" line="85"/>
-        <source> mm</source>
-        <translation> 毫米</translation>
-    </message>
-    <message>
         <location filename="../UI/NewFileDialog.cpp" line="80"/>
         <source>Width:</source>
         <translation>宽度:</translation>
@@ -1698,14 +1377,9 @@
         <translation>高度:</translation>
     </message>
     <message>
-        <location filename="../UI/NewFileDialog.cpp" line="92"/>
-        <source> PPI</source>
-        <translation> PPI</translation>
-    </message>
-    <message>
         <location filename="../UI/NewFileDialog.cpp" line="94"/>
         <source>Pixels Per Inch — affects mm↔px conversion</source>
-        <translation>每英寸像素数 — 影响毫米与像素的转换</translation>
+        <translation>每英寸像素数 — 影响mm与px的转换</translation>
     </message>
     <message>
         <location filename="../UI/NewFileDialog.cpp" line="95"/>
@@ -1728,204 +1402,240 @@
         <translation>创建新画布</translation>
     </message>
     <message>
+        <location filename="../UI/NewFileDialog.cpp" line="92"/>
+        <source> dpi</source>
+        <translation> dpi</translation>
+    </message>
+    <message>
         <location filename="../UI/NewFileDialog.cpp" line="104"/>
         <source>Cancel and close the dialog</source>
         <translation>取消并关闭对话框</translation>
     </message>
 </context>
 <context>
+    <name>ProgressManager</name>
+    <message>
+        <location filename="../Utils/ProgressManager.cpp" line="9"/>
+        <location filename="../Utils/ProgressManager.cpp" line="71"/>
+        <location filename="../Utils/ProgressManager.cpp" line="100"/>
+        <location filename="../Utils/ProgressManager.cpp" line="122"/>
+        <source>Ready</source>
+        <translation>就绪</translation>
+    </message>
+</context>
+<context>
     <name>PropertyPanel</name>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="27"/>
+        <location filename="../UI/PropertyPanel.cpp" line="28"/>
         <source>Properties</source>
         <translation>属性</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="40"/>
+        <location filename="../UI/PropertyPanel.cpp" line="41"/>
         <source>No item selected</source>
         <translation>未选中任何图元</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="47"/>
+        <location filename="../UI/PropertyPanel.cpp" line="48"/>
         <source>Geometry</source>
         <translation>位置与尺寸</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="57"/>
+        <location filename="../UI/PropertyPanel.cpp" line="58"/>
         <source>X:</source>
         <translation>X:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="58"/>
+        <location filename="../UI/PropertyPanel.cpp" line="59"/>
         <source>Y:</source>
         <translation>Y:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="59"/>
-        <location filename="../UI/PropertyPanel.cpp" line="75"/>
+        <location filename="../UI/PropertyPanel.cpp" line="60"/>
+        <location filename="../UI/PropertyPanel.cpp" line="76"/>
         <source>Width:</source>
         <translation>宽度:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="60"/>
+        <location filename="../UI/PropertyPanel.cpp" line="61"/>
         <source>Height:</source>
         <translation>高度:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="64"/>
+        <location filename="../UI/PropertyPanel.cpp" line="65"/>
         <source>Border</source>
         <translation>边框</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="73"/>
+        <location filename="../UI/PropertyPanel.cpp" line="74"/>
         <source>Solid</source>
         <translation>实线</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="73"/>
+        <location filename="../UI/PropertyPanel.cpp" line="74"/>
         <source>Dash</source>
         <translation>虚线</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="73"/>
+        <location filename="../UI/PropertyPanel.cpp" line="74"/>
         <source>Dot</source>
         <translation>点线</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="73"/>
+        <location filename="../UI/PropertyPanel.cpp" line="74"/>
         <source>DashDot</source>
         <translation>点划线</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="73"/>
+        <location filename="../UI/PropertyPanel.cpp" line="74"/>
         <source>DashDotDot</source>
         <translation>双点划线</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="73"/>
+        <location filename="../UI/PropertyPanel.cpp" line="74"/>
         <source>None</source>
         <translation>无</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="74"/>
-        <location filename="../UI/PropertyPanel.cpp" line="100"/>
-        <location filename="../UI/PropertyPanel.cpp" line="132"/>
+        <location filename="../UI/PropertyPanel.cpp" line="75"/>
+        <location filename="../UI/PropertyPanel.cpp" line="101"/>
+        <location filename="../UI/PropertyPanel.cpp" line="133"/>
         <source>Color:</source>
         <translation>颜色:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="76"/>
-        <location filename="../UI/PropertyPanel.cpp" line="131"/>
+        <location filename="../UI/PropertyPanel.cpp" line="77"/>
+        <location filename="../UI/PropertyPanel.cpp" line="132"/>
         <source>Style:</source>
         <translation>样式:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="80"/>
+        <location filename="../UI/PropertyPanel.cpp" line="81"/>
         <source>Fill</source>
         <translation>填充</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="85"/>
+        <location filename="../UI/PropertyPanel.cpp" line="86"/>
         <source>No Fill</source>
         <translation>无填充</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="85"/>
+        <location filename="../UI/PropertyPanel.cpp" line="86"/>
         <source>Solid Color</source>
         <translation>纯色填充</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="85"/>
+        <location filename="../UI/PropertyPanel.cpp" line="86"/>
         <source>Gradient</source>
         <translation>渐变填充</translation>
     </message>
     <message>
-        <source>Edit...</source>
-        <translation type="vanished">编辑...</translation>
+        <location filename="../UI/PropertyPanel.cpp" line="159"/>
+        <source>Image Info</source>
+        <translation>图片信息</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="99"/>
+        <location filename="../UI/PropertyPanel.cpp" line="171"/>
+        <source>Path:</source>
+        <translation>路径:</translation>
+    </message>
+    <message>
+        <location filename="../UI/PropertyPanel.cpp" line="172"/>
+        <source>Format:</source>
+        <translation>格式:</translation>
+    </message>
+    <message>
+        <location filename="../UI/PropertyPanel.cpp" line="173"/>
+        <source>Display Size:</source>
+        <translation>显示尺寸:</translation>
+    </message>
+    <message>
+        <location filename="../UI/PropertyPanel.cpp" line="174"/>
+        <source>Original Size:</source>
+        <translation>原始尺寸:</translation>
+    </message>
+    <message>
+        <location filename="../UI/PropertyPanel.cpp" line="175"/>
+        <source>Color Space:</source>
+        <translation>颜色空间:</translation>
+    </message>
+    <message>
+        <location filename="../UI/PropertyPanel.cpp" line="176"/>
+        <source>DPI:</source>
+        <translation>DPI:</translation>
+    </message>
+    <message>
+        <location filename="../UI/PropertyPanel.cpp" line="619"/>
+        <source>%1 x %2 px</source>
+        <translation>%1 × %2 px</translation>
+    </message>
+    <message>
+        <location filename="../UI/PropertyPanel.cpp" line="100"/>
         <source>Mode:</source>
         <translation>模式:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="104"/>
+        <location filename="../UI/PropertyPanel.cpp" line="105"/>
         <source>Text</source>
         <translation>文字</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="109"/>
+        <location filename="../UI/PropertyPanel.cpp" line="110"/>
         <source>B</source>
         <translation>B</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="113"/>
+        <location filename="../UI/PropertyPanel.cpp" line="114"/>
         <source>I</source>
         <translation>I</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="129"/>
+        <location filename="../UI/PropertyPanel.cpp" line="130"/>
         <source>Font:</source>
         <translation>字体:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="130"/>
+        <location filename="../UI/PropertyPanel.cpp" line="131"/>
         <source>Size:</source>
         <translation>字号:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="133"/>
+        <location filename="../UI/PropertyPanel.cpp" line="134"/>
         <source>Background:</source>
         <translation>背景色:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="134"/>
+        <location filename="../UI/PropertyPanel.cpp" line="135"/>
         <source>Text:</source>
         <translation>文字:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="138"/>
+        <location filename="../UI/PropertyPanel.cpp" line="139"/>
         <source>Corner Radius</source>
         <translation>圆角</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="142"/>
+        <location filename="../UI/PropertyPanel.cpp" line="143"/>
         <source>Radius:</source>
         <translation>圆角半径:</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="146"/>
+        <location filename="../UI/PropertyPanel.cpp" line="147"/>
         <source>Rotation</source>
         <translation>旋转</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="154"/>
+        <location filename="../UI/PropertyPanel.cpp" line="155"/>
         <source>Angle:</source>
         <translation>角度:</translation>
     </message>
     <message>
-        <source>Border Color</source>
-        <translation type="vanished">边框颜色</translation>
-    </message>
-    <message>
-        <source>Fill Color</source>
-        <translation type="vanished">填充颜色</translation>
-    </message>
-    <message>
-        <source>Text Color</source>
-        <translation type="vanished">文字颜色</translation>
-    </message>
-    <message>
-        <source>Background Color</source>
-        <translation type="vanished">背景颜色</translation>
-    </message>
-    <message>
-        <location filename="../UI/PropertyPanel.cpp" line="112"/>
+        <location filename="../UI/PropertyPanel.cpp" line="113"/>
         <source>Toggle bold</source>
         <translation>切换粗体</translation>
     </message>
     <message>
-        <location filename="../UI/PropertyPanel.cpp" line="116"/>
+        <location filename="../UI/PropertyPanel.cpp" line="117"/>
         <source>Toggle italic</source>
         <translation>切换斜体</translation>
     </message>
@@ -1936,14 +1646,6 @@
         <location filename="../UI/qatgraphicsview.cpp" line="244"/>
         <source>Text</source>
         <translation>文字</translation>
-    </message>
-    <message>
-        <source>Bring to Front</source>
-        <translation type="vanished">置于顶层</translation>
-    </message>
-    <message>
-        <source>Send to Back</source>
-        <translation type="vanished">置于底层</translation>
     </message>
     <message>
         <location filename="../UI/qatgraphicsview.cpp" line="451"/>
@@ -1976,12 +1678,14 @@
         <translation>解散组</translation>
     </message>
     <message>
-        <source>Bring selected items to the front</source>
-        <translation type="vanished">将选中图元移到最前面</translation>
+        <location filename="../UI/qatgraphicsview.cpp" line="481"/>
+        <source>Fit Canvas to Selection</source>
+        <translation>画布适配选中图元</translation>
     </message>
     <message>
-        <source>Send selected items to the back</source>
-        <translation type="vanished">将选中图元移到最后面</translation>
+        <location filename="../UI/qatgraphicsview.cpp" line="483"/>
+        <source>Resize the canvas to fit the selected items</source>
+        <translation>调整画布尺寸以适配选中图元</translation>
     </message>
     <message>
         <location filename="../UI/qatgraphicsview.cpp" line="473"/>
@@ -1997,111 +1701,94 @@
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../Commands/Commands.cpp" line="13"/>
+        <location filename="../Commands/Commands.cpp" line="14"/>
         <source>Add Item</source>
         <translation>添加图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="50"/>
+        <location filename="../Commands/Commands.cpp" line="51"/>
         <source>Delete Items</source>
         <translation>删除图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="103"/>
+        <location filename="../Commands/Commands.cpp" line="104"/>
         <source>Move Items</source>
         <translation>移动图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="143"/>
+        <location filename="../Commands/Commands.cpp" line="144"/>
         <source>Change Pen</source>
         <translation>修改边框</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="144"/>
+        <location filename="../Commands/Commands.cpp" line="145"/>
         <source>Change Brush</source>
         <translation>修改画刷</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="145"/>
+        <location filename="../Commands/Commands.cpp" line="146"/>
         <source>Change Font</source>
         <translation>修改字体</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="146"/>
+        <location filename="../Commands/Commands.cpp" line="147"/>
         <source>Change Text</source>
         <translation>修改文字</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="147"/>
+        <location filename="../Commands/Commands.cpp" line="148"/>
         <source>Resize</source>
         <translation>调整大小</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="148"/>
+        <location filename="../Commands/Commands.cpp" line="149"/>
         <source>Change Corner Radius</source>
         <translation>修改圆角半径</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="208"/>
+        <location filename="../Commands/Commands.cpp" line="209"/>
         <source>Paste Items</source>
         <translation>粘贴图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="257"/>
+        <location filename="../Commands/Commands.cpp" line="258"/>
         <source>Change Z-Order</source>
         <translation>修改层级</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="295"/>
+        <location filename="../Commands/Commands.cpp" line="296"/>
         <source>Align Items</source>
         <translation>对齐图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="337"/>
+        <location filename="../Commands/Commands.cpp" line="338"/>
         <source>Stretch Align Items</source>
         <translation>拉伸对齐图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="374"/>
+        <location filename="../Commands/Commands.cpp" line="375"/>
         <source>Change Position</source>
         <translation>修改位置</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="420"/>
+        <location filename="../Commands/Commands.cpp" line="421"/>
         <source>Rotate %1°</source>
         <translation>旋转 %1°</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="447"/>
+        <location filename="../Commands/Commands.cpp" line="448"/>
         <source>Group Items</source>
         <translation>成组图元</translation>
     </message>
     <message>
-        <location filename="../Commands/Commands.cpp" line="532"/>
+        <location filename="../Commands/Commands.cpp" line="533"/>
         <source>Ungroup Items</source>
         <translation>解散组图元</translation>
     </message>
     <message>
-        <location filename="../Utils/ImageUtils.cpp" line="353"/>
-        <location filename="../Utils/ImageUtils.cpp" line="379"/>
-        <source>Import Image</source>
-        <translation>导入图片</translation>
-    </message>
-    <message>
-        <location filename="../Utils/ImageUtils.cpp" line="354"/>
-        <source>Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;TIFF (*.tif *.tiff);;PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp);;All Files (*)</source>
-        <translation>图片文件 (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;TIFF (*.tif *.tiff);;PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp);;所有文件 (*)</translation>
-    </message>
-    <message>
-        <location filename="../Utils/ImageUtils.cpp" line="380"/>
-        <source>Image size (%1 x %2) exceeds canvas size (%3 x %4).
-Scale to fit canvas?</source>
-        <translation>图片尺寸 (%1 x %2) 超出画布尺寸 (%3 x %4)。
-是否缩放以适配画布?</translation>
-    </message>
-    <message>
-        <source>Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;TIFF (*.tif *.tiff);;All Files (*)</source>
-        <translation type="vanished">图片文件 (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;TIFF (*.tif *.tiff);;所有文件 (*)</translation>
+        <location filename="../Commands/Commands.cpp" line="612"/>
+        <source>Fit Canvas</source>
+        <translation>适配画布</translation>
     </message>
 </context>
 <context>
@@ -2443,19 +2130,49 @@ Scale to fit canvas?</source>
     </message>
 </context>
 <context>
+    <name>ResizeCanvasDialog</name>
+    <message>
+        <location filename="../UI/ResizeCanvasDialog.cpp" line="17"/>
+        <source>Resize Canvas</source>
+        <translation>调整画布尺寸</translation>
+    </message>
+    <message>
+        <location filename="../UI/ResizeCanvasDialog.cpp" line="27"/>
+        <source>Width:</source>
+        <translation>宽度:</translation>
+    </message>
+    <message>
+        <location filename="../UI/ResizeCanvasDialog.cpp" line="32"/>
+        <source>Height:</source>
+        <translation>高度:</translation>
+    </message>
+    <message>
+        <location filename="../UI/ResizeCanvasDialog.cpp" line="41"/>
+        <source>OK</source>
+        <translation>确定</translation>
+    </message>
+    <message>
+        <location filename="../UI/ResizeCanvasDialog.cpp" line="42"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location filename="../UI/ResizeCanvasDialog.cpp" line="63"/>
+        <source>Resolution: %1 PPI  |  1 mm = %2 px</source>
+        <translation>分辨率: %1 PPI  |  1 mm = %2 px</translation>
+    </message>
+    <message>
+        <location filename="../UI/ResizeCanvasDialog.cpp" line="72"/>
+        <source>Resolution: %1 PPI  |  %2 × %3 px = %4 × %5 mm</source>
+        <translation>分辨率: %1 PPI  |  %2 × %3 px = %4 × %5 mm</translation>
+    </message>
+</context>
+<context>
     <name>SettingsDialog</name>
     <message>
         <location filename="../UI/SettingsDialog.cpp" line="30"/>
         <source>设置</source>
         <translation>设置</translation>
-    </message>
-    <message>
-        <source>Rip设置</source>
-        <translation type="vanished">Rip 设置</translation>
-    </message>
-    <message>
-        <source>输出分辨率</source>
-        <translation type="vanished">输出分辨率</translation>
     </message>
     <message>
         <location filename="../UI/SettingsDialog.cpp" line="56"/>
@@ -2481,14 +2198,6 @@ Scale to fit canvas?</source>
         <location filename="../UI/SettingsDialog.cpp" line="90"/>
         <source>输出路径:</source>
         <translation>输出路径:</translation>
-    </message>
-    <message>
-        <source>确定</source>
-        <translation type="vanished">确定</translation>
-    </message>
-    <message>
-        <source>取消</source>
-        <translation type="vanished">取消</translation>
     </message>
     <message>
         <location filename="../UI/SettingsDialog.cpp" line="39"/>
@@ -2619,7 +2328,7 @@ Scale to fit canvas?</source>
 <context>
     <name>color_widgets::ColorDialog</name>
     <message>
-        <location filename="../Qt-Color-Widgets/src/QtColorWidgets/color_dialog.cpp" line="103"/>
+        <location filename="../Qt-Color-Widgets/src/QtColorWidgets/color_dialog.cpp" line="99"/>
         <source>Pick</source>
         <translation>取色</translation>
     </message>

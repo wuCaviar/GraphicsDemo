@@ -76,13 +76,13 @@ void NewFileDialog::setupUI()
     m_widthSpin = new QDoubleSpinBox;
     m_widthSpin->setRange(1, 99999);
     m_widthSpin->setDecimals(1);
-    m_widthSpin->setSuffix(tr(" mm"));
+    m_widthSpin->setSuffix(QStringLiteral(" mm"));
     formLayout->addRow(tr("Width:"), m_widthSpin);
 
     m_heightSpin = new QDoubleSpinBox;
     m_heightSpin->setRange(1, 99999);
     m_heightSpin->setDecimals(1);
-    m_heightSpin->setSuffix(tr(" mm"));
+    m_heightSpin->setSuffix(QStringLiteral(" mm"));
     formLayout->addRow(tr("Height:"), m_heightSpin);
 
     // PPI 设置

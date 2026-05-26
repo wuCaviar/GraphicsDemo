@@ -58,16 +58,16 @@ void ResizeCanvasDialog::setCurrentSize(const QSizeF &pixelSize, qreal ppi, bool
         qreal factor = 25.4 / ppi;
         m_widthSpin->setValue(pixelSize.width() * factor);
         m_heightSpin->setValue(pixelSize.height() * factor);
-        m_widthSpin->setSuffix(tr(" mm"));
-        m_heightSpin->setSuffix(tr(" mm"));
+        m_widthSpin->setSuffix(QStringLiteral(" mm"));
+        m_heightSpin->setSuffix(QStringLiteral(" mm"));
         m_infoLabel->setText(tr("Resolution: %1 PPI  |  1 mm = %2 px")
                                  .arg(ppi, 0, 'f', 0)
                                  .arg(ppi / 25.4, 0, 'f', 2));
     } else {
         m_widthSpin->setValue(pixelSize.width());
         m_heightSpin->setValue(pixelSize.height());
-        m_widthSpin->setSuffix(tr(" px"));
-        m_heightSpin->setSuffix(tr(" px"));
+        m_widthSpin->setSuffix(QStringLiteral(" px"));
+        m_heightSpin->setSuffix(QStringLiteral(" px"));
         m_infoLabel->setText(
             tr("Resolution: %1 PPI  |  %2 × %3 px = %4 × %5 mm")
                 .arg(ppi, 0, 'f', 0)
