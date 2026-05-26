@@ -63,28 +63,78 @@ void ResizeHandleItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
 
     qreal zoom = zoomLevel();
 
-    // 亮蓝色选中框 — cosmetic pen 确保在任何缩放比例下始终可见
-    QColor outlineColor(0, 120, 255);
+    // Black selection box outline
     Qt::PenStyle style = m_pastedStyle ? Qt::DotLine : Qt::DashLine;
-    QPen outlinePen(outlineColor, 0);
+    QPen outlinePen(Qt::black, 0);
     outlinePen.setStyle(style);
     outlinePen.setCosmetic(true);
     painter->setPen(outlinePen);
     painter->setBrush(Qt::NoBrush);
     painter->drawPolygon(m_selectionPolygon);
 
-    // 缩放手柄 — 大小随缩放反向缩放，保持视觉大小恒定
+    // Resize handles — constant visual size regardless of zoom
     qreal handleSize = kHandleSize / zoom;
     qreal halfHs = handleSize / 2.0;
+    painter->setPen(Qt::NoPen);
 
-    QPen handlePen(outlineColor, 0);
-    handlePen.setCosmetic(true);
-    painter->setPen(handlePen);
-    painter->setBrush(Qt::white);
+    // Compute inverted fill color for single-item mode
+    QColor insideColor = Qt::black;
+    if (!isGroupMode() && m_target) {
+        auto *igi = dynamic_cast<IGraphicsItem *>(m_target);
+        QColor itemColor = Qt::white;
+        if (igi) {
+            QBrush brush = igi->itemBrush();
+            if (brush.style() != Qt::NoBrush)
+                itemColor = brush.color();
+        }
+        insideColor = QColor(255 - itemColor.red(),
+                             255 - itemColor.green(),
+                             255 - itemColor.blue());
+    }
+
     for (const auto &h : m_handles) {
-        QPointF center = h.rect.center();
-        painter->drawRect(QRectF(center.x() - halfHs, center.y() - halfHs,
-                                  handleSize, handleSize));
+        QPointF c = h.rect.center();
+        QRectF fullRect(c.x() - halfHs, c.y() - halfHs, handleSize, handleSize);
+
+        painter->setBrush(Qt::black);
+        painter->drawRect(fullRect);
+
+        if (isGroupMode())
+            continue;
+
+        QRectF insideRect;
+        switch (h.role) {
+        case TopLeft:
+            insideRect = QRectF(c.x(), c.y(), halfHs, halfHs);
+            break;
+        case Top:
+            insideRect = QRectF(c.x() - halfHs, c.y(), handleSize, halfHs);
+            break;
+        case TopRight:
+            insideRect = QRectF(c.x() - halfHs, c.y(), halfHs, halfHs);
+            break;
+        case Left:
+            insideRect = QRectF(c.x(), c.y() - halfHs, halfHs, handleSize);
+            break;
+        case Right:
+            insideRect = QRectF(c.x() - halfHs, c.y() - halfHs, halfHs, handleSize);
+            break;
+        case BottomLeft:
+            insideRect = QRectF(c.x(), c.y() - halfHs, halfHs, halfHs);
+            break;
+        case Bottom:
+            insideRect = QRectF(c.x() - halfHs, c.y() - halfHs, handleSize, halfHs);
+            break;
+        case BottomRight:
+            insideRect = QRectF(c.x() - halfHs, c.y() - halfHs, halfHs, halfHs);
+            break;
+        default:
+            break;
+        }
+        if (insideRect.isValid()) {
+            painter->setBrush(insideColor);
+            painter->drawRect(insideRect);
+        }
     }
 }
 
