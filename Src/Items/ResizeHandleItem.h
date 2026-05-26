@@ -91,6 +91,8 @@ private:
     QRectF m_preResizeRect;
     QPointF m_preResizePos;
 
+    qreal zoomLevel() const;
+
     static const int kHandleSize = 6;
 };
 

@@ -9,6 +9,7 @@
 #include <QGraphicsScene>
 #include <QGraphicsSceneHoverEvent>
 #include <QGraphicsSceneMouseEvent>
+#include <QGraphicsView>
 #include <QPainter>
 #include <QPen>
 #include <QUndoStack>
@@ -60,17 +61,31 @@ void ResizeHandleItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
     if (!isTargetValid())
         return;
 
-    // 选中虚线/点线框
+    qreal zoom = zoomLevel();
+
+    // 亮蓝色选中框 — cosmetic pen 确保在任何缩放比例下始终可见
+    QColor outlineColor(0, 120, 255);
     Qt::PenStyle style = m_pastedStyle ? Qt::DotLine : Qt::DashLine;
-    painter->setPen(QPen(Qt::blue, 1, style));
+    QPen outlinePen(outlineColor, 0);
+    outlinePen.setStyle(style);
+    outlinePen.setCosmetic(true);
+    painter->setPen(outlinePen);
     painter->setBrush(Qt::NoBrush);
     painter->drawPolygon(m_selectionPolygon);
 
-    // 8 个缩放手柄
-    painter->setPen(QPen(Qt::blue, 1));
+    // 缩放手柄 — 大小随缩放反向缩放，保持视觉大小恒定
+    qreal handleSize = kHandleSize / zoom;
+    qreal halfHs = handleSize / 2.0;
+
+    QPen handlePen(outlineColor, 0);
+    handlePen.setCosmetic(true);
+    painter->setPen(handlePen);
     painter->setBrush(Qt::white);
-    for (const auto &h : m_handles)
-        painter->drawRect(h.rect);
+    for (const auto &h : m_handles) {
+        QPointF center = h.rect.center();
+        painter->drawRect(QRectF(center.x() - halfHs, center.y() - halfHs,
+                                  handleSize, handleSize));
+    }
 }
 
 // ============================================================
@@ -199,10 +214,27 @@ bool ResizeHandleItem::isTargetValid() const
 // Hit testing — handle at origin, scene pos == local pos
 // ============================================================
 
+qreal ResizeHandleItem::zoomLevel() const
+{
+    if (!scene())
+        return 1.0;
+    const auto views = scene()->views();
+    if (views.isEmpty())
+        return 1.0;
+    return views.first()->transform().m11();
+}
+
 ResizeHandleItem::HandleRole ResizeHandleItem::handleAtPos(const QPointF &scenePos) const
 {
+    qreal zoom = zoomLevel();
+    qreal handleSize = kHandleSize / zoom;
+    qreal halfHs = handleSize / 2.0;
+
     for (const auto &h : m_handles) {
-        if (h.rect.contains(scenePos))
+        QPointF center = h.rect.center();
+        QRectF scaledRect(center.x() - halfHs, center.y() - halfHs,
+                           handleSize, handleSize);
+        if (scaledRect.contains(scenePos))
             return h.role;
     }
     return NoHandle;
