@@ -17,6 +17,9 @@ public:
     PropertyFlags propertyFlags() const override { return HasPen | HasRotation; }
     QGraphicsItem *cloneItem() const override;
 
+    QRectF geometryRect() const override { return path().boundingRect(); }
+    bool supportsGeometryRect() const override { return true; }
+
     QPen itemPen() const override { return pen(); }
     void setItemPen(const QPen &p) override { setPen(p); }
     QBrush itemBrush() const override { return Qt::NoBrush; }

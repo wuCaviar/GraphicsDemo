@@ -89,7 +89,7 @@ void NewFileDialog::setupUI()
     m_ppiSpin = new QDoubleSpinBox;
     m_ppiSpin->setRange(1, 9999);
     m_ppiSpin->setDecimals(0);
-    m_ppiSpin->setSuffix(tr(" PPI"));
+    m_ppiSpin->setSuffix(tr(" dpi"));
     m_ppiSpin->setValue(300);
     m_ppiSpin->setToolTip(tr("Pixels Per Inch — affects mm↔px conversion"));
     formLayout->addRow(tr("Resolution:"), m_ppiSpin);

@@ -10,12 +10,14 @@
 #include "colortransform.h"
 #include "EllipseItem.h"
 
+#include "ImageArrangementDialog.h"
 #include "ImageItem.h"
 #include "ImageUtils.h"
 #include "ProjectFile.h"
 
 #include "LineItem.h"
 #include "NewFileDialog.h"
+#include "ResizeCanvasDialog.h"
 #include "SettingsDialog.h"
 #include "RectItem.h"
 #include "ResizeHandleItem.h"
@@ -48,6 +50,7 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QPushButton>
+#include <QToolButton>
 #include <QScrollBar>
 #include <QSettings>
 #include <QShortcut>
@@ -603,8 +606,10 @@ void MainWindow::_initConnections()
             [this]() { _updateUndoRedoActions(); });
 
     // undo/redo 后更新 ResizeHandleItem 位置（而非重建，避免选中框闪烁）
-    connect(m_undoStack, &QUndoStack::indexChanged, this,
-            [this]() { m_pView->refreshResizeHandle(); });
+    connect(m_undoStack, &QUndoStack::indexChanged, this, [this]() {
+        m_pView->refreshResizeHandle();
+        _updateCanvasLabel();
+    });
 
     // 视图滚动/缩放时更新刻度尺
     connect(m_pView->horizontalScrollBar(), &QScrollBar::valueChanged, m_hRuler,
@@ -685,6 +690,16 @@ void MainWindow::_initStatusBar()
         m_pView->setZoomLevel(targetZoom);
     });
 
+    // 画布尺寸修改按钮
+    m_resizeCanvasBtn = new QToolButton;
+    m_resizeCanvasBtn->setIcon(QIcon(":/icons/icons/canvas-resize.svg"));
+    m_resizeCanvasBtn->setIconSize(QSize(16, 16));
+    m_resizeCanvasBtn->setAutoRaise(true);
+    m_resizeCanvasBtn->setToolTip(tr("Resize canvas"));
+    m_resizeCanvasBtn->setVisible(false);
+    connect(m_resizeCanvasBtn, &QToolButton::clicked, this,
+            &MainWindow::onResizeCanvas);
+
     // 画布尺寸
     m_canvasLabel = new QLabel;
     m_canvasLabel->setMinimumWidth(230);
@@ -703,6 +718,7 @@ void MainWindow::_initStatusBar()
     bar->addPermanentWidget(m_zoomLabel);
     bar->addPermanentWidget(m_zoomSlider);
     bar->addPermanentWidget(createStatusSeparator(bar));
+    bar->addPermanentWidget(m_resizeCanvasBtn);
     bar->addPermanentWidget(m_canvasLabel);
     bar->addPermanentWidget(m_toolLabel);
 }
@@ -870,6 +886,7 @@ void MainWindow::onNew()
     // 安全清空场景并重建画布
     m_pView->resetCanvas(canvasSize);
     m_pView->setEnabled(true); // 画板就绪，允许操作
+    m_resizeCanvasBtn->setVisible(true);
 
     // 设置画布 PPI
     if (m_pView->canvasItem())
@@ -961,6 +978,7 @@ void MainWindow::onOpenProject()
         if (m_pView->canvasItem())
             m_pView->canvasItem()->setPpi(canvasInfo.dpi);
         m_pView->setEnabled(true);
+        m_resizeCanvasBtn->setVisible(true);
         m_hRuler->setPpi(canvasInfo.dpi);
         m_vRuler->setPpi(canvasInfo.dpi);
         m_hRuler->updateRuler();
@@ -1012,6 +1030,7 @@ void MainWindow::onOpenProject()
                     m_pView->scene()->addItem(item);
 
                 m_pView->setEnabled(true);
+                m_resizeCanvasBtn->setVisible(true);
 
                 m_hRuler->setPpi(canvasInfo.dpi);
                 m_vRuler->setPpi(canvasInfo.dpi);
@@ -1129,7 +1148,6 @@ void MainWindow::onSaveProject()
 
 void MainWindow::onImportImage()
 {
-    // 1. 多选文件
     const QStringList paths = QFileDialog::getOpenFileNames(
         this, tr("Import Images"), QString(),
         tr("Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;"
@@ -1145,25 +1163,94 @@ void MainWindow::onImportImage()
     if (!canvas)
         return;
 
-    // 2. 画布适配对话框
-    FitCanvasDlg dlg;
-    dlg.setParam(canvas->canvasSize());
-    if (dlg.exec() != QDialog::Accepted)
+    // Single image: show fit-canvas dialog
+    FitCanvasType fitType = fctNone;
+    double fitVal = 0;
+
+    if (paths.size() == 1) {
+        FitCanvasDlg dlg;
+        dlg.setParam(canvas->canvasSize());
+        if (dlg.exec() != QDialog::Accepted)
+            return;
+        fitType = dlg.fitType();
+        fitVal = dlg.fitValue();
+    } else {
+        // Multiple images: show arrangement dialog
+        ImageArrangementDialog dlg;
+        dlg.setFilePaths(paths);
+        if (dlg.exec() != QDialog::Accepted)
+            return;
+
+        const ImageArrangement arr = dlg.arrangement();
+        const QStringList ordered = dlg.orderedPaths();
+
+        const QString taskId =
+            m_pProgressMgr->startTask(tr("Import"), ordered.size());
+
+        auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
+        auto *importedItems = new QList<ImageItem *>();
+        auto runningCoord = std::make_shared<qreal>(0);
+
+        connect(
+            watcher,
+            &QFutureWatcher<ImageUtils::ImportWorkerResult>::progressValueChanged,
+            this, [this, taskId](int progressValue) {
+                m_pProgressMgr->updateTask(taskId, progressValue);
+            });
+
+        connect(
+            watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
+            this, [this, watcher, importedItems, runningCoord, arr](int index) {
+                auto result = watcher->resultAt(index);
+                if (result.isValid()) {
+                    auto *item = new ImageItem(result.pixmap);
+                    item->setItemPen(QPen(Qt::NoPen));
+                    item->setFilePath(result.path);
+
+                    if (arr == ArrangeHorizontal) {
+                        item->setPos(*runningCoord, 0);
+                        *runningCoord += result.pixmap.width();
+                    } else {
+                        item->setPos(0, *runningCoord);
+                        *runningCoord += result.pixmap.height();
+                    }
+
+                    m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
+                    importedItems->append(item);
+                } else {
+                    qWarning() << "Import failed:" << result.path
+                               << result.errorMessage;
+                }
+            });
+
+        connect(
+            watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished,
+            this, [this, watcher, taskId, importedItems]() {
+                m_pProgressMgr->finishTask(taskId);
+                watcher->deleteLater();
+
+                if (!importedItems->isEmpty()) {
+                    m_pView->fitToCanvas();
+                }
+
+                delete importedItems;
+                qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz")
+                         << "Finished import";
+            });
+
+        auto future = QtConcurrent::mapped(ordered, ImageUtils::runImportWorker);
+        watcher->setFuture(future);
+        qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz");
         return;
+    }
 
-    const FitCanvasType fitType = dlg.fitType();
-    const double fitVal = dlg.fitValue();
-
-    // 3. 启动进度任务，线程池异步加载（QPixmap 在工作线程中构造）
+    // Single image: original flow
     const QString taskId =
         m_pProgressMgr->startTask(tr("Import"), paths.size());
 
-    // QThreadPool *pool = QThreadPool::globalInstance();
-    // pool->setMaxThreadCount(
-    //     qMin(4, QThread::idealThreadCount())); // 避免 I/O 风暴
-
     auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
     auto *importedItems = new QList<ImageItem *>();
+    auto runningY = std::make_shared<qreal>(0);
 
     connect(
         watcher,
@@ -1174,13 +1261,14 @@ void MainWindow::onImportImage()
 
     connect(
         watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
-        this, [this, watcher, importedItems](int index) {
+        this, [this, watcher, importedItems, runningY](int index) {
             auto result = watcher->resultAt(index);
             if (result.isValid()) {
                 auto *item = new ImageItem(result.pixmap);
                 item->setItemPen(QPen(Qt::NoPen));
                 item->setFilePath(result.path);
-                item->setPos(index * 30, index * 30);
+                item->setPos(0, *runningY);
+                *runningY += result.pixmap.height() + 10;
 
                 m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
                 importedItems->append(item);
@@ -1196,11 +1284,9 @@ void MainWindow::onImportImage()
             m_pProgressMgr->finishTask(taskId);
             watcher->deleteLater();
 
-            // 根据用户选择适配画布大小
             if (fitType != fctNone && !importedItems->isEmpty()) {
                 CanvasItem *canvas = m_pView->canvasItem();
                 if (canvas) {
-                    // 计算所有导入图片的场景包围矩形并集
                     QRectF unitedRect;
                     for (auto *item : *importedItems) {
                         QRectF r = item->mapToScene(item->boundingRect())
@@ -1209,7 +1295,6 @@ void MainWindow::onImportImage()
                             unitedRect.isValid() ? unitedRect.united(r) : r;
                     }
 
-                    // 计算偏移量：若图元在负坐标，整体平移到正坐标区域
                     qreal offsetX =
                         unitedRect.left() < 0 ? -unitedRect.left() : 0;
                     qreal offsetY =
@@ -1236,7 +1321,6 @@ void MainWindow::onImportImage()
                         && newSize.height() > 0 && newSize != oldSize) {
                         m_undoStack->beginMacro(tr("Fit Canvas on Import"));
 
-                        // 若有负坐标图元，先平移
                         if (offsetX > 0 || offsetY > 0) {
                             QPointF delta(offsetX, offsetY);
                             QList<QPointF> oldPositions, newPositions;
@@ -1978,8 +2062,12 @@ void MainWindow::onFitCanvasToItems()
     // 计算所有目标图元的场景包围矩形并集
     QRectF unitedRect;
     for (auto *item : items) {
+        auto *igi = dynamic_cast<IGraphicsItem *>(item);
+        QRectF localRect = (igi && igi->supportsGeometryRect())
+                               ? igi->geometryRect()
+                               : item->boundingRect();
         QRectF itemSceneRect =
-            item->mapToScene(item->boundingRect()).boundingRect();
+            item->mapToScene(localRect).boundingRect();
         unitedRect = unitedRect.isValid() ? unitedRect.united(itemSceneRect)
                                           : itemSceneRect;
     }
@@ -1988,12 +2076,12 @@ void MainWindow::onFitCanvasToItems()
         || unitedRect.height() < 1)
         return;
 
-    // 计算偏移量：若图元在负坐标，整体平移到正坐标区域
-    qreal offsetX = unitedRect.left() < 0 ? -unitedRect.left() : 0;
-    qreal offsetY = unitedRect.top() < 0 ? -unitedRect.top() : 0;
+    // 将图元整体平移到 (0,0) 起始，消除边缘留白
+    qreal offsetX = -unitedRect.left();
+    qreal offsetY = -unitedRect.top();
 
-    // 画布从 (0,0) 开始，尺寸需覆盖所有图元的最大延伸
-    QSizeF newSize(unitedRect.right() + offsetX, unitedRect.bottom() + offsetY);
+    // 画布从 (0,0) 开始，尺寸覆盖所有图元
+    QSizeF newSize(unitedRect.width(), unitedRect.height());
     QSizeF oldSize = canvas->canvasSize();
 
     if (newSize.width() <= 0 || newSize.height() <= 0)
@@ -2001,8 +2089,8 @@ void MainWindow::onFitCanvasToItems()
 
     m_undoStack->beginMacro(tr("Fit Canvas to Selection"));
 
-    // 若有负坐标图元，先平移
-    if (offsetX > 0 || offsetY > 0) {
+    // 平移图元到原点
+    if (offsetX != 0 || offsetY != 0) {
         QPointF delta(offsetX, offsetY);
         QList<QPointF> oldPositions, newPositions;
         for (auto *item : items) {
@@ -2020,6 +2108,32 @@ void MainWindow::onFitCanvasToItems()
                                                   m_pView->scene()));
 
     m_undoStack->endMacro();
+    _updateCanvasLabel();
+    m_pView->fitToCanvas();
+}
+
+// ============================================================
+// 弹出对话框修改画布尺寸
+// ============================================================
+void MainWindow::onResizeCanvas()
+{
+    CanvasItem *canvas = m_pView->canvasItem();
+    if (!canvas)
+        return;
+
+    ResizeCanvasDialog dlg(this);
+    bool isMm = m_hRuler->unit() == RulerBar::Millimeter;
+    dlg.setCurrentSize(canvas->canvasSize(), canvas->ppi(), isMm);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    QSizeF newSize = dlg.newPixelSize();
+    QSizeF oldSize = canvas->canvasSize();
+    if (newSize == oldSize)
+        return;
+
+    m_undoStack->push(
+        new CanvasResizeCommand(canvas, oldSize, newSize, m_pView->scene()));
     _updateCanvasLabel();
     m_pView->fitToCanvas();
 }

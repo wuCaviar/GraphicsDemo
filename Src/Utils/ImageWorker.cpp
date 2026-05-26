@@ -129,11 +129,11 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
     TIFFGetFieldDefaulted(tif, TIFFTAG_PLANARCONFIG, &planarConfig);
     TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLEFORMAT, &sampleFormat);
 
-    if (w == 0 || h == 0 || w > 50000 || h > 50000) {
-        TIFFClose(tif);
-        buf.errorMessage = QString("Invalid dimensions: %1x%2").arg(w).arg(h);
-        return buf;
-    }
+    // if (w == 0 || h == 0 || w > 50000 || h > 50000) {
+    //     TIFFClose(tif);
+    //     buf.errorMessage = QString("Invalid dimensions: %1x%2").arg(w).arg(h);
+    //     return buf;
+    // }
 
     if (bitsPerSample != 8 || sampleFormat != SAMPLEFORMAT_UINT) {
         TIFFClose(tif);
@@ -516,7 +516,7 @@ ExportWorkerResult exportTiff(const QString &outputPath,
     }
 
     // ===== Phase 4: 写入输出 TIFF (90→100%) =====
-    TIFF *tif = TIFFOpen(outputPath.toUtf8().constData(), "w8");
+    TIFF *tif = TIFFOpen(outputPath.toLocal8Bit().constData(), "w");
     if (!tif) {
         result.errorMessage = QString("Cannot create output TIFF: %1").arg(outputPath);
         return result;
@@ -537,15 +537,7 @@ ExportWorkerResult exportTiff(const QString &outputPath,
     TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_SEPARATED);
     TIFFSetField(tif, TIFFTAG_INKSET, INKSET_CMYK);
     TIFFSetField(tif, TIFFTAG_NUMBEROFINKS, 4);
-    const char inkNames[] =
-        "Cyan\0Magenta\0Yellow\0Black\0\0";
 
-    const uint16_t inkNamesLen =
-        sizeof(inkNames) - 1;
-
-    TIFFSetField(tif, TIFFTAG_INKNAMES,
-                 inkNamesLen,
-                 inkNames);
     // Data layout
     TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
     TIFFSetField(tif, TIFFTAG_COMPRESSION, settings.compression);

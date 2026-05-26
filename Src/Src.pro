@@ -3,7 +3,7 @@ TEMPLATE = app
 
 QT += core gui widgets network xml concurrent
 
-TARGET = GraphicsDemo
+TARGET = ATGraphics
 
 DEFINES += QTCOLORWIDGETS_STATICALLY_LINKED
 
@@ -21,12 +21,14 @@ HEADERS += \
     App/SingleInstance.h \
     App/AppConfig.h \
     UI/FitCanvasDlg.h \
+    UI/ImageArrangementDialog.h \
     UI/MergeTiffProcessor.h \
     UI/mainwindow.h \
     UI/qatgraphicsview.h \
     UI/GraphicsScene.h \
     UI/PropertyPanel.h \
     UI/NewFileDialog.h \
+    UI/ResizeCanvasDialog.h \
     UI/RulerBar.h \
     UI/GradientDialog.h \
     UI/AlignLayoutDialog.h \
@@ -65,12 +67,14 @@ SOURCES += \
     App/AppConfig.cpp \
     App/main.cpp \
     UI/FitCanvasDlg.cpp \
+    UI/ImageArrangementDialog.cpp \
     UI/MergeTiffProcessor.cpp \
     UI/mainwindow.cpp \
     UI/qatgraphicsview.cpp \
     UI/GraphicsScene.cpp \
     UI/PropertyPanel.cpp \
     UI/NewFileDialog.cpp \
+    UI/ResizeCanvasDialog.cpp \
     UI/RulerBar.cpp \
     UI/GradientDialog.cpp \
     UI/AlignLayoutDialog.cpp \

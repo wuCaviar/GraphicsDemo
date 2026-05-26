@@ -27,6 +27,7 @@
         <file>icons/group.svg</file>
         <file>icons/ungroup.svg</file>
         <file>icons/view-fit.svg</file>
+        <file>icons/canvas-resize.svg</file>
         <file>icons/view-zoom-reset.svg</file>
         <file>icons/view-grid.svg</file>
         <file>icons/align-left.svg</file>

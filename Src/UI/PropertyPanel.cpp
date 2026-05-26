@@ -48,13 +48,13 @@ void PropertyPanel::setupUI()
     m_geomGroup = new QGroupBox(tr("Geometry"));
     auto *geomLayout = new QFormLayout(m_geomGroup);
     m_xSpin = new QDoubleSpinBox;
-    m_xSpin->setRange(-99999, 99999);
+    m_xSpin->setRange(-999999, 999999);
     m_ySpin = new QDoubleSpinBox;
-    m_ySpin->setRange(-99999, 99999);
+    m_ySpin->setRange(-999999, 999999);
     m_wSpin = new QDoubleSpinBox;
-    m_wSpin->setRange(0, 99999);
+    m_wSpin->setRange(0, 999999);
     m_hSpin = new QDoubleSpinBox;
-    m_hSpin->setRange(0, 99999);
+    m_hSpin->setRange(0, 999999);
     geomLayout->addRow(tr("X:"), m_xSpin);
     geomLayout->addRow(tr("Y:"), m_ySpin);
     geomLayout->addRow(tr("Width:"), m_wSpin);
