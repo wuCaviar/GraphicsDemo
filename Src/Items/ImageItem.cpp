@@ -65,7 +65,7 @@ void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 
 void ImageItem::serialize(QDataStream &out) const
 {
-    out << pixmap() << m_pen << pos() << rotation() << m_filePath;
+    out << pixmap() << pos() << rotation() << m_filePath;
     out << m_rect << m_originalSize << m_dpiX << m_dpiY << m_isCmykSource
         << m_isMultiPage;
 }
@@ -75,7 +75,7 @@ bool ImageItem::deserialize(QDataStream &in)
     QPixmap pix;
     qreal rot;
     QPointF pos_;
-    in >> pix >> m_pen >> pos_ >> rot >> m_filePath;
+    in >> pix >> pos_ >> rot >> m_filePath;
     in >> m_rect >> m_originalSize >> m_dpiX >> m_dpiY >> m_isCmykSource
         >> m_isMultiPage;
     if (in.status() != QDataStream::Ok)

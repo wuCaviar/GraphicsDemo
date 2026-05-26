@@ -46,6 +46,8 @@ protected:
 
 private slots:
     void onNew();
+    void onOpenProject();
+    void onSaveProject();
     void onImportImage();
     void onExportImage();
     void onUndo();
@@ -132,6 +134,8 @@ private:
     NetWorkUtils *m_pNetWorkUtils = nullptr;
 
     bool m_exporting = false; // 防止重复导出
+
+    QString m_currentProjectPath; // 当前工程文件路径，空表示未保存
 
     ImageUtils::ImageImportPipeline m_importSinglePipeline; // 单图导入处理管线
     ImageUtils::ImageImportPipeline m_importMultiPipeline;  // 批量导入处理管线

@@ -56,6 +56,7 @@ HEADERS += \
     QCommonDefs.h \
     Utils/NetWorkDefs.h \
     Utils/NetWorkUtils.h \
+    Utils/ProjectFile.h \
     Tiff/tifffile.h \
     version.h \
 
@@ -96,6 +97,7 @@ SOURCES += \
     NetWork/QHttp.cpp \
     Action/QATActionBase.cpp \
     Utils/NetWorkUtils.cpp \
+    Utils/ProjectFile.cpp \
     Tiff/tifffile.cpp \
 
 FORMS += \
