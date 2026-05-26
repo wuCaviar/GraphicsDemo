@@ -16,6 +16,7 @@
 
 #include "LineItem.h"
 #include "NewFileDialog.h"
+#include "ResizeCanvasDialog.h"
 #include "SettingsDialog.h"
 #include "RectItem.h"
 #include "ResizeHandleItem.h"
@@ -48,6 +49,7 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QPushButton>
+#include <QToolButton>
 #include <QScrollBar>
 #include <QSettings>
 #include <QShortcut>
@@ -603,8 +605,10 @@ void MainWindow::_initConnections()
             [this]() { _updateUndoRedoActions(); });
 
     // undo/redo 后更新 ResizeHandleItem 位置（而非重建，避免选中框闪烁）
-    connect(m_undoStack, &QUndoStack::indexChanged, this,
-            [this]() { m_pView->refreshResizeHandle(); });
+    connect(m_undoStack, &QUndoStack::indexChanged, this, [this]() {
+        m_pView->refreshResizeHandle();
+        _updateCanvasLabel();
+    });
 
     // 视图滚动/缩放时更新刻度尺
     connect(m_pView->horizontalScrollBar(), &QScrollBar::valueChanged, m_hRuler,
@@ -685,6 +689,16 @@ void MainWindow::_initStatusBar()
         m_pView->setZoomLevel(targetZoom);
     });
 
+    // 画布尺寸修改按钮
+    m_resizeCanvasBtn = new QToolButton;
+    m_resizeCanvasBtn->setIcon(QIcon(":/icons/icons/canvas-resize.svg"));
+    m_resizeCanvasBtn->setIconSize(QSize(16, 16));
+    m_resizeCanvasBtn->setAutoRaise(true);
+    m_resizeCanvasBtn->setToolTip(tr("Resize canvas"));
+    m_resizeCanvasBtn->setVisible(false);
+    connect(m_resizeCanvasBtn, &QToolButton::clicked, this,
+            &MainWindow::onResizeCanvas);
+
     // 画布尺寸
     m_canvasLabel = new QLabel;
     m_canvasLabel->setMinimumWidth(230);
@@ -703,6 +717,7 @@ void MainWindow::_initStatusBar()
     bar->addPermanentWidget(m_zoomLabel);
     bar->addPermanentWidget(m_zoomSlider);
     bar->addPermanentWidget(createStatusSeparator(bar));
+    bar->addPermanentWidget(m_resizeCanvasBtn);
     bar->addPermanentWidget(m_canvasLabel);
     bar->addPermanentWidget(m_toolLabel);
 }
@@ -870,6 +885,7 @@ void MainWindow::onNew()
     // 安全清空场景并重建画布
     m_pView->resetCanvas(canvasSize);
     m_pView->setEnabled(true); // 画板就绪，允许操作
+    m_resizeCanvasBtn->setVisible(true);
 
     // 设置画布 PPI
     if (m_pView->canvasItem())
@@ -961,6 +977,7 @@ void MainWindow::onOpenProject()
         if (m_pView->canvasItem())
             m_pView->canvasItem()->setPpi(canvasInfo.dpi);
         m_pView->setEnabled(true);
+        m_resizeCanvasBtn->setVisible(true);
         m_hRuler->setPpi(canvasInfo.dpi);
         m_vRuler->setPpi(canvasInfo.dpi);
         m_hRuler->updateRuler();
@@ -1012,6 +1029,7 @@ void MainWindow::onOpenProject()
                     m_pView->scene()->addItem(item);
 
                 m_pView->setEnabled(true);
+                m_resizeCanvasBtn->setVisible(true);
 
                 m_hRuler->setPpi(canvasInfo.dpi);
                 m_vRuler->setPpi(canvasInfo.dpi);
@@ -2026,6 +2044,32 @@ void MainWindow::onFitCanvasToItems()
                                                   m_pView->scene()));
 
     m_undoStack->endMacro();
+    _updateCanvasLabel();
+    m_pView->fitToCanvas();
+}
+
+// ============================================================
+// 弹出对话框修改画布尺寸
+// ============================================================
+void MainWindow::onResizeCanvas()
+{
+    CanvasItem *canvas = m_pView->canvasItem();
+    if (!canvas)
+        return;
+
+    ResizeCanvasDialog dlg(this);
+    bool isMm = m_hRuler->unit() == RulerBar::Millimeter;
+    dlg.setCurrentSize(canvas->canvasSize(), canvas->ppi(), isMm);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    QSizeF newSize = dlg.newPixelSize();
+    QSizeF oldSize = canvas->canvasSize();
+    if (newSize == oldSize)
+        return;
+
+    m_undoStack->push(
+        new CanvasResizeCommand(canvas, oldSize, newSize, m_pView->scene()));
     _updateCanvasLabel();
     m_pView->fitToCanvas();
 }

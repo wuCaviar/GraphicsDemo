@@ -27,6 +27,7 @@ HEADERS += \
     UI/GraphicsScene.h \
     UI/PropertyPanel.h \
     UI/NewFileDialog.h \
+    UI/ResizeCanvasDialog.h \
     UI/RulerBar.h \
     UI/GradientDialog.h \
     UI/AlignLayoutDialog.h \
@@ -71,6 +72,7 @@ SOURCES += \
     UI/GraphicsScene.cpp \
     UI/PropertyPanel.cpp \
     UI/NewFileDialog.cpp \
+    UI/ResizeCanvasDialog.cpp \
     UI/RulerBar.cpp \
     UI/GradientDialog.cpp \
     UI/AlignLayoutDialog.cpp \

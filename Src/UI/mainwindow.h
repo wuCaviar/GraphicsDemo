@@ -21,6 +21,7 @@ class QLabel;
 class QPushButton;
 class QSlider;
 class QToolBar;
+class QToolButton;
 class AlignLayoutDialog;
 
 namespace Ui {
@@ -63,6 +64,7 @@ private slots:
     void onUngroup();
     void onAlignLayoutDialog();
     void onFitCanvasToItems();
+    void onResizeCanvas();
     void onSettings();
     void onAbout();
     void onAlignLeft();
@@ -175,6 +177,7 @@ private:
     QLabel *m_canvasLabel = nullptr;
     QLabel *m_toolLabel = nullptr;
     QSlider *m_zoomSlider = nullptr;
+    QToolButton *m_resizeCanvasBtn = nullptr;
 
     // 状态栏辅助
     QPointF m_lastScenePos; // 最近一次鼠标场景坐标
