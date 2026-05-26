@@ -109,6 +109,13 @@ void ColorLineEdit::setColor(const QColor& color)
 
 void ColorLineEdit::setShowAlpha(bool showAlpha)
 {
+    // 正则：匹配 # 后跟6位十六进制字符（大小写均可）
+    int count = showAlpha ? 8 : 6;
+    QString exp = QString("^#[0-9A-Fa-f]{%1}$").arg(count);
+    QRegularExpression regExp(exp);
+    QValidator *validator = new QRegularExpressionValidator(regExp, this);
+    setValidator(validator);
+
     if ( p->show_alpha != showAlpha )
     {
         p->show_alpha = showAlpha;

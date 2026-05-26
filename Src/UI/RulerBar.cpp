@@ -9,6 +9,25 @@
 
 static const int kRulerSize = 30; // 刻度尺宽度/高度（加宽以提升可读性）
 
+// 将数值规整到 1-2-5 序列中最接近的"整数"（保持屏幕刻度间距可读）
+static qreal roundToNiceNumber(qreal value)
+{
+    if (value <= 0.0)
+        return 1.0;
+    const qreal magnitude = std::pow(10.0, std::floor(std::log10(value)));
+    const qreal normalized = value / magnitude; // [1, 10)
+    qreal nice;
+    if (normalized < 1.5)
+        nice = 1.0;
+    else if (normalized < 3.5)
+        nice = 2.0;
+    else if (normalized < 7.5)
+        nice = 5.0;
+    else
+        nice = 10.0;
+    return nice * magnitude;
+}
+
 RulerBar::RulerBar(RulerOrientation orientation, QWidget *parent)
     : QWidget(parent), m_orientation(orientation)
 {
@@ -106,66 +125,39 @@ qreal RulerBar::sceneToScreen(qreal scenePos) const
 
 void RulerBar::calcInterval(qreal &interval, qreal &subInterval) const
 {
+    // 目标主刻度屏幕间距：80px，保证标签不重叠
+    static constexpr qreal kTargetSpacing = 80.0;
+
     if (m_unit == Pixel) {
-        // px 模式：原有逻辑
-        if (m_scale < 0.15)
-            interval = 1000;
-        else if (m_scale < 0.3)
-            interval = 500;
-        else if (m_scale < 0.6)
-            interval = 200;
-        else if (m_scale < 1.2)
-            interval = 100;
-        else if (m_scale < 2.5)
-            interval = 50;
-        else if (m_scale < 5.0)
-            interval = 20;
-        else
-            interval = 10;
+        // px 模式：根据当前缩放动态选择 1-2-5 序列的刻度间隔
+        qreal idealInterval = kTargetSpacing / m_scale;
+        interval = roundToNiceNumber(idealInterval);
         subInterval = interval / 5.0;
     } else {
-        // mm 模式：刻度间隔以 mm 为单位，选择 1-2-5 序列
-        // 先计算 1mm 对应的屏幕像素数
-        qreal pixelsPerMm = m_ppi / 25.4;
-        qreal mmScreenPx = pixelsPerMm * m_scale;
+        // mm 模式：先计算 mm 单位的间隔，再转换为场景像素
+        const qreal pixelsPerMm = m_ppi / 25.4;
+        const qreal mmScreenPx = pixelsPerMm * m_scale;
+        const qreal idealMm = kTargetSpacing / mmScreenPx;
+        const qreal intervalMm = roundToNiceNumber(idealMm);
 
-        // 选择合适的 mm 间隔，使得主刻度屏幕间距在 40~150px 之间
-        // 候选序列：0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500
-        static const qreal candidates[] = {
-            0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500
-        };
-
-        interval = 10; // 默认 10mm
-        for (qreal c : candidates) {
-            qreal screenSpacing = c * mmScreenPx;
-            if (screenSpacing >= 40 && screenSpacing <= 150) {
-                interval = c;
-                break;
-            }
-        }
-
-        // 次刻度：将主刻度 5 等分或 2 等分
-        // 对于 1, 10, 100 等 → 5 等分（0.2, 2, 20）
-        // 对于 0.2, 2, 20, 200 等 → 4 等分（0.05, 0.5, 5, 50）
-        // 对于 0.5, 5, 50, 500 等 → 5 等分（0.1, 1, 10, 100）
+        // 次刻度间隔（mm 单位）
+        qreal subMm;
         qreal intPart;
-        qreal frac = std::modf(interval, &intPart);
+        qreal frac = std::modf(intervalMm, &intPart);
         if (qFuzzyCompare(frac, 0.0)) {
-            // 整数间隔：1, 2, 5, 10, 20, 50, 100...
             int n = qRound(intPart);
             if (n % 5 == 0)
-                subInterval = interval / 5.0;   // 5→1, 10→2, 50→10, 100→20
+                subMm = intervalMm / 5.0;
             else if (n % 2 == 0)
-                subInterval = interval / 4.0;   // 2→0.5, 20→5, 200→50
+                subMm = intervalMm / 4.0;
             else
-                subInterval = interval / 5.0;   // 1→0.2
+                subMm = intervalMm / 5.0;
         } else {
-            subInterval = interval / 5.0;       // 0.1→0.02, 0.2→0.04, 0.5→0.1
+            subMm = intervalMm / 5.0;
         }
 
-        // 将 mm 单位的间隔转换为场景像素单位（后续绘制代码用场景像素计算）
-        interval *= pixelsPerMm;
-        subInterval *= pixelsPerMm;
+        interval = intervalMm * pixelsPerMm;
+        subInterval = subMm * pixelsPerMm;
     }
 }
 

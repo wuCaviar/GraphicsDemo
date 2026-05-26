@@ -1164,6 +1164,7 @@ void MainWindow::onImportImage()
 
     auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
     auto *importedItems = new QList<ImageItem *>();
+    auto runningY = std::make_shared<qreal>(0);
 
     connect(
         watcher,
@@ -1174,13 +1175,14 @@ void MainWindow::onImportImage()
 
     connect(
         watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
-        this, [this, watcher, importedItems](int index) {
+        this, [this, watcher, importedItems, runningY](int index) {
             auto result = watcher->resultAt(index);
             if (result.isValid()) {
                 auto *item = new ImageItem(result.pixmap);
                 item->setItemPen(QPen(Qt::NoPen));
                 item->setFilePath(result.path);
-                item->setPos(index * 30, index * 30);
+                item->setPos(0, *runningY);
+                *runningY += result.pixmap.height() + 10;
 
                 m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
                 importedItems->append(item);
@@ -1978,8 +1980,12 @@ void MainWindow::onFitCanvasToItems()
     // 计算所有目标图元的场景包围矩形并集
     QRectF unitedRect;
     for (auto *item : items) {
+        auto *igi = dynamic_cast<IGraphicsItem *>(item);
+        QRectF localRect = (igi && igi->supportsGeometryRect())
+                               ? igi->geometryRect()
+                               : item->boundingRect();
         QRectF itemSceneRect =
-            item->mapToScene(item->boundingRect()).boundingRect();
+            item->mapToScene(localRect).boundingRect();
         unitedRect = unitedRect.isValid() ? unitedRect.united(itemSceneRect)
                                           : itemSceneRect;
     }
@@ -1988,12 +1994,12 @@ void MainWindow::onFitCanvasToItems()
         || unitedRect.height() < 1)
         return;
 
-    // 计算偏移量：若图元在负坐标，整体平移到正坐标区域
-    qreal offsetX = unitedRect.left() < 0 ? -unitedRect.left() : 0;
-    qreal offsetY = unitedRect.top() < 0 ? -unitedRect.top() : 0;
+    // 将图元整体平移到 (0,0) 起始，消除边缘留白
+    qreal offsetX = -unitedRect.left();
+    qreal offsetY = -unitedRect.top();
 
-    // 画布从 (0,0) 开始，尺寸需覆盖所有图元的最大延伸
-    QSizeF newSize(unitedRect.right() + offsetX, unitedRect.bottom() + offsetY);
+    // 画布从 (0,0) 开始，尺寸覆盖所有图元
+    QSizeF newSize(unitedRect.width(), unitedRect.height());
     QSizeF oldSize = canvas->canvasSize();
 
     if (newSize.width() <= 0 || newSize.height() <= 0)
@@ -2001,8 +2007,8 @@ void MainWindow::onFitCanvasToItems()
 
     m_undoStack->beginMacro(tr("Fit Canvas to Selection"));
 
-    // 若有负坐标图元，先平移
-    if (offsetX > 0 || offsetY > 0) {
+    // 平移图元到原点
+    if (offsetX != 0 || offsetY != 0) {
         QPointF delta(offsetX, offsetY);
         QList<QPointF> oldPositions, newPositions;
         for (auto *item : items) {

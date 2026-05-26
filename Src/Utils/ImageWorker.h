@@ -86,7 +86,7 @@ ImportWorkerResult runImportWorker(const QString &filePath);
 struct TiffExportSettings
 {
     int dpi = 300;
-    uint16_t compression = COMPRESSION_NONE; // libtiff compression constant
+    uint16_t compression = COMPRESSION_LZW; // libtiff compression constant
     QString iccProfilePath;                   // empty = use built-in default
 };
 

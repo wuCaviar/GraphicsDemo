@@ -516,7 +516,7 @@ ExportWorkerResult exportTiff(const QString &outputPath,
     }
 
     // ===== Phase 4: 写入输出 TIFF (90→100%) =====
-    TIFF *tif = TIFFOpen(outputPath.toUtf8().constData(), "w8");
+    TIFF *tif = TIFFOpen(outputPath.toLocal8Bit().constData(), "w");
     if (!tif) {
         result.errorMessage = QString("Cannot create output TIFF: %1").arg(outputPath);
         return result;
