@@ -235,6 +235,12 @@ void PropertyPanel::setupUI()
             &PropertyPanel::onBrushGradientSelected);
     connect(m_brushGradient, &GradientPreview::brushSelectionCanceled, this,
             &PropertyPanel::onBrushGradientCanceled);
+    connect(m_brushGradient, &GradientPreview::gradientCmykChanged, this,
+            [this](const QMap<qreal, CmykColor> &cmykMap) {
+                if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem)) {
+                    gi->setGradientStopCmykMap(cmykMap);
+                }
+            });
 
     connect(m_fontCombo, &QFontComboBox::currentFontChanged, this,
             &PropertyPanel::onFontFamilyChanged);
@@ -512,7 +518,13 @@ void PropertyPanel::updatePanel()
     if (flags & IGraphicsItem::HasPen) {
         QPen p = gi->itemPen();
         m_oldPen = p;
-        m_penColorSelector->setColor(p.color());
+        double c, m, y, k;
+        if (gi->hasPenCmyk()) {
+            gi->penCmyk(c, m, y, k);
+            m_penColorSelector->setCmykColor(p.color(), c, m, y, k);
+        } else {
+            m_penColorSelector->setColor(p.color());
+        }
         m_penWidthSpin->setValue(p.width());
         int styleIdx = 0;
         switch (p.style()) {
@@ -541,11 +553,21 @@ void PropertyPanel::updatePanel()
             // 渐变
             nIndex = static_cast<int>(FillMode::Gradient);
             m_brushGradient->setBrush(b);
+            // 读取已保存的渐变 CMYK
+            QMap<double, CmykColor> cmykMap = gi->gradientStopCmykMap();
+            if (!cmykMap.isEmpty())
+                m_brushGradient->setGradientCmyk(cmykMap);
 
         } else if (style == Qt::SolidPattern) {
             // 纯色
             nIndex = static_cast<int>(FillMode::Solid);
-            m_brushSolid->setColor(b.color());
+            double c, m, y, k;
+            if (gi->hasBrushCmyk()) {
+                gi->brushCmyk(c, m, y, k);
+                m_brushSolid->setCmykColor(b.color(), c, m, y, k);
+            } else {
+                m_brushSolid->setColor(b.color());
+            }
         }
         else
         {
@@ -576,8 +598,19 @@ void PropertyPanel::updatePanel()
             m_textColorSelector->setVisible(true);
             m_textBgColorSelector->setVisible(true);
 
-            m_textColorSelector->setColor(gi->itemPen().color());
-            m_textBgColorSelector->setColor(gi->itemBrush().color());
+            double c, m, y, k;
+            if (gi->hasPenCmyk()) {
+                gi->penCmyk(c, m, y, k);
+                m_textColorSelector->setCmykColor(gi->itemPen().color(), c, m, y, k);
+            } else {
+                m_textColorSelector->setColor(gi->itemPen().color());
+            }
+            if (gi->hasBrushCmyk()) {
+                gi->brushCmyk(c, m, y, k);
+                m_textBgColorSelector->setCmykColor(gi->itemBrush().color(), c, m, y, k);
+            } else {
+                m_textBgColorSelector->setColor(gi->itemBrush().color());
+            }
         }
         else
         {
@@ -698,9 +731,13 @@ void PropertyPanel::onFillModeChanged(int idx)
     switch (mode) {
     case FillMode::NoFill:
         newBrush = QBrush(Qt::NoBrush);
+        if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem))
+            gi->clearGradientCmyk();
         break;
     case FillMode::Solid:
         newBrush = QBrush(m_brushSolid->color());
+        if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem))
+            gi->clearGradientCmyk();
         break;
     case FillMode::Gradient:
         newBrush = m_brushGradient->brush();

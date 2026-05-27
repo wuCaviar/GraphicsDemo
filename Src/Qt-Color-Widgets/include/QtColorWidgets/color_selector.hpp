@@ -65,6 +65,10 @@ public Q_SLOTS:
     void setColorSpace(ColorWheel::ColorSpaceEnum space);
     void setWheelRotating(bool rotating);
 
+public:
+    /// Set color with explicit CMYK values for dialog initialization
+    void setCmykColor(const QColor &color, double c, double m, double y, double k);
+
 private Q_SLOTS:
     void accept_dialog();
     void reject_dialog();

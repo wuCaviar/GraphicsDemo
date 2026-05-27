@@ -17,6 +17,7 @@ public:
     QBrush brush;     ///< 渐变画刷
     QBrush back;      ///< 透明区域背景（棋盘格）
     bool draw_frame = true; ///< 是否绘制边框
+    QMap<qreal, CmykColor> gradientCmyk;  ///< per-stop CMYK values
 
     Private()
         : brush(QGradient()),
@@ -130,6 +131,7 @@ void GradientPreview::mouseReleaseEvent(QMouseEvent *ev)
     Q_EMIT clicked();
 
     const QBrush oldBrush = p->brush;
+    const QMap<qreal, CmykColor> oldCmyk = p->gradientCmyk;
     Q_EMIT brushEditingStarted(oldBrush);
 
     // 创建渐变编辑对话框
@@ -142,6 +144,10 @@ void GradientPreview::mouseReleaseEvent(QMouseEvent *ev)
     else
         dialog.setGradient(QLinearGradient(0, 0, 1, 0));
 
+    // 传入已保存的渐变 CMYK
+    if (!p->gradientCmyk.isEmpty())
+        dialog.setStopsCmyk(p->gradientCmyk);
+
     // 连接 gradientChanged 信号实现实时预览
     connect(&dialog, &QtGradientDialog::gradientChanged, this,
             [this](const QGradient &gradient) {
@@ -152,10 +158,14 @@ void GradientPreview::mouseReleaseEvent(QMouseEvent *ev)
             });
 
     if (dialog.exec() == QDialog::Accepted) {
+        // 从对话框获取渐变 CMYK 并保存
+        p->gradientCmyk = dialog.stopsCmyk();
         Q_EMIT brushSelected(p->brush);
         Q_EMIT brushChanged(p->brush);
+        Q_EMIT gradientCmykChanged(p->gradientCmyk);
     } else {
         p->brush = oldBrush;
+        p->gradientCmyk = oldCmyk;
         update();
         Q_EMIT brushPreviewed(p->brush);
         Q_EMIT brushSelectionCanceled(oldBrush);
@@ -199,4 +209,14 @@ void GradientPreview::setDrawFrame(bool draw)
     p->draw_frame = draw;
     Q_EMIT drawFrameChanged(draw);
     update();
+}
+
+void GradientPreview::setGradientCmyk(const QMap<qreal, CmykColor> &cmykMap)
+{
+    p->gradientCmyk = cmykMap;
+}
+
+QMap<qreal, CmykColor> GradientPreview::gradientCmyk() const
+{
+    return p->gradientCmyk;
 }

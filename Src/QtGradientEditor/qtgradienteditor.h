@@ -5,6 +5,8 @@
 #define QTGRADIENTEDITOR_H
 
 #include <QtWidgets/QWidget>
+#include <QMap>
+#include "../ColorTrans/colortransform.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -30,6 +32,10 @@ public:
 
     bool isDetailsButtonVisible() const;
     void setDetailsButtonVisible(bool visible);
+
+    // Per-stop CMYK for TIFF export accuracy
+    void setStopsCmyk(const QMap<qreal, CmykColor> &cmykMap);
+    QMap<qreal, CmykColor> stopsCmyk() const;
 
 signals:
     void gradientChanged(const QGradient &gradient);

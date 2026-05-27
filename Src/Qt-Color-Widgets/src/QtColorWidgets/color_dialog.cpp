@@ -153,6 +153,31 @@ void ColorDialog::showColor(const QColor &c)
     show();
 }
 
+void ColorDialog::setCmykColor(const QColor &color, double c, double m, double y, double k)
+{
+    p->ui.preview->setComparisonColor(color);
+    p->ui.edit_hex->setModified(false);
+    // Block signals during setColorInternal to prevent it from emitting
+    // colorSelectedCmyk(-1,...) which would clear stored CMYK on the item.
+    bool blocked = signalsBlocked();
+    blockSignals(true);
+    setColorInternal(color);
+    blockSignals(blocked);
+    // Set all CMYK spin boxes silently, then trigger one set_cmyk() for
+    // proper CMYK→RGB conversion with the complete set of values.
+    {
+        QSignalBlocker b1(p->ui.spin_cyan);
+        QSignalBlocker b2(p->ui.spin_magenta);
+        QSignalBlocker b3(p->ui.spin_yellow);
+        QSignalBlocker b4(p->ui.spin_black);
+        p->ui.spin_cyan->setValue(c);
+        p->ui.spin_magenta->setValue(m);
+        p->ui.spin_yellow->setValue(y);
+        p->ui.spin_black->setValue(k);
+    }
+    set_cmyk();
+}
+
 void ColorDialog::setPreviewDisplayMode(ColorPreview::DisplayMode mode)
 {
     p->ui.preview->setDisplayMode(mode);

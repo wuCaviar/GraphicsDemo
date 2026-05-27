@@ -5,6 +5,8 @@
 #define QTGRADIENTDIALOG_H
 
 #include <QtWidgets/QDialog>
+#include <QMap>
+#include "../ColorTrans/colortransform.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -33,6 +35,10 @@ public:
 
     QColor::Spec spec() const;
     void setSpec(QColor::Spec spec);
+
+    // Per-stop CMYK for TIFF export accuracy
+    void setStopsCmyk(const QMap<qreal, CmykColor> &cmykMap);
+    QMap<qreal, CmykColor> stopsCmyk() const;
 
     static QGradient getGradient(bool *ok, const QGradient &initial, QWidget *parent = 0, const QString &caption = QString());
     static QGradient getGradient(bool *ok, QWidget *parent = 0, const QString &caption = QString());

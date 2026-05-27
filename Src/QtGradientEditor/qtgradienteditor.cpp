@@ -891,6 +891,16 @@ void QtGradientEditor::setDetailsButtonVisible(bool visible)
     d_ptr->m_ui.detailsButton->setVisible(visible);
 }
 
+void QtGradientEditor::setStopsCmyk(const QMap<qreal, CmykColor> &cmykMap)
+{
+    d_ptr->m_gradientStopsController->setStopsCmyk(cmykMap);
+}
+
+QMap<qreal, CmykColor> QtGradientEditor::stopsCmyk() const
+{
+    return d_ptr->m_gradientStopsController->stopsCmyk();
+}
+
 QT_END_NAMESPACE
 
 #include "qtgradienteditor.moc"
