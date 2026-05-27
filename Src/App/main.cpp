@@ -3,6 +3,7 @@
 #include <QEvent>
 #include <QTranslator>
 #include <QLocale>
+#include <QLibraryInfo>
 #include <QSettings>
 #include <QTimer>
 
@@ -29,12 +30,21 @@ int main(int argc, char *argv[])
     a.setApplicationVersion(ATHC_VERSION_STR_MAJ_MIN_MIC);
 
     // 加载中文翻译
-    QTranslator translator;
     const QStringList uiLanguages = QLocale::system().uiLanguages();
     for (const QString &locale : uiLanguages) {
-        const QString baseName = "GraphicsDemo_" + QLocale(locale).name();
-        if (translator.load(":/translations/" + baseName)) {
-            a.installTranslator(&translator);
+        const QString localeName = QLocale(locale).name();
+
+        // Qt 基础翻译（标准按钮等）
+        auto *qtTranslator = new QTranslator(&a);
+        if (qtTranslator->load("qtbase_" + localeName,
+                               QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+            a.installTranslator(qtTranslator);
+        }
+
+        // 应用翻译
+        auto *appTranslator = new QTranslator(&a);
+        if (appTranslator->load(":/translations/GraphicsDemo_" + localeName)) {
+            a.installTranslator(appTranslator);
             break;
         }
     }
