@@ -1,27 +1,27 @@
-#include "QATActionBase.h"
+#include "QAtActionBase.h"
 
 #include <QCoreApplication>
 
 // ============================================================================
-// QhsActionFactory
+// QAtActionFactory
 // ============================================================================
 
-QhsActionFactory::QhsActionFactory()
+QAtActionFactory::QAtActionFactory()
 {
 }
 
-QhsActionFactory& QhsActionFactory::get()
+QAtActionFactory& QAtActionFactory::get()
 {
-    static QhsActionFactory instance;
+    static QAtActionFactory instance;
     return instance;
 }
 
-void QhsActionFactory::_registerAction(const QString& token, ActionCreateFunc func)
+void QAtActionFactory::_registerAction(const QString& token, ActionCreateFunc func)
 {
     m_mapCreateFunc.insert(token, func);
 }
 
-QhsActionBasePtr QhsActionFactory::createAction(const QString& token)
+QAtActionBasePtr QAtActionFactory::createAction(const QString& token)
 {
     auto it = m_mapCreateFunc.find(token);
     if (it != m_mapCreateFunc.end())
@@ -30,24 +30,24 @@ QhsActionBasePtr QhsActionFactory::createAction(const QString& token)
 }
 
 // ============================================================================
-// QhsActionFactory::_Register
+// QAtActionFactory::_Register
 // ============================================================================
 
-QhsActionFactory::_Register::_Register(const QString& token, ActionCreateFunc func)
+QAtActionFactory::_Register::_Register(const QString& token, ActionCreateFunc func)
 {
-    QhsActionFactory::get()._registerAction(token, func);
+    QAtActionFactory::get()._registerAction(token, func);
 }
 
 // ============================================================================
-// QhsActionBase
+// QAtActionBase
 // ============================================================================
 
-void QhsActionBase::onUpdateState(bool& isEnabled, bool& isChecked, bool& isVisible)
+void QAtActionBase::onUpdateState(bool& isEnabled, bool& isChecked, bool& isVisible)
 {
     _onUpdateState(isEnabled, isChecked, isVisible);
 }
 
-void QhsActionBase::_onUpdateState(bool& isEnabled, bool& isChecked, bool& isVisible)
+void QAtActionBase::_onUpdateState(bool& isEnabled, bool& isChecked, bool& isVisible)
 {
     Q_UNUSED(isEnabled);
     Q_UNUSED(isChecked);

@@ -4,16 +4,16 @@
 #include <QCommonDefs.h>
 #include <QAction>
 
-Q_CLASS_TYPEDEFS(QhsActionBase)
-typedef QhsActionBasePtr(*ActionCreateFunc)();
+Q_CLASS_TYPEDEFS(QAtActionBase)
+typedef QAtActionBasePtr(*ActionCreateFunc)();
 
-class QhsActionFactory
+class QAtActionFactory
 {
 protected:
-	QhsActionFactory();
+	QAtActionFactory();
 
 public:
-	static QhsActionFactory& get();
+	static QAtActionFactory& get();
 
 	friend class _Register;
 
@@ -24,7 +24,7 @@ public:
 	};
 
 public:
-	QhsActionBasePtr createAction(const QString& token);
+	QAtActionBasePtr createAction(const QString& token);
 
 private:
 	void _registerAction(const QString& token, ActionCreateFunc func);
@@ -37,25 +37,25 @@ protected:
 class _Action##class_name \
 { \
 	public: \
-		static QhsActionBasePtr instance() \
-		{ return QhsActionBasePtr(new class_name); } \
+		static QAtActionBasePtr instance() \
+		{ return QAtActionBasePtr(new class_name); } \
 	private: \
-		static const QhsActionFactory::_Register m_stRegister; \
+		static const QAtActionFactory::_Register m_stRegister; \
 };
 
 #define REGISTER_ACTION(action_name, class_name) \
-const QhsActionFactory::_Register class_name::_Action##class_name::m_stRegister( \
+const QAtActionFactory::_Register class_name::_Action##class_name::m_stRegister( \
 #action_name, class_name::_Action##class_name::instance);
 
-class QhsActionBase
+class QAtActionBase
 {
 protected:
-	QhsActionBase() {}
+	QAtActionBase() {}
 
 public:
-	virtual ~QhsActionBase() {}
+	virtual ~QAtActionBase() {}
 
-	friend class QhsActionFactory;
+	friend class QAtActionFactory;
 
 public:
 	const QString& token() const
@@ -80,16 +80,6 @@ public:
 		_execute();
 	}
 
-	void setStateCondition(const QString& condition)
-	{
-		m_strStateCondition = condition;
-	}
-
-	const QString& stateCondition() const
-	{
-		return m_strStateCondition;
-	}
-
 	void setUserData(const QVariant& data)
 	{
 		m_valUserData = data;
@@ -112,12 +102,12 @@ protected:
 
 protected:
 	QString					m_strActionToken;
-	QString					m_strStateCondition;
 	QVariant				m_valUserData;
+
 };
 
 #ifdef Q_OS_WIN
-Q_DECLARE_METATYPE(QhsActionBasePtr)
+Q_DECLARE_METATYPE(QAtActionBasePtr)
 #endif // Q_OS_WIN
 
 #define ACTION_TOKEN(token) #token

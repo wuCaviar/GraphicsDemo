@@ -35,6 +35,7 @@
 #include <QtConcurrent>
 #include <QFutureWatcher>
 #include <QCloseEvent>
+#include <QPointer>
 #include <QDataStream>
 #include <QFile>
 #include <QFileDialog>
@@ -1661,14 +1662,18 @@ void MainWindow::onExportImage()
 
     QSize outSize = exportRect.size().toSize();
 
-    auto progress = [this, taskId](int pct) {
+    QPointer<MainWindow> guard(this);
+    auto progress = [guard, taskId](int pct) {
         QMetaObject::invokeMethod(
-            this,
-            [this, taskId, pct]() { m_pProgressMgr->updateTask(taskId, pct); },
+            guard.data(),
+            [guard, taskId, pct]() {
+                if (!guard) return;
+                guard->m_pProgressMgr->updateTask(taskId, pct);
+            },
             Qt::QueuedConnection);
     };
 
-    auto *thread = QThread::create([this, tiffPath, sources,
+    auto *thread = QThread::create([guard, tiffPath, sources,
                                      overlays = std::move(overlays), outSize,
                                      settings, progress, taskId, bRip, ripXRes,
                                      ripYRes]() {
@@ -1676,17 +1681,18 @@ void MainWindow::onExportImage()
                                              outSize, settings, progress);
 
         QMetaObject::invokeMethod(
-            this,
-            [this, result, taskId, bRip, ripXRes, ripYRes, tiffPath]() {
-                m_exporting = false;
+            guard.data(),
+            [guard, result, taskId, bRip, ripXRes, ripYRes, tiffPath]() {
+                if (!guard) return;
+                guard->m_exporting = false;
                 if (result.success) {
-                    m_pProgressMgr->finishTask(taskId);
-                    if (bRip && m_pNetWorkUtils) {
-                        m_pNetWorkUtils->doAddRip(ripXRes, ripYRes,
-                                                  result.filePath);
+                    guard->m_pProgressMgr->finishTask(taskId);
+                    if (bRip && guard->m_pNetWorkUtils) {
+                        guard->m_pNetWorkUtils->doAddRip(ripXRes, ripYRes,
+                                                         result.filePath);
                     }
                 } else {
-                    m_pProgressMgr->cancelTask(taskId);
+                    guard->m_pProgressMgr->cancelTask(taskId);
                     qWarning() << "Export failed:" << result.filePath
                                << result.errorMessage;
                 }

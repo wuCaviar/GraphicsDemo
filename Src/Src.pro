@@ -53,7 +53,8 @@ HEADERS += \
     Utils/AlignmentUtils.h \
     ColorTrans/colortransform.h \
     NetWork/QHttp.h \
-    Action/QATActionBase.h \
+    Action/QAtActionBase.h \
+    Action/QAtDrawAction.h \
     CommonDefs.h \
     QCommonDefs.h \
     Utils/NetWorkDefs.h \
@@ -99,7 +100,8 @@ SOURCES += \
     Utils/AlignmentUtils.cpp \
     ColorTrans/colortransform.cpp \
     NetWork/QHttp.cpp \
-    Action/QATActionBase.cpp \
+    Action/QAtActionBase.cpp \
+    Action/QAtDrawAction.cpp \
     Utils/NetWorkUtils.cpp \
     Utils/ProjectFile.cpp \
     Tiff/tifffile.cpp \

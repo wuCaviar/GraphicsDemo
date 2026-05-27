@@ -15,7 +15,6 @@
 #include <tiff.h>
 #include <tiffio.h>
 #include <algorithm>
-#include <atomic>
 #include <cmath>
 #include <cstring>
 
@@ -129,11 +128,11 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
     TIFFGetFieldDefaulted(tif, TIFFTAG_PLANARCONFIG, &planarConfig);
     TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLEFORMAT, &sampleFormat);
 
-    // if (w == 0 || h == 0 || w > 50000 || h > 50000) {
-    //     TIFFClose(tif);
-    //     buf.errorMessage = QString("Invalid dimensions: %1x%2").arg(w).arg(h);
-    //     return buf;
-    // }
+    if (w == 0 || h == 0 || w > 30000 || h > 30000) {
+        TIFFClose(tif);
+        buf.errorMessage = QString("Invalid dimensions: %1x%2").arg(w).arg(h);
+        return buf;
+    }
 
     if (bitsPerSample != 8 || sampleFormat != SAMPLEFORMAT_UINT) {
         TIFFClose(tif);
@@ -430,13 +429,12 @@ ExportWorkerResult exportTiff(const QString &outputPath,
     }
 
     // ===== Phase 3: 并行合成 (40→90%) =====
-    std::vector<uint8_t> outBuf(static_cast<size_t>(outW) * outH * 4);
+    std::vector<uint8_t> outBuf(static_cast<size_t>(outW) * static_cast<size_t>(outH) * 4);
 
     int numThreads = std::max(1, QThread::idealThreadCount());
     int rowsPerChunk = (outH + numThreads - 1) / numThreads;
 
     QList<QFuture<void>> chunkFutures;
-    std::atomic<int> chunksDone{0};
     int totalChunks = 0;
 
     for (int t = 0; t < numThreads; ++t) {
@@ -503,7 +501,6 @@ ExportWorkerResult exportTiff(const QString &outputPath,
                     }
                 }
             }
-            ++chunksDone; // atomic — safe across threads, no callback
         }));
     }
 
