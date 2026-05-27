@@ -10,6 +10,7 @@
 #include "colortransform.h"
 #include "EllipseItem.h"
 
+#include "ImageArrangementDialog.h"
 #include "ImageItem.h"
 #include "ImageUtils.h"
 #include "ProjectFile.h"
@@ -779,12 +780,12 @@ void MainWindow::_updateCanvasLabel()
     bool isMm = m_hRuler->unit() == RulerBar::Millimeter;
     if (isMm) {
         qreal kPxToMm = 25.4 / ppi;
-        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm \u00b7 %3 PPI")
+        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm \u00b7 %3 DPI")
                                    .arg(sz.width() * kPxToMm, 0, 'f', 1)
                                    .arg(sz.height() * kPxToMm, 0, 'f', 1)
                                    .arg(ppi, 0, 'f', 0));
     } else {
-        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 px \u00b7 %3 PPI")
+        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 px \u00b7 %3 DPI")
                                    .arg(sz.width(), 0, 'f', 1)
                                    .arg(sz.height(), 0, 'f', 1)
                                    .arg(ppi, 0, 'f', 0));
@@ -1147,7 +1148,6 @@ void MainWindow::onSaveProject()
 
 void MainWindow::onImportImage()
 {
-    // 1. 多选文件
     const QStringList paths = QFileDialog::getOpenFileNames(
         this, tr("Import Images"), QString(),
         tr("Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;"
@@ -1163,22 +1163,90 @@ void MainWindow::onImportImage()
     if (!canvas)
         return;
 
-    // 2. 画布适配对话框
-    FitCanvasDlg dlg;
-    dlg.setParam(canvas->canvasSize());
-    if (dlg.exec() != QDialog::Accepted)
+    // Single image: show fit-canvas dialog
+    FitCanvasType fitType = fctNone;
+    double fitVal = 0;
+
+    if (paths.size() == 1) {
+        FitCanvasDlg dlg;
+        dlg.setParam(canvas->canvasSize());
+        if (dlg.exec() != QDialog::Accepted)
+            return;
+        fitType = dlg.fitType();
+        fitVal = dlg.fitValue();
+    } else {
+        // Multiple images: show arrangement dialog
+        ImageArrangementDialog dlg;
+        dlg.setFilePaths(paths);
+        if (dlg.exec() != QDialog::Accepted)
+            return;
+
+        const ImageArrangement arr = dlg.arrangement();
+        const QStringList ordered = dlg.orderedPaths();
+
+        const QString taskId =
+            m_pProgressMgr->startTask(tr("Import"), ordered.size());
+
+        auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
+        auto *importedItems = new QList<ImageItem *>();
+        auto runningCoord = std::make_shared<qreal>(0);
+
+        connect(
+            watcher,
+            &QFutureWatcher<ImageUtils::ImportWorkerResult>::progressValueChanged,
+            this, [this, taskId](int progressValue) {
+                m_pProgressMgr->updateTask(taskId, progressValue);
+            });
+
+        connect(
+            watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
+            this, [this, watcher, importedItems, runningCoord, arr](int index) {
+                auto result = watcher->resultAt(index);
+                if (result.isValid()) {
+                    auto *item = new ImageItem(result.pixmap);
+                    item->setItemPen(QPen(Qt::NoPen));
+                    item->setFilePath(result.path);
+
+                    if (arr == ArrangeHorizontal) {
+                        item->setPos(*runningCoord, 0);
+                        *runningCoord += result.pixmap.width();
+                    } else {
+                        item->setPos(0, *runningCoord);
+                        *runningCoord += result.pixmap.height();
+                    }
+
+                    m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
+                    importedItems->append(item);
+                } else {
+                    qWarning() << "Import failed:" << result.path
+                               << result.errorMessage;
+                }
+            });
+
+        connect(
+            watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished,
+            this, [this, watcher, taskId, importedItems]() {
+                m_pProgressMgr->finishTask(taskId);
+                watcher->deleteLater();
+
+                if (!importedItems->isEmpty()) {
+                    m_pView->fitToCanvas();
+                }
+
+                delete importedItems;
+                qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz")
+                         << "Finished import";
+            });
+
+        auto future = QtConcurrent::mapped(ordered, ImageUtils::runImportWorker);
+        watcher->setFuture(future);
+        qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz");
         return;
+    }
 
-    const FitCanvasType fitType = dlg.fitType();
-    const double fitVal = dlg.fitValue();
-
-    // 3. 启动进度任务，线程池异步加载（QPixmap 在工作线程中构造）
+    // Single image: original flow
     const QString taskId =
         m_pProgressMgr->startTask(tr("Import"), paths.size());
-
-    // QThreadPool *pool = QThreadPool::globalInstance();
-    // pool->setMaxThreadCount(
-    //     qMin(4, QThread::idealThreadCount())); // 避免 I/O 风暴
 
     auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
     auto *importedItems = new QList<ImageItem *>();
@@ -1216,11 +1284,9 @@ void MainWindow::onImportImage()
             m_pProgressMgr->finishTask(taskId);
             watcher->deleteLater();
 
-            // 根据用户选择适配画布大小
             if (fitType != fctNone && !importedItems->isEmpty()) {
                 CanvasItem *canvas = m_pView->canvasItem();
                 if (canvas) {
-                    // 计算所有导入图片的场景包围矩形并集
                     QRectF unitedRect;
                     for (auto *item : *importedItems) {
                         QRectF r = item->mapToScene(item->boundingRect())
@@ -1229,7 +1295,6 @@ void MainWindow::onImportImage()
                             unitedRect.isValid() ? unitedRect.united(r) : r;
                     }
 
-                    // 计算偏移量：若图元在负坐标，整体平移到正坐标区域
                     qreal offsetX =
                         unitedRect.left() < 0 ? -unitedRect.left() : 0;
                     qreal offsetY =
@@ -1256,7 +1321,6 @@ void MainWindow::onImportImage()
                         && newSize.height() > 0 && newSize != oldSize) {
                         m_undoStack->beginMacro(tr("Fit Canvas on Import"));
 
-                        // 若有负坐标图元，先平移
                         if (offsetX > 0 || offsetY > 0) {
                             QPointF delta(offsetX, offsetY);
                             QList<QPointF> oldPositions, newPositions;

@@ -230,13 +230,14 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
             m_scene->scheduleResizeHandleUpdate();
 
         m_moving = true;
+        QGraphicsView::mousePressEvent(event);  // 先让 Qt 处理选中变更，再捕获位置
+
         m_moveStartPositions.clear();
         const auto selected = m_scene->selectedItems();
         for (auto *item : selected) {
             if (item->type() != CanvasItem::Type && item->type() != ResizeHandleItem::Type)
                 m_moveStartPositions[item] = item->pos();
         }
-        QGraphicsView::mousePressEvent(event);
         return;
     }
 
@@ -307,10 +308,12 @@ void QAtGraphicsView::mouseMoveEvent(QMouseEvent *event)
         m_handLastPos = event->pos();
         horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
         verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
+        QGraphicsView::mouseMoveEvent(event);
         return;
     }
 
     if (m_tool != Tool::Select && !m_drawing) {
+        QGraphicsView::mouseMoveEvent(event);
         return;
     }
 

@@ -9,6 +9,7 @@
 #include <QGraphicsScene>
 #include <QGraphicsSceneHoverEvent>
 #include <QGraphicsSceneMouseEvent>
+#include <QGraphicsView>
 #include <QPainter>
 #include <QPen>
 #include <QUndoStack>
@@ -60,17 +61,81 @@ void ResizeHandleItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
     if (!isTargetValid())
         return;
 
-    // 选中虚线/点线框
+    qreal zoom = zoomLevel();
+
+    // Black selection box outline
     Qt::PenStyle style = m_pastedStyle ? Qt::DotLine : Qt::DashLine;
-    painter->setPen(QPen(Qt::blue, 1, style));
+    QPen outlinePen(Qt::black, 0);
+    outlinePen.setStyle(style);
+    outlinePen.setCosmetic(true);
+    painter->setPen(outlinePen);
     painter->setBrush(Qt::NoBrush);
     painter->drawPolygon(m_selectionPolygon);
 
-    // 8 个缩放手柄
-    painter->setPen(QPen(Qt::blue, 1));
-    painter->setBrush(Qt::white);
-    for (const auto &h : m_handles)
-        painter->drawRect(h.rect);
+    // Resize handles — constant visual size regardless of zoom
+    qreal handleSize = kHandleSize / zoom;
+    qreal halfHs = handleSize / 2.0;
+    painter->setPen(Qt::NoPen);
+
+    // Compute inverted fill color for single-item mode
+    QColor insideColor = Qt::black;
+    if (!isGroupMode() && m_target) {
+        auto *igi = dynamic_cast<IGraphicsItem *>(m_target);
+        QColor itemColor = Qt::white;
+        if (igi) {
+            QBrush brush = igi->itemBrush();
+            if (brush.style() != Qt::NoBrush)
+                itemColor = brush.color();
+        }
+        insideColor = QColor(255 - itemColor.red(),
+                             255 - itemColor.green(),
+                             255 - itemColor.blue());
+    }
+
+    for (const auto &h : m_handles) {
+        QPointF c = h.rect.center();
+        QRectF fullRect(c.x() - halfHs, c.y() - halfHs, handleSize, handleSize);
+
+        painter->setBrush(Qt::black);
+        painter->drawRect(fullRect);
+
+        if (isGroupMode())
+            continue;
+
+        QRectF insideRect;
+        switch (h.role) {
+        case TopLeft:
+            insideRect = QRectF(c.x(), c.y(), halfHs, halfHs);
+            break;
+        case Top:
+            insideRect = QRectF(c.x() - halfHs, c.y(), handleSize, halfHs);
+            break;
+        case TopRight:
+            insideRect = QRectF(c.x() - halfHs, c.y(), halfHs, halfHs);
+            break;
+        case Left:
+            insideRect = QRectF(c.x(), c.y() - halfHs, halfHs, handleSize);
+            break;
+        case Right:
+            insideRect = QRectF(c.x() - halfHs, c.y() - halfHs, halfHs, handleSize);
+            break;
+        case BottomLeft:
+            insideRect = QRectF(c.x(), c.y() - halfHs, halfHs, halfHs);
+            break;
+        case Bottom:
+            insideRect = QRectF(c.x() - halfHs, c.y() - halfHs, handleSize, halfHs);
+            break;
+        case BottomRight:
+            insideRect = QRectF(c.x() - halfHs, c.y() - halfHs, halfHs, halfHs);
+            break;
+        default:
+            break;
+        }
+        if (insideRect.isValid()) {
+            painter->setBrush(insideColor);
+            painter->drawRect(insideRect);
+        }
+    }
 }
 
 // ============================================================
@@ -199,10 +264,27 @@ bool ResizeHandleItem::isTargetValid() const
 // Hit testing — handle at origin, scene pos == local pos
 // ============================================================
 
+qreal ResizeHandleItem::zoomLevel() const
+{
+    if (!scene())
+        return 1.0;
+    const auto views = scene()->views();
+    if (views.isEmpty())
+        return 1.0;
+    return views.first()->transform().m11();
+}
+
 ResizeHandleItem::HandleRole ResizeHandleItem::handleAtPos(const QPointF &scenePos) const
 {
+    qreal zoom = zoomLevel();
+    qreal handleSize = kHandleSize / zoom;
+    qreal halfHs = handleSize / 2.0;
+
     for (const auto &h : m_handles) {
-        if (h.rect.contains(scenePos))
+        QPointF center = h.rect.center();
+        QRectF scaledRect(center.x() - halfHs, center.y() - halfHs,
+                           handleSize, handleSize);
+        if (scaledRect.contains(scenePos))
             return h.role;
     }
     return NoHandle;

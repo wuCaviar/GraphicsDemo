@@ -21,6 +21,7 @@ HEADERS += \
     App/SingleInstance.h \
     App/AppConfig.h \
     UI/FitCanvasDlg.h \
+    UI/ImageArrangementDialog.h \
     UI/MergeTiffProcessor.h \
     UI/mainwindow.h \
     UI/qatgraphicsview.h \
@@ -66,6 +67,7 @@ SOURCES += \
     App/AppConfig.cpp \
     App/main.cpp \
     UI/FitCanvasDlg.cpp \
+    UI/ImageArrangementDialog.cpp \
     UI/MergeTiffProcessor.cpp \
     UI/mainwindow.cpp \
     UI/qatgraphicsview.cpp \

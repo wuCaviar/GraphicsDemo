@@ -129,11 +129,11 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
     TIFFGetFieldDefaulted(tif, TIFFTAG_PLANARCONFIG, &planarConfig);
     TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLEFORMAT, &sampleFormat);
 
-    if (w == 0 || h == 0 || w > 50000 || h > 50000) {
-        TIFFClose(tif);
-        buf.errorMessage = QString("Invalid dimensions: %1x%2").arg(w).arg(h);
-        return buf;
-    }
+    // if (w == 0 || h == 0 || w > 50000 || h > 50000) {
+    //     TIFFClose(tif);
+    //     buf.errorMessage = QString("Invalid dimensions: %1x%2").arg(w).arg(h);
+    //     return buf;
+    // }
 
     if (bitsPerSample != 8 || sampleFormat != SAMPLEFORMAT_UINT) {
         TIFFClose(tif);
