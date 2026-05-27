@@ -6,6 +6,7 @@
 #include <QFont>
 #include <QGraphicsItem>
 #include <QImage>
+#include <QMap>
 #include <QPen>
 
 #include "colortransform.h"
@@ -70,6 +71,14 @@ public:
     virtual bool hasBrushCmyk() const { return false; }
     virtual void brushCmyk(double &c, double &m, double &y, double &k) const { c = m = y = k = 0; }
     virtual void clearBrushCmyk() {}
+
+    // 渐变 CMYK 颜色存储（按停止点位置索引，用于 TIFF 导出精确 CMYK 渐变）
+    virtual void setGradientStopCmyk(double position, double c, double m, double y, double k) { Q_UNUSED(position); Q_UNUSED(c); Q_UNUSED(m); Q_UNUSED(y); Q_UNUSED(k); }
+    virtual bool hasGradientStopCmyk(double position) const { Q_UNUSED(position); return false; }
+    virtual void gradientStopCmyk(double position, double &c, double &m, double &y, double &k) const { Q_UNUSED(position); c = m = y = k = 0; }
+    virtual void clearGradientCmyk() {}
+    virtual QMap<double, CmykColor> gradientStopCmykMap() const { return {}; }
+    virtual void setGradientStopCmykMap(const QMap<double, CmykColor> &) {}
 
     // 是否允许缩放手柄调整大小
     virtual bool isResizable() const { return true; }

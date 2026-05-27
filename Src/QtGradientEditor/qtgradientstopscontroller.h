@@ -5,6 +5,8 @@
 #define QTGRADIENTSTOPSCONTROLLER_H
 
 #include <QtWidgets/QWidget>
+#include <QMap>
+#include "../ColorTrans/colortransform.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -23,6 +25,10 @@ public:
 
     void setGradientStops(const QGradientStops &stops);
     QGradientStops gradientStops() const;
+
+    // Per-stop CMYK storage for accurate TIFF export
+    void setStopsCmyk(const QMap<qreal, CmykColor> &cmykMap);
+    QMap<qreal, CmykColor> stopsCmyk() const;
 
 signals:
     void gradientStopsChanged(const QGradientStops &stops);

@@ -91,23 +91,27 @@ compile_commands.json
 .vscode
 
 Build*
-build/
 
-.DS_Store
-libtiffpic
+3rdparty
 
-.agents
-.claude
+.vs
 
-# 测试构建产物
-Tests/tst_alignment
-Tests/*.o
-Tests/*.moc
-Tests/moc_predefs.h
+debug
+release
 
-.cache
+.qtc_*
 
-Build
+*.user
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.qtvscr
+*.rc
+*.aps
+.reuse
+cmake*
 Bin
 
 .qtcreator
+.claude

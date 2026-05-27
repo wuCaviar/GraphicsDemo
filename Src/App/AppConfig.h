@@ -19,10 +19,10 @@ public:
     QString ripConfigPath() const { return m_ripConfigPath; }
     void setRipConfigPath(const QString &path) { m_ripConfigPath = path; }
 
-    // -- ICC Profile 基础目录 --
-    // Windows: applicationDirPath()
-    // macOS:   /Volumes/Caviar/Test/GraphicsDemo/Bin
+    // -- ICC Profile 基础目录 (config.xml: /Config/ICC/Path) --
+    // 未配置时回退: Windows = applicationDirPath(), macOS = /Volumes/Caviar/Test/GraphicsDemo/Bin
     QString iccProfileBasePath() const;
+    void setIccProfileBasePath(const QString &path) { m_iccProfileBasePath = path; }
 
     // -- 具体 ICC 文件路径 --
     QString srgbIccPath() const;
@@ -52,6 +52,7 @@ private:
 
     QString m_ripExePath;
     QString m_ripConfigPath;
+    QString m_iccProfileBasePath;
     QString m_dotCurveIccPath;
     QString m_proofIccPath;
     int m_ripResolutionX = 300;

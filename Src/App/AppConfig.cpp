@@ -51,13 +51,25 @@ void AppConfig::loadConfig()
             m_ripConfigPath = cfgEl.text();
     }
 
+    // <ICC> 子元素
+    QDomElement iccEl = root.firstChildElement(QStringLiteral("ICC"));
+    if (!iccEl.isNull()) {
+        QDomElement pathEl = iccEl.firstChildElement(QStringLiteral("Path"));
+        if (!pathEl.isNull())
+            m_iccProfileBasePath = pathEl.text().trimmed();
+    }
+
     qInfo() << "[AppConfig] Loaded from config.xml"
             << "\n  ripExe:" << m_ripExePath
-            << "\n  ripConfig:" << m_ripConfigPath;
+            << "\n  ripConfig:" << m_ripConfigPath
+            << "\n  iccBase:" << iccProfileBasePath();
 }
 
 QString AppConfig::iccProfileBasePath() const
 {
+    if (!m_iccProfileBasePath.isEmpty())
+        return m_iccProfileBasePath;
+
 #if defined(Q_OS_WIN)
     return QCoreApplication::applicationDirPath();
 #elif defined(Q_OS_MACOS)
@@ -70,11 +82,11 @@ QString AppConfig::iccProfileBasePath() const
 QString AppConfig::srgbIccPath() const
 {
     return iccProfileBasePath()
-           + QStringLiteral("/ICC Profile/RGB/SRGB IEC61966-2.1.icc");
+           + QStringLiteral("/RGB/SRGB IEC61966-2.1.icc");
 }
 
 QString AppConfig::cmykIccPath() const
 {
     return iccProfileBasePath()
-           + QStringLiteral("/ICC Profile/CMYK/JapanColor2001Coated.icc");
+           + QStringLiteral("/CMYK/JapanColor2001Coated.icc");
 }

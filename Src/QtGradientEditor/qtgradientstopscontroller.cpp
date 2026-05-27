@@ -50,6 +50,7 @@ public:
 
     QtGradientStopsModel *m_model = nullptr;
     QColor::Spec m_spec = QColor::Hsv;
+    QMap<qreal, CmykColor> m_stopsCmyk;  // per-stop CMYK values
 
     Ui::QtGradientEditor *m_ui;
 };
@@ -77,6 +78,17 @@ void QtGradientStopsControllerPrivate::setUi(Ui::QtGradientEditor *ui)
 
     connect(m_ui->colorWidget, &color_widgets::ColorSelector::colorChanged,
             this, &QtGradientStopsControllerPrivate::slotChangeColor);
+
+    connect(m_ui->colorWidget, &color_widgets::ColorSelector::colorSelectedCmyk,
+            this, [this](const QColor &, double c, double m, double y, double k) {
+                QtGradientStop *stop = m_model->currentStop();
+                if (!stop)
+                    return;
+                if (c >= 0)
+                    m_stopsCmyk[stop->position()] = {c, m, y, k, true};
+                else
+                    m_stopsCmyk.remove(stop->position());
+            });
 
     connect(m_ui->positionSpinBox, &QDoubleSpinBox::valueChanged,
             this, &QtGradientStopsControllerPrivate::slotChangePosition);
@@ -155,7 +167,11 @@ void QtGradientStopsControllerPrivate::slotCurrentStopChanged(QtGradientStop *st
 
     // block signals to avoid changing the stop color when setting the color widget's color
     disconnect(m_ui->colorWidget, &color_widgets::ColorSelector::colorChanged, this, nullptr);
-    m_ui->colorWidget->setColor(stop->color());
+    auto it = m_stopsCmyk.find(stop->position());
+    if (it != m_stopsCmyk.end() && it->valid)
+        m_ui->colorWidget->setCmykColor(stop->color(), it->c, it->m, it->y, it->k);
+    else
+        m_ui->colorWidget->setColor(stop->color());
     connect(m_ui->colorWidget, &color_widgets::ColorSelector::colorChanged,
             this, &QtGradientStopsControllerPrivate::slotChangeColor);
 }
@@ -163,6 +179,21 @@ void QtGradientStopsControllerPrivate::slotCurrentStopChanged(QtGradientStop *st
 void QtGradientStopsControllerPrivate::slotStopMoved(QtGradientStop *stop, qreal newPos)
 {
     QTimer::singleShot(0, this, &QtGradientStopsControllerPrivate::slotUpdatePositionSpinBox);
+
+    // Update CMYK map key when stop position changes.
+    // stop->position() already equals newPos at this point, so find the orphaned
+    // entry whose old position no longer exists in the model.
+    QSet<qreal> currentPositions;
+    const auto modelStops = m_model->stops();
+    for (auto it = modelStops.cbegin(); it != modelStops.cend(); ++it)
+        currentPositions.insert(it.key());
+    for (auto it = m_stopsCmyk.begin(); it != m_stopsCmyk.end(); ++it) {
+        if (!currentPositions.contains(it.key())) {
+            m_stopsCmyk[newPos] = it.value();
+            m_stopsCmyk.erase(it);
+            break;
+        }
+    }
 
     PositionColorMap stops = stopsData(m_model->stops());
     stops.remove(stop->position());
@@ -176,9 +207,15 @@ void QtGradientStopsControllerPrivate::slotStopsSwapped(QtGradientStop *stop1, Q
 {
     QTimer::singleShot(0, this, &QtGradientStopsControllerPrivate::slotUpdatePositionSpinBox);
 
-    PositionColorMap stops = stopsData(m_model->stops());
+    // Swap CMYK values in the map
     const qreal pos1 = stop1->position();
     const qreal pos2 = stop2->position();
+    CmykColor cmyk1 = m_stopsCmyk.take(pos1);
+    CmykColor cmyk2 = m_stopsCmyk.take(pos2);
+    if (cmyk2.valid) m_stopsCmyk[pos1] = cmyk2;
+    if (cmyk1.valid) m_stopsCmyk[pos2] = cmyk1;
+
+    PositionColorMap stops = stopsData(m_model->stops());
     stops[pos1] = stop2->color();
     stops[pos2] = stop1->color();
 
@@ -197,6 +234,8 @@ void QtGradientStopsControllerPrivate::slotStopAdded(QtGradientStop *stop)
 
 void QtGradientStopsControllerPrivate::slotStopRemoved(QtGradientStop *stop)
 {
+    m_stopsCmyk.remove(stop->position());
+
     PositionColorMap stops = stopsData(m_model->stops());
     stops.remove(stop->position());
 
@@ -355,6 +394,16 @@ QGradientStops QtGradientStopsController::gradientStops() const
     for (const QtGradientStop *stop : stopsList)
         stops.append({stop->position(), stop->color()});
     return stops;
+}
+
+void QtGradientStopsController::setStopsCmyk(const QMap<qreal, CmykColor> &cmykMap)
+{
+    d_ptr->m_stopsCmyk = cmykMap;
+}
+
+QMap<qreal, CmykColor> QtGradientStopsController::stopsCmyk() const
+{
+    return d_ptr->m_stopsCmyk;
 }
 
 QT_END_NAMESPACE

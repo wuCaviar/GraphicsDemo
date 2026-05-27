@@ -2,6 +2,8 @@
 #define GRADIENTDIALOG_H
 
 #include <QWidget>
+#include <QMap>
+#include "ColorTrans/colortransform.h"
 
 class GradientPreview : public QWidget
 {
@@ -31,6 +33,10 @@ public:
     bool drawFrame() const;
     void setDrawFrame(bool);
 
+    // Per-stop CMYK storage for gradient TIFF export
+    void setGradientCmyk(const QMap<qreal, CmykColor> &cmykMap);
+    QMap<qreal, CmykColor> gradientCmyk() const;
+
 public Q_SLOTS:
     /// Set current color
     void setBrush(const QBrush &b);
@@ -46,6 +52,7 @@ Q_SIGNALS:
     void brushPreviewed(QBrush brush);
     void brushSelected(QBrush brush);
     void brushSelectionCanceled(QBrush oldBrush);
+    void gradientCmykChanged(const QMap<qreal, CmykColor> &cmykMap);
 
     void backgroundChanged(const QBrush&);
     void drawFrameChanged(bool);

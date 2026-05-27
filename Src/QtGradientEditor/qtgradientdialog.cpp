@@ -269,6 +269,16 @@ void QtGradientDialog::setDetailsButtonVisible(bool visible)
     d_ptr->m_ui.gradientEditor->setDetailsButtonVisible(visible);
 }
 
+void QtGradientDialog::setStopsCmyk(const QMap<qreal, CmykColor> &cmykMap)
+{
+    d_ptr->m_ui.gradientEditor->setStopsCmyk(cmykMap);
+}
+
+QMap<qreal, CmykColor> QtGradientDialog::stopsCmyk() const
+{
+    return d_ptr->m_ui.gradientEditor->stopsCmyk();
+}
+
 /*!
     Executes a modal gradient dialog, lets the user to specify a gradient, and returns that
    gradient.

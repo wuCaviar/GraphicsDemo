@@ -33,6 +33,14 @@ public:
     void brushCmyk(double &c, double &m, double &y, double &k) const override { c = m_brushCmyk.c; m = m_brushCmyk.m; y = m_brushCmyk.y; k = m_brushCmyk.k; }
     void clearBrushCmyk() override { m_brushCmyk.valid = false; }
 
+    // 渐变 CMYK 存储
+    void setGradientStopCmyk(double pos, double c, double m, double y, double k) override { m_gradientCmyk[pos] = {c, m, y, k, true}; }
+    bool hasGradientStopCmyk(double pos) const override { return m_gradientCmyk.contains(pos) && m_gradientCmyk[pos].valid; }
+    void gradientStopCmyk(double pos, double &c, double &m, double &y, double &k) const override { if (auto it = m_gradientCmyk.find(pos); it != m_gradientCmyk.end()) { c = it->c; m = it->m; y = it->y; k = it->k; } }
+    void clearGradientCmyk() override { m_gradientCmyk.clear(); }
+    QMap<double, CmykColor> gradientStopCmykMap() const override { return m_gradientCmyk; }
+    void setGradientStopCmykMap(const QMap<double, CmykColor> &map) override { m_gradientCmyk = map; }
+
     // 精确几何矩形 — 返回不含画笔边距的 rect()
     QRectF geometryRect() const override { return rect(); }
     bool supportsGeometryRect() const override { return true; }
@@ -49,6 +57,7 @@ protected:
 private:
     CmykColor m_penCmyk;
     CmykColor m_brushCmyk;
+    QMap<double, CmykColor> m_gradientCmyk;
 };
 
 #endif // ELLIPSEITEM_H

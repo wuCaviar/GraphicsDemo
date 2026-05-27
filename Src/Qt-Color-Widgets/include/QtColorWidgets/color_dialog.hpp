@@ -88,6 +88,12 @@ public Q_SLOTS:
      */
     void setColor(const QColor &c);
 
+    /**
+     * Set color with explicit CMYK values to initialize the dialog.
+     * The CMYK spin boxes and pendingCmyk are set to preserve the original CMYK intent.
+     */
+    void setCmykColor(const QColor &color, double c, double m, double y, double k);
+
 	/**
      * Set the current color and show the dialog
      */

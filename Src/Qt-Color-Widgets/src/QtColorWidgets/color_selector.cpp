@@ -10,6 +10,8 @@
 #include <QDragEnterEvent>
 #include <QMimeData>
 
+#include "../Src/ColorTrans/colortransform.h"
+
 namespace color_widgets {
 
 class ColorSelector::Private
@@ -18,6 +20,7 @@ public:
     UpdateMode update_mode;
     ColorDialog *dialog;
     QColor old_color;
+    CmykColor storedCmyk;
 
     Private(QWidget *widget) : dialog(new ColorDialog(widget))
     {
@@ -101,11 +104,21 @@ bool ColorSelector::wheelRotating() const
     return p->dialog->wheelRotating();
 }
 
+void ColorSelector::setCmykColor(const QColor &color, double c, double m, double y, double k)
+{
+    setColor(color);
+    p->storedCmyk = {c, m, y, k, true};
+}
+
 void ColorSelector::showDialog()
 {
     p->old_color = color();
     Q_EMIT colorEditingStarted(p->old_color);
-    p->dialog->setColor(color());
+    if (p->storedCmyk.valid)
+        p->dialog->setCmykColor(color(), p->storedCmyk.c, p->storedCmyk.m, p->storedCmyk.y, p->storedCmyk.k);
+    else
+        p->dialog->setColor(color());
+    p->storedCmyk.valid = false;
     connect_dialog();
 #ifdef Q_OS_ANDROID
     p->dialog->showMaximized();

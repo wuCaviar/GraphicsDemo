@@ -35,6 +35,7 @@
 #include <QtConcurrent>
 #include <QFutureWatcher>
 #include <QCloseEvent>
+#include <QPointer>
 #include <QDataStream>
 #include <QFile>
 #include <QFileDialog>
@@ -1466,93 +1467,184 @@ void MainWindow::onExportImage()
             overlay.outputRect = outRect;
             overlay.zOrder = static_cast<int>(item->zValue());
 
-            // 收集该项及其所有子项（处理分组）
-            QSet<QGraphicsItem *> keepVisible;
-            std::function<void(QGraphicsItem *)> collectDescendants =
-                [&](QGraphicsItem *root) {
-                    keepVisible.insert(root);
-                    for (auto *child : root->childItems())
-                        collectDescendants(child);
+            auto *gi = dynamic_cast<IGraphicsItem *>(item);
+
+            // 检查是否可以使用存储的精确 CMYK 值直接填充（跳过 QPainter + LCMS2）
+            bool useDirectCmyk = false;
+            double dC = 0, dM = 0, dY = 0, dK = 0;
+            if (gi) {
+                // 纯色填充且无边框：直接用存储的 brush CMYK
+                if (gi->hasBrushCmyk()) {
+                    QBrush b = gi->itemBrush();
+                    if (b.style() == Qt::SolidPattern) {
+                        QPen p = gi->itemPen();
+                        if (p.style() == Qt::NoPen || p.width() == 0) {
+                            gi->brushCmyk(dC, dM, dY, dK);
+                            useDirectCmyk = true;
+                        }
+                    }
+                }
+                // 只有边框无填充：直接用存储的 pen CMYK
+                if (!useDirectCmyk && gi->hasPenCmyk()) {
+                    QBrush b = gi->itemBrush();
+                    if (b.style() == Qt::NoBrush) {
+                        gi->penCmyk(dC, dM, dY, dK);
+                        useDirectCmyk = true;
+                    }
+                }
+            }
+
+            if (useDirectCmyk) {
+                // 直接使用存储的 CMYK 值填充整个 overlay
+                // CMYK 值 0-100 → 0-255
+                uint8_t cmyk[4] = {
+                    static_cast<uint8_t>(qBound(0.0, dC * 2.55, 255.0)),
+                    static_cast<uint8_t>(qBound(0.0, dM * 2.55, 255.0)),
+                    static_cast<uint8_t>(qBound(0.0, dY * 2.55, 255.0)),
+                    static_cast<uint8_t>(qBound(0.0, dK * 2.55, 255.0))
                 };
-            collectDescendants(item);
+                size_t totalPixels = static_cast<size_t>(w) * h;
+                overlay.data.resize(totalPixels * 4);
+                uint8_t *dst = overlay.data.data();
+                for (size_t i = 0; i < totalPixels; ++i) {
+                    dst[i * 4 + 0] = cmyk[0];
+                    dst[i * 4 + 1] = cmyk[1];
+                    dst[i * 4 + 2] = cmyk[2];
+                    dst[i * 4 + 3] = cmyk[3];
+                }
+                // 使用场景渲染来获取形状蒙版（只保留图元实际覆盖的像素）
+                // 先渲染到临时图像获取 alpha 通道
+                {
+                    QSet<QGraphicsItem *> keepVisible;
+                    std::function<void(QGraphicsItem *)> collectDescendants =
+                        [&](QGraphicsItem *root) {
+                            keepVisible.insert(root);
+                            for (auto *child : root->childItems())
+                                collectDescendants(child);
+                        };
+                    collectDescendants(item);
 
-            // 保存可见性并隐藏其他项
-            QHash<QGraphicsItem *, bool> savedVisibility;
-            m_pView->scene()->setBackgroundBrush(Qt::NoBrush);
-            for (auto *other : allSceneItems) {
-                savedVisibility[other] = other->isVisible();
-                if (!keepVisible.contains(other))
-                    other->setVisible(false);
-            }
+                    QHash<QGraphicsItem *, bool> savedVisibility;
+                    m_pView->scene()->setBackgroundBrush(Qt::NoBrush);
+                    for (auto *other : allSceneItems) {
+                        savedVisibility[other] = other->isVisible();
+                        if (!keepVisible.contains(other))
+                            other->setVisible(false);
+                    }
 
-            // 渲染
-            QImage img(w, h, QImage::Format_ARGB32);
-            img.fill(Qt::transparent);
-            {
-                QPainter painter(&img);
-                painter.setRenderHint(QPainter::Antialiasing);
-                painter.setRenderHint(QPainter::TextAntialiasing);
-                m_pView->scene()->render(&painter, QRectF(0, 0, w, h),
-                                         sceneRect.intersected(exportRect));
-            }
+                    QImage maskImg(w, h, QImage::Format_ARGB32);
+                    maskImg.fill(Qt::transparent);
+                    {
+                        QPainter painter(&maskImg);
+                        painter.setRenderHint(QPainter::Antialiasing);
+                        painter.setRenderHint(QPainter::TextAntialiasing);
+                        m_pView->scene()->render(&painter, QRectF(0, 0, w, h),
+                                                 sceneRect.intersected(exportRect));
+                    }
 
-            // 恢复可见性和场景背景
-            for (auto *other : allSceneItems)
-                other->setVisible(savedVisibility.value(other, true));
-            m_pView->scene()->setBackgroundBrush(oldSceneBg);
+                    for (auto *other : allSceneItems)
+                        other->setVisible(savedVisibility.value(other, true));
+                    m_pView->scene()->setBackgroundBrush(oldSceneBg);
 
-            // BGRA → CMYK
-            overlay.data.resize(static_cast<size_t>(w) * h * 4);
-            QATColorManager &cm = QATColorManager::instance();
-            if (cm.isValid()) {
-                auto *xform = cm.createBgraToCmyk8(
-                    INTENT_PERCEPTUAL, cmsFLAGS_BLACKPOINTCOMPENSATION
-                                           | cmsFLAGS_HIGHRESPRECALC);
-                QATColorManager::convertBgra8ToCmyk8(
-                    xform, img.constBits(), overlay.data.data(), w, h);
-                cmsDeleteTransform(xform);
-                // 透明像素（A=0）→ CMYK 全零，避免将透明区域导出为黑色
-                for (int y = 0; y < h; ++y) {
-                    const uchar *src = img.constScanLine(y);
-                    uint8_t *dst =
-                        overlay.data.data() + static_cast<size_t>(y) * w * 4;
-                    for (int x = 0; x < w; ++x) {
-                        if (src[x * 4 + 3] == 0)
-                            std::memset(dst + x * 4, 0, 4);
+                    // 只保留图元实际覆盖的像素（alpha > 0）
+                    for (int y = 0; y < h; ++y) {
+                        const uchar *src = maskImg.constScanLine(y);
+                        uint8_t *row = overlay.data.data() + static_cast<size_t>(y) * w * 4;
+                        for (int x = 0; x < w; ++x) {
+                            if (src[x * 4 + 3] == 0)
+                                std::memset(row + x * 4, 0, 4);
+                        }
                     }
                 }
             } else {
-                for (int y = 0; y < h; ++y) {
-                    const uchar *src = img.constScanLine(y);
-                    uint8_t *dst =
-                        overlay.data.data() + static_cast<size_t>(y) * w * 4;
-                    for (int x = 0; x < w; ++x) {
-                        if (src[x * 4 + 3] == 0) {
-                            std::memset(dst + x * 4, 0, 4);
-                            continue;
+                // 收集该项及其所有子项（处理分组）
+                QSet<QGraphicsItem *> keepVisible;
+                std::function<void(QGraphicsItem *)> collectDescendants =
+                    [&](QGraphicsItem *root) {
+                        keepVisible.insert(root);
+                        for (auto *child : root->childItems())
+                            collectDescendants(child);
+                    };
+                collectDescendants(item);
+
+                // 保存可见性并隐藏其他项
+                QHash<QGraphicsItem *, bool> savedVisibility;
+                m_pView->scene()->setBackgroundBrush(Qt::NoBrush);
+                for (auto *other : allSceneItems) {
+                    savedVisibility[other] = other->isVisible();
+                    if (!keepVisible.contains(other))
+                        other->setVisible(false);
+                }
+
+                // 渲染
+                QImage img(w, h, QImage::Format_ARGB32);
+                img.fill(Qt::transparent);
+                {
+                    QPainter painter(&img);
+                    painter.setRenderHint(QPainter::Antialiasing);
+                    painter.setRenderHint(QPainter::TextAntialiasing);
+                    m_pView->scene()->render(&painter, QRectF(0, 0, w, h),
+                                             sceneRect.intersected(exportRect));
+                }
+
+                // 恢复可见性和场景背景
+                for (auto *other : allSceneItems)
+                    other->setVisible(savedVisibility.value(other, true));
+                m_pView->scene()->setBackgroundBrush(oldSceneBg);
+
+                // BGRA → CMYK
+                overlay.data.resize(static_cast<size_t>(w) * h * 4);
+                QATColorManager &cm = QATColorManager::instance();
+                if (cm.isValid()) {
+                    auto *xform = cm.createBgraToCmyk8(
+                        INTENT_PERCEPTUAL, cmsFLAGS_BLACKPOINTCOMPENSATION
+                                               | cmsFLAGS_HIGHRESPRECALC);
+                    QATColorManager::convertBgra8ToCmyk8(
+                        xform, img.constBits(), overlay.data.data(), w, h);
+                    cmsDeleteTransform(xform);
+                    // 透明像素（A=0）→ CMYK 全零，避免将透明区域导出为黑色
+                    for (int y = 0; y < h; ++y) {
+                        const uchar *src = img.constScanLine(y);
+                        uint8_t *dst =
+                            overlay.data.data() + static_cast<size_t>(y) * w * 4;
+                        for (int x = 0; x < w; ++x) {
+                            if (src[x * 4 + 3] == 0)
+                                std::memset(dst + x * 4, 0, 4);
                         }
-                        double b = src[x * 4 + 0] / 255.0;
-                        double g = src[x * 4 + 1] / 255.0;
-                        double r = src[x * 4 + 2] / 255.0;
-                        double cd = 1.0 - r, md = 1.0 - g, yd = 1.0 - b;
-                        double kd = std::min({cd, md, yd});
-                        if (kd < 1.0) {
-                            cd = (cd - kd) / (1.0 - kd) * 100.0;
-                            md = (md - kd) / (1.0 - kd) * 100.0;
-                            yd = (yd - kd) / (1.0 - kd) * 100.0;
-                        } else {
-                            cd = md = yd = 0.0;
+                    }
+                } else {
+                    for (int y = 0; y < h; ++y) {
+                        const uchar *src = img.constScanLine(y);
+                        uint8_t *dst =
+                            overlay.data.data() + static_cast<size_t>(y) * w * 4;
+                        for (int x = 0; x < w; ++x) {
+                            if (src[x * 4 + 3] == 0) {
+                                std::memset(dst + x * 4, 0, 4);
+                                continue;
+                            }
+                            double b = src[x * 4 + 0] / 255.0;
+                            double g = src[x * 4 + 1] / 255.0;
+                            double r = src[x * 4 + 2] / 255.0;
+                            double cd = 1.0 - r, md = 1.0 - g, yd = 1.0 - b;
+                            double kd = std::min({cd, md, yd});
+                            if (kd < 1.0) {
+                                cd = (cd - kd) / (1.0 - kd) * 100.0;
+                                md = (md - kd) / (1.0 - kd) * 100.0;
+                                yd = (yd - kd) / (1.0 - kd) * 100.0;
+                            } else {
+                                cd = md = yd = 0.0;
+                            }
+                            kd *= 100.0;
+                            int off = static_cast<int>(x) * 4;
+                            dst[off + 0] =
+                                static_cast<uint8_t>(std::clamp(cd * 2.55, 0.0, 255.0));
+                            dst[off + 1] =
+                                static_cast<uint8_t>(std::clamp(md * 2.55, 0.0, 255.0));
+                            dst[off + 2] =
+                                static_cast<uint8_t>(std::clamp(yd * 2.55, 0.0, 255.0));
+                            dst[off + 3] =
+                                static_cast<uint8_t>(std::clamp(kd * 2.55, 0.0, 255.0));
                         }
-                        kd *= 100.0;
-                        int off = static_cast<int>(x) * 4;
-                        dst[off + 0] =
-                            static_cast<uint8_t>(std::clamp(cd * 2.55, 0.0, 255.0));
-                        dst[off + 1] =
-                            static_cast<uint8_t>(std::clamp(md * 2.55, 0.0, 255.0));
-                        dst[off + 2] =
-                            static_cast<uint8_t>(std::clamp(yd * 2.55, 0.0, 255.0));
-                        dst[off + 3] =
-                            static_cast<uint8_t>(std::clamp(kd * 2.55, 0.0, 255.0));
                     }
                 }
             }
@@ -1570,14 +1662,18 @@ void MainWindow::onExportImage()
 
     QSize outSize = exportRect.size().toSize();
 
-    auto progress = [this, taskId](int pct) {
+    QPointer<MainWindow> guard(this);
+    auto progress = [guard, taskId](int pct) {
         QMetaObject::invokeMethod(
-            this,
-            [this, taskId, pct]() { m_pProgressMgr->updateTask(taskId, pct); },
+            guard.data(),
+            [guard, taskId, pct]() {
+                if (!guard) return;
+                guard->m_pProgressMgr->updateTask(taskId, pct);
+            },
             Qt::QueuedConnection);
     };
 
-    auto *thread = QThread::create([this, tiffPath, sources,
+    auto *thread = QThread::create([guard, tiffPath, sources,
                                      overlays = std::move(overlays), outSize,
                                      settings, progress, taskId, bRip, ripXRes,
                                      ripYRes]() {
@@ -1585,17 +1681,18 @@ void MainWindow::onExportImage()
                                              outSize, settings, progress);
 
         QMetaObject::invokeMethod(
-            this,
-            [this, result, taskId, bRip, ripXRes, ripYRes, tiffPath]() {
-                m_exporting = false;
+            guard.data(),
+            [guard, result, taskId, bRip, ripXRes, ripYRes, tiffPath]() {
+                if (!guard) return;
+                guard->m_exporting = false;
                 if (result.success) {
-                    m_pProgressMgr->finishTask(taskId);
-                    if (bRip && m_pNetWorkUtils) {
-                        m_pNetWorkUtils->doAddRip(ripXRes, ripYRes,
-                                                  result.filePath);
+                    guard->m_pProgressMgr->finishTask(taskId);
+                    if (bRip && guard->m_pNetWorkUtils) {
+                        guard->m_pNetWorkUtils->doAddRip(ripXRes, ripYRes,
+                                                         result.filePath);
                     }
                 } else {
-                    m_pProgressMgr->cancelTask(taskId);
+                    guard->m_pProgressMgr->cancelTask(taskId);
                     qWarning() << "Export failed:" << result.filePath
                                << result.errorMessage;
                 }

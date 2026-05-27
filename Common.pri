@@ -1,14 +1,16 @@
 
-PROJECT_PATH = /Volumes/Caviar/Test/GraphicsDemo
+PROJECT_PATH = D:/WorkSpace/Caviar/ATGraphics
 DESTDIR = $$PROJECT_PATH/Bin
 OBJECTS_DIR = $$PROJECT_PATH/Build/$$TARGET/obj
 MOC_DIR = $$PROJECT_PATH/Build/$$TARGET/moc
 RCC_DIR = $$PROJECT_PATH/Build/$$TARGET/rcc
 UI_DIR = $$PROJECT_PATH/Build/$$TARGET/ui
 
-INCLUDEPATH += \
-    /opt/homebrew/include \
+# ---------- 第三方库----------
+INCLUDEPATH += $$PROJECT_PATH/3rdParty/libtiff-msvc2022/include
+LIBS += -L$$PROJECT_PATH/3rdParty/libtiff-msvc2022/lib \
+        -ltiff
 
-LIBS += -L/opt/homebrew/lib \
-    -ltiff \
-    -llcms2 \
+INCLUDEPATH += $$PROJECT_PATH/3rdParty/lcms2-2.19/include
+LIBS += -L$$PROJECT_PATH/3rdParty/lcms2-2.19/bin \
+        -llcms2
