@@ -1,107 +1,94 @@
-# ---> C++
-# Prerequisites
-*.d
+# ============================================================
+# 编译产物
+# ============================================================
 
-# Compiled Object files
-*.slo
-*.lo
+# 目标文件
 *.o
 *.obj
+*.lo
+*.slo
 
-# Precompiled Headers
+# 预编译头
 *.gch
 *.pch
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
+# 静态库
 *.a
+*.la
+*.lai
 *.lib
 
-# Executables
-*.exe
-*.out
-*.app
-
-# ---> Qt
-# C++ objects and libs
-*.slo
-*.lo
-*.o
-*.a
-*.la
-*.lai
+# 动态库
 *.so
 *.so.*
 *.dll
 *.dylib
 
-# Qt-es
-object_script.*.Release
-object_script.*.Debug
-*_plugin_import.cpp
-/.qmake.cache
-/.qmake.stash
-*.pro.user
-*.pro.user.*
-*.qbs.user
-*.qbs.user.*
-*.moc
+# 可执行文件
+*.exe
+*.out
+*.app
+
+# Fortran 模块
+*.mod
+*.smod
+
+# ============================================================
+# Qt 构建产物
+# ============================================================
+
+# MOC / RCC / UIC 生成文件
 moc_*.cpp
 moc_*.h
 qrc_*.cpp
 ui_*.h
-*.qmlc
-*.jsc
-Makefile*
-*build-*
+*.moc
 *.qm
 *.prl
 
-# Qt unit tests
-target_wrapper.*
+# Qt 插件导入
+*_plugin_import.cpp
 
-# QtCreator
-*.autosave
+# QML 缓存
+*.qmlc
+*.jsc
+*_qmlcache.qrc
 
-# QtCreator Qml
+# Makefile 及构建脚本
+Makefile*
+object_script.*.Release
+object_script.*.Debug
+
+# qmake 缓存
+.qmake.cache
+.qmake.stash
+.qmake.stash
+
+# 项目用户配置
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
 *.qmlproject.user
 *.qmlproject.user.*
 
-# QtCreator CMake
-CMakeLists.txt.user*
+# 单元测试包装
+target_wrapper.*
 
-# QtCreator 4.8< compilation database
+# ============================================================
+# IDE 与编辑器配置
+# ============================================================
+
+# Qt Creator
+.qtcreator
+.qtc_*
+*.autosave
+*creator.user*
 compile_commands.json
 
-# QtCreator local machine specific files for imported projects
-*creator.user*
-
-*_qmlcache.qrc
-
-.vscode
-
-Build*
-
-3rdparty
-
+# Visual Studio
 .vs
-
-debug
-release
-
-.qtc_*
-
-*.user
+.vscode
 *.sln
 *.vcxproj
 *.vcxproj.filters
@@ -109,9 +96,35 @@ release
 *.qtvscr
 *.rc
 *.aps
-.reuse
-cmake*
-Bin
 
-.qtcreator
+# CMake
+cmake*
+CMakeLists.txt.user*
+
+# ============================================================
+# 构建与输出目录
+# ============================================================
+
+Build*
+Bin
+debug
+release
+*build-*
+
+# ============================================================
+# 第三方库
+# ============================================================
+
+3rdparty
+
+# ============================================================
+# 项目工具与缓存
+# ============================================================
+
+# Claude Code
 .claude
+.agents
+.cache
+
+# 许可证与复用
+.reuse

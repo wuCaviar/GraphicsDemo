@@ -66,6 +66,7 @@ private slots:
     void onFitCanvasToItems();
     void onResizeCanvas();
     void onSettings();
+    void onPreferences();
     void onAbout();
     void onAlignLeft();
     void onAlignRight();
@@ -110,8 +111,6 @@ private:
     void _initProcess();
     void _updateUndoRedoActions();
 
-    void loadStyleSheet();
-
     // 窗口状态持久化
     void loadWindowState();
     void saveWindowState();
@@ -120,6 +119,8 @@ private:
     QList<QGraphicsItem *> pasteItemsFromClipboard();
     QList<QGraphicsItem *> filterSelectableItems() const;
     void rotateSelectedItems(qreal angleDelta);
+
+    bool _maybeSaveProject(); // 提示保存，返回 false 表示用户取消操作
 
     // 对齐/分布辅助方法
     void applyAlign(AlignmentUtils::AlignDirection direction);
@@ -138,6 +139,7 @@ private:
     bool m_exporting = false; // 防止重复导出
 
     QString m_currentProjectPath; // 当前工程文件路径，空表示未保存
+    bool m_projectModified = false; // 工程文件是否已修改（未保存）
 
     ImageUtils::ImageImportPipeline m_importSinglePipeline; // 单图导入处理管线
     ImageUtils::ImageImportPipeline m_importMultiPipeline;  // 批量导入处理管线
@@ -161,6 +163,13 @@ private:
 
     // 刻度尺单位切换
     QAction *m_rulerUnitAction = nullptr;
+
+    // 主题切换
+    QAction *m_lightThemeAction = nullptr;
+    QAction *m_darkThemeAction = nullptr;
+    QString m_currentTheme;
+    void _initThemeMenu(QMenu *viewMenu);
+    void switchTheme(const QString &theme);
 
     // 通用进度管理器
     ProgressManager *m_pProgressMgr = nullptr;

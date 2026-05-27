@@ -19,6 +19,7 @@
 #include "NewFileDialog.h"
 #include "ResizeCanvasDialog.h"
 #include "SettingsDialog.h"
+#include "PreferencesDialog.h"
 #include "RectItem.h"
 #include "ResizeHandleItem.h"
 #include "RulerBar.h"
@@ -93,23 +94,11 @@ MainWindow::MainWindow(QWidget *parent)
     _initProcess();
     _initNetWork();
 
-    // 加载 QSS 样式表
-    loadStyleSheet();
-
     setWindowTitle(tr("AT Drawing Tools"));
     resize(1200, 800);
 
     // 加载窗口状态（工具栏位置、可见性等）
     loadWindowState();
-}
-
-void MainWindow::loadStyleSheet()
-{
-    QFile f(":/style/style.qss");
-    if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qApp->setStyleSheet(f.readAll());
-        f.close();
-    }
 }
 
 MainWindow::~MainWindow()
@@ -288,26 +277,7 @@ void MainWindow::_initMenuBar()
     ungroupAct->setToolTip(tr("Ungroup selected items"));
     connect(ungroupAct, &QAction::triggered, this, &MainWindow::onUngroup);
     arrMenu->addSeparator();
-    QMenu *alignMenu = arrMenu->addMenu(tr("Align"));
-    alignMenu->addAction(tr("Left"), this, &MainWindow::onAlignLeft)
-        ->setToolTip(tr("Align selected items to the left edge"));
-    alignMenu->addAction(tr("Right"), this, &MainWindow::onAlignRight)
-        ->setToolTip(tr("Align selected items to the right edge"));
-    alignMenu->addAction(tr("Top"), this, &MainWindow::onAlignTop)
-        ->setToolTip(tr("Align selected items to the top edge"));
-    alignMenu->addAction(tr("Bottom"), this, &MainWindow::onAlignBottom)
-        ->setToolTip(tr("Align selected items to the bottom edge"));
-    alignMenu->addAction(tr("Center H"), this, &MainWindow::onAlignHCenter)
-        ->setToolTip(tr("Align selected items to the horizontal center"));
-    alignMenu->addAction(tr("Center V"), this, &MainWindow::onAlignVCenter)
-        ->setToolTip(tr("Align selected items to the vertical center"));
-    QMenu *distMenu = arrMenu->addMenu(tr("Distribute"));
-    distMenu->addAction(tr("Horizontally"), this, &MainWindow::onDistributeH)
-        ->setToolTip(tr("Distribute selected items evenly horizontally"));
-    distMenu->addAction(tr("Vertically"), this, &MainWindow::onDistributeV)
-        ->setToolTip(tr("Distribute selected items evenly vertically"));
-    distMenu->addSeparator();
-    distMenu
+    arrMenu
         ->addAction(tr("Align && Layout..."), this,
                     &MainWindow::onAlignLayoutDialog)
         ->setToolTip(tr("Open the Align & Layout dialog"));
@@ -334,8 +304,11 @@ void MainWindow::_initMenuBar()
 
     // ---- 设置 ----
     QMenu *settingsMenu = menu->addMenu(tr("&Settings"));
-    settingsMenu->addAction(tr("&Settings..."), this, &MainWindow::onSettings)
-        ->setToolTip(tr("Open application settings"));
+    settingsMenu->addAction(tr("&RIP Settings..."), this, &MainWindow::onSettings)
+        ->setToolTip(tr("Configure RIP settings"));
+    settingsMenu->addSeparator();
+    settingsMenu->addAction(tr("&Preferences..."), this, &MainWindow::onPreferences)
+        ->setToolTip(tr("Open application preferences"));
 
     // ---- 视图 ----
     QMenu *viewMenu = menu->addMenu(tr("&View"));
@@ -373,6 +346,8 @@ void MainWindow::_initMenuBar()
         _updatePosLabel(m_lastScenePos);
     });
 
+    _initThemeMenu(viewMenu);
+
     viewMenu->addSeparator();
     // 缩放适配
     QAction *fitAct = new QAction(QIcon(":/icons/icons/view-fit.svg"),
@@ -391,6 +366,54 @@ void MainWindow::_initMenuBar()
     viewMenu->addAction(resetZoomAct);
 
     _updateUndoRedoActions();
+}
+
+void MainWindow::_initThemeMenu(QMenu *viewMenu)
+{
+    QMenu *themeMenu = viewMenu->addMenu(tr("Theme"));
+
+    auto *themeGroup = new QActionGroup(this);
+    themeGroup->setExclusive(true);
+
+    m_lightThemeAction = themeMenu->addAction(tr("Light"));
+    m_lightThemeAction->setCheckable(true);
+    themeGroup->addAction(m_lightThemeAction);
+
+    m_darkThemeAction = themeMenu->addAction(tr("Dark"));
+    m_darkThemeAction->setCheckable(true);
+    themeGroup->addAction(m_darkThemeAction);
+
+    connect(m_lightThemeAction, &QAction::triggered, this,
+            [this]() { switchTheme("light"); });
+    connect(m_darkThemeAction, &QAction::triggered, this,
+            [this]() { switchTheme("dark"); });
+
+    // 恢复保存的主题设置
+    QSettings settings;
+    QString savedTheme = settings.value("appearance/theme", "light").toString();
+    switchTheme(savedTheme);
+}
+
+void MainWindow::switchTheme(const QString &theme)
+{
+    if (m_currentTheme == theme)
+        return;
+
+    m_currentTheme = theme;
+
+    QString qssPath = QString(":/qdarkstyle/%1/%1style.qss").arg(theme);
+    QFile f(qssPath);
+    if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qApp->setStyleSheet(f.readAll());
+        f.close();
+    }
+
+    if (m_lightThemeAction)
+        m_lightThemeAction->setChecked(theme == "light");
+    if (m_darkThemeAction)
+        m_darkThemeAction->setChecked(theme == "dark");
+
+    QSettings().setValue("appearance/theme", theme);
 }
 
 void MainWindow::_initToolBar()
@@ -607,9 +630,11 @@ void MainWindow::_initConnections()
             [this]() { _updateUndoRedoActions(); });
 
     // undo/redo 后更新 ResizeHandleItem 位置（而非重建，避免选中框闪烁）
+    // 同时标记工程为已修改
     connect(m_undoStack, &QUndoStack::indexChanged, this, [this]() {
         m_pView->refreshResizeHandle();
         _updateCanvasLabel();
+        m_projectModified = true;
     });
 
     // 视图滚动/缩放时更新刻度尺
@@ -869,8 +894,54 @@ void MainWindow::getToolInfo()
 // ============================================================
 // 文件操作
 // ============================================================
+bool MainWindow::_maybeSaveProject()
+{
+    if (!m_projectModified || !m_pView->canvasItem())
+        return true;
+
+    QMessageBox::StandardButton btn = QMessageBox::question(
+        this, tr("Unsaved Changes"),
+        tr("The current project has unsaved changes.\n"
+           "Do you want to save them?"),
+        QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+    if (btn == QMessageBox::Cancel)
+        return false;
+    if (btn == QMessageBox::Yes) {
+        // 如果已有保存路径，直接保存；否则弹出另存为对话框
+        if (!m_currentProjectPath.isEmpty()) {
+            CanvasItem *canvas = m_pView->canvasItem();
+            if (!canvas)
+                return false;
+            ProjectFile::ProjectInfo info;
+            info.name = QFileInfo(m_currentProjectPath).completeBaseName();
+            info.version = QStringLiteral("1.0.0");
+            info.author = QStringLiteral("Caviar");
+            ProjectFile::CanvasInfo canvasInfo;
+            canvasInfo.width = canvas->canvasSize().width();
+            canvasInfo.height = canvas->canvasSize().height();
+            canvasInfo.dpi = canvas->ppi();
+            auto items = ::filterSelectableItems(m_pView->scene()->items());
+            ProjectFile pf;
+            if (!pf.save(m_currentProjectPath, info, canvasInfo, items)) {
+                QMessageBox::warning(this, tr("Save Project"),
+                                     tr("Failed to save:\n%1").arg(pf.lastError()));
+                return false;
+            }
+            m_projectModified = false;
+        } else {
+            onSaveProject();
+            if (m_projectModified)
+                return false; // 用户取消了保存
+        }
+    }
+    return true;
+}
+
 void MainWindow::onNew()
 {
+    if (!_maybeSaveProject())
+        return;
+
     NewFileDialog dlg(this);
     if (dlg.exec() != QDialog::Accepted)
         return;
@@ -880,6 +951,10 @@ void MainWindow::onNew()
 
     // 先清空 undo 栈，避免命令引用即将被删除的图元
     m_undoStack->clear();
+
+    // 重置工程状态
+    m_currentProjectPath.clear();
+    m_projectModified = false;
 
     // 清空属性面板引用
     m_pPropertyPanel->setItem(nullptr);
@@ -908,50 +983,8 @@ void MainWindow::onNew()
 
 void MainWindow::onOpenProject()
 {
-    // 检查当前画布是否有图元，提示用户保存
-    auto existingItems = ::filterSelectableItems(m_pView->scene()->items());
-    if (!existingItems.isEmpty()) {
-        QMessageBox::StandardButton btn = QMessageBox::question(
-            this, tr("Open Project"),
-            tr("The current canvas has unsaved content.\n"
-               "Do you want to save it before opening another project?"),
-            QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
-        if (btn == QMessageBox::Cancel)
-            return;
-        if (btn == QMessageBox::Yes) {
-            // 同步保存（保存完成后才继续打开流程）
-            CanvasItem *canvas = m_pView->canvasItem();
-            if (!canvas)
-                return;
-
-            QString savePath = QFileDialog::getSaveFileName(
-                this, tr("Save Project"), QString(),
-                tr("AT Project Files (*.atp);;All Files (*)"));
-            if (savePath.isEmpty())
-                return; // 用户取消保存 → 中止打开
-
-            if (!savePath.endsWith(QLatin1String(".atp"), Qt::CaseInsensitive))
-                savePath.append(QLatin1String(".atp"));
-
-            ProjectFile::ProjectInfo saveInfo;
-            saveInfo.name = QFileInfo(savePath).completeBaseName();
-            saveInfo.version = QStringLiteral("1.0.0");
-            saveInfo.author = QStringLiteral("Caviar");
-
-            ProjectFile::CanvasInfo saveCanvas;
-            saveCanvas.width = canvas->canvasSize().width();
-            saveCanvas.height = canvas->canvasSize().height();
-            saveCanvas.dpi = canvas->ppi();
-
-            ProjectFile pf;
-            if (!pf.save(savePath, saveInfo, saveCanvas, existingItems)) {
-                QMessageBox::warning(this, tr("Save Project"),
-                                     tr("Failed to save:\n%1").arg(pf.lastError()));
-                return;
-            }
-            m_currentProjectPath = savePath;
-        }
-    }
+    if (!_maybeSaveProject())
+        return;
 
     QString path = QFileDialog::getOpenFileName(
         this, tr("Open Project"), QString(),
@@ -987,6 +1020,7 @@ void MainWindow::onOpenProject()
         _updateCanvasLabel();
         _updatePosLabel(m_lastScenePos);
         m_currentProjectPath = path;
+        m_projectModified = false;
         m_pProgressMgr->resetAll();
         setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
         return;
@@ -1041,6 +1075,7 @@ void MainWindow::onOpenProject()
                 _updatePosLabel(m_lastScenePos);
 
                 m_currentProjectPath = path;
+                m_projectModified = false;
                 setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
 
                 watcher->deleteLater();
@@ -1137,6 +1172,7 @@ void MainWindow::onSaveProject()
                 }
 
                 m_currentProjectPath = path;
+                m_projectModified = false;
                 setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
 
                 m_pView->setEnabled(true);
@@ -1903,6 +1939,12 @@ void MainWindow::onSettings()
         return;
     // TODO: 使用 dlg.resolutionX(), dlg.resolutionY(),
     //       dlg.dotCurvePath(), dlg.colorCurvePath(), dlg.outputPath()
+}
+
+void MainWindow::onPreferences()
+{
+    PreferencesDialog dlg(this);
+    dlg.exec();
 }
 
 void MainWindow::onAbout()

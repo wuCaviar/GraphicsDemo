@@ -29,8 +29,6 @@ void QAtDrawActionBase::_execute() { }
 ///////////////////////////////////////////////////////////////////////////////
 QAtDrawRectAction::QAtDrawRectAction() : QAtDrawActionBase() { }
 
-QAtDrawRectAction::~QAtDrawRectAction() { }
-
 void QAtDrawRectAction::_onUpdateState(bool &isEnabled, bool &isChecked,
                                        bool &isVisible)
 {

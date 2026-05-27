@@ -33,6 +33,7 @@ HEADERS += \
     UI/GradientDialog.h \
     UI/AlignLayoutDialog.h \
     UI/SettingsDialog.h \
+    UI/PreferencesDialog.h \
     Items/IGraphicsItem.h \
     Items/RectItem.h \
     Items/EllipseItem.h \
@@ -80,6 +81,7 @@ SOURCES += \
     UI/GradientDialog.cpp \
     UI/AlignLayoutDialog.cpp \
     UI/SettingsDialog.cpp \
+    UI/PreferencesDialog.cpp \
     Items/IGraphicsItem.cpp \
     Items/RectItem.cpp \
     Items/EllipseItem.cpp \
@@ -112,7 +114,9 @@ FORMS += \
 
 RESOURCES += \
     translations/translations.qrc \
-    resources/resources.qrc
+    resources/resources.qrc \
+    resources/theme/dark/darkstyle.qrc \
+    resources/theme/light/lightstyle.qrc \
 
 TRANSLATIONS += \
     translations/GraphicsDemo_zh_CN.ts
