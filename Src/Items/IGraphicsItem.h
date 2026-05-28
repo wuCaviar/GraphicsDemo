@@ -9,7 +9,7 @@
 #include <QMap>
 #include <QPen>
 
-#include "colortransform.h"
+#include "ColorTypes.h"
 
 // 统一属性接口，所有自定义图元均实现此接口
 class IGraphicsItem

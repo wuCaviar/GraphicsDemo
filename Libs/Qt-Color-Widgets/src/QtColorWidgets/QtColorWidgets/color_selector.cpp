@@ -10,7 +10,7 @@
 #include <QDragEnterEvent>
 #include <QMimeData>
 
-#include "../Src/ColorTrans/colortransform.h"
+#include "Common/ColorTypes.h"
 
 namespace color_widgets {
 

@@ -16,9 +16,17 @@
 
 #include "QtColorWidgets/color_utils.hpp"
 
-#include "../Src/ColorTrans/colortransform.h"
+#include "Common/ColorTypes.h"
+#include "Common/IColorTransform.h"
 
 namespace color_widgets {
+
+static IColorTransform *s_colorTransform = nullptr;
+
+void ColorDialog::setColorTransform(IColorTransform *transform)
+{
+    s_colorTransform = transform;
+}
 
 /// @brief Convert CMYK values to QColor (RGB)
 /// @param c Cyan (0-100)
@@ -28,11 +36,8 @@ namespace color_widgets {
 /// @return QColor in RGB space
 QColor ColorDialog::cmyk_to_rgb(double c, double m, double y, double k)
 {
-    QATColorManager &cm = QATColorManager::instance();
-    if (cm.isValid()) {
-        return cm.toRgb(QATColorManager::Cmyk{ c, m, y, k }, INTENT_PERCEPTUAL,
-                        cmsFLAGS_BLACKPOINTCOMPENSATION
-                            | cmsFLAGS_HIGHRESPRECALC);
+    if (s_colorTransform && s_colorTransform->isValid()) {
+        return s_colorTransform->toRgb(c, m, y, k);
     }
 
     return QColor();
@@ -47,15 +52,8 @@ QColor ColorDialog::cmyk_to_rgb(double c, double m, double y, double k)
 void ColorDialog::rgb_to_cmyk(const QColor &color, double &c, double &m,
                               double &y, double &k)
 {
-    QATColorManager &cm = QATColorManager::instance();
-    if (cm.isValid()) {
-        QATColorManager::Cmyk cmyk = cm.toCmyk(color, INTENT_PERCEPTUAL,
-                                               cmsFLAGS_BLACKPOINTCOMPENSATION
-                                                   | cmsFLAGS_HIGHRESPRECALC);
-        c = cmyk.c;
-        m = cmyk.m;
-        y = cmyk.y;
-        k = cmyk.k;
+    if (s_colorTransform && s_colorTransform->isValid()) {
+        s_colorTransform->toCmyk(color, c, m, y, k);
     }
 }
 
@@ -126,9 +124,6 @@ ColorDialog::ColorDialog(QWidget *parent, Qt::WindowFlags f)
     connect(p->ui.spin_black,
             QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &ColorDialog::set_cmyk);
-
-    QATColorManager &cm = QATColorManager::instance();
-    cm.initialize();
 }
 
 ColorDialog::~ColorDialog()
@@ -323,8 +318,8 @@ void ColorDialog::set_hsv()
 {
     if (!signalsBlocked()) {
         QColor col = QColor::fromHsv(
-            p->ui.slide_hue->value(), p->ui.slide_saturation->value(),
-            p->ui.slide_value->value(), p->ui.slide_alpha->value());
+            p->ui.slide_hue->value(), qRound(p->ui.slide_saturation->value() * 255.0 / 100.0),
+            qRound(p->ui.slide_value->value() * 255.0 / 100.0), p->ui.slide_alpha->value());
         p->ui.wheel->setColor(col);
         setColorInternal(col);
     }

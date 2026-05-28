@@ -6,7 +6,7 @@
 
 #include <QtWidgets/QWidget>
 #include <QMap>
-#include "../ColorTrans/colortransform.h"
+#include "Common/ColorTypes.h"
 
 QT_BEGIN_NAMESPACE
 

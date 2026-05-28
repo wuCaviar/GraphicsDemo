@@ -14,6 +14,7 @@
 #include <QDialog>
 
 class QAbstractButton;
+class IColorTransform;
 
 namespace color_widgets {
 
@@ -43,6 +44,12 @@ public:
     explicit ColorDialog(QWidget *parent = nullptr, Qt::WindowFlags f = {});
 
     ~ColorDialog();
+
+    /**
+     * Set the color transform implementation for CMYK conversion.
+     * Must be called before any ColorDialog is created.
+     */
+    static void setColorTransform(IColorTransform *transform);
 
     /**
      * Get currently selected color

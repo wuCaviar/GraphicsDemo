@@ -5,17 +5,25 @@ QT += core gui widgets network xml concurrent
 
 TARGET = ATGraphics
 
-DEFINES += QTCOLORWIDGETS_STATICALLY_LINKED
-
-include(Qt-Color-Widgets/color_widgets.pri)
-include(QtGradientEditor/qtgradienteditor.pri)
-include(QSimpleUpdater/qsimpleupdater.pri)
-
 # 启用 RTTI（AlignmentUtils 使用 dynamic_cast<IGraphicsItem*>）
 CONFIG += rtti c++17
 
 # 编译器警告
 QMAKE_CXXFLAGS += -Wall
+
+include(../Common.pri)
+
+# 链接独立库（DESTDIR 由 Common.pri 设置）
+LIBS += -L$$PROJECT_PATH/Bin -lColorTrans
+LIBS += -L$$PROJECT_PATH/Bin -lQtColorWidgets
+LIBS += -L$$PROJECT_PATH/Bin -lQtGradientEditor
+LIBS += -L$$PROJECT_PATH/Bin -lQSimpleUpdater
+
+PRE_TARGETDEPS += \
+    $$PROJECT_PATH/Bin/$${QMAKE_PREFIX_STATICLIB}ColorTrans.$${QMAKE_EXTENSION_STATICLIB} \
+    $$PROJECT_PATH/Bin/$${QMAKE_PREFIX_STATICLIB}QtColorWidgets.$${QMAKE_EXTENSION_STATICLIB} \
+    $$PROJECT_PATH/Bin/$${QMAKE_PREFIX_STATICLIB}QtGradientEditor.$${QMAKE_EXTENSION_STATICLIB} \
+    $$PROJECT_PATH/Bin/$${QMAKE_PREFIX_STATICLIB}QSimpleUpdater.$${QMAKE_EXTENSION_STATICLIB}
 
 HEADERS += \
     App/SingleInstance.h \
@@ -54,7 +62,6 @@ HEADERS += \
     Utils/ProgressManager.h \
     Utils/ColorUtils.h \
     Utils/AlignmentUtils.h \
-    ColorTrans/colortransform.h \
     NetWork/QHttp.h \
     Action/QAtActionBase.h \
     Action/QAtDrawAction.h \
@@ -104,7 +111,6 @@ SOURCES += \
     Utils/ProgressManager.cpp \
     Utils/ColorUtils.cpp \
     Utils/AlignmentUtils.cpp \
-    ColorTrans/colortransform.cpp \
     NetWork/QHttp.cpp \
     Action/QAtActionBase.cpp \
     Action/QAtDrawAction.cpp \
@@ -123,7 +129,7 @@ RESOURCES += \
     resources/theme/light/lightstyle.qrc \
 
 TRANSLATIONS += \
-    translations/GraphicsDemo_zh_CN.ts
+    translations/GraphicsDemo_zh_CN.ts \
 
 
 INCLUDEPATH += \
@@ -133,8 +139,13 @@ INCLUDEPATH += \
     $$PWD/Items \
     $$PWD/Commands \
     $$PWD/Utils \
-    $$PWD/ColorTrans \
     $$PWD/NetWork \
-    $$PWD/Tiff \    
-    
-include(../Common.pri)
+    $$PWD/Tiff \
+    $$PWD/../Libs \
+    $$PWD/../Libs/Common \
+    $$PWD/../Libs/ColorTrans \
+    $$PWD/../Libs/Qt-Color-Widgets/include \
+    $$PWD/../Libs/Qt-Color-Widgets/src \
+    $$PWD/../Libs/QtGradientEditor \
+    $$PWD/../Libs/QSimpleUpdater/include \
+    $$PWD/../Libs/QSimpleUpdater/src \

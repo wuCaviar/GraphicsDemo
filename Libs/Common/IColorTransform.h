@@ -1,0 +1,17 @@
+#ifndef ICOLORTRANSFORM_H
+#define ICOLORTRANSFORM_H
+
+#include <QColor>
+#include "ColorTypes.h"
+
+class IColorTransform
+{
+public:
+    virtual ~IColorTransform() = default;
+
+    virtual bool isValid() const = 0;
+    virtual QColor toRgb(double c, double m, double y, double k) = 0;
+    virtual void toCmyk(const QColor &rgb, double &c, double &m, double &y, double &k) = 0;
+};
+
+#endif // ICOLORTRANSFORM_H

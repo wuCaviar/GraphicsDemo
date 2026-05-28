@@ -1,5 +1,4 @@
 #include "colortransform.h"
-#include "AppConfig.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -42,7 +41,7 @@ QATColorManager &QATColorManager::instance()
 //  初始化
 // ================================================================
 
-bool QATColorManager::initialize()
+bool QATColorManager::initialize(const QString &srgbIccPath, const QString &cmykIccPath)
 {
     cmsSetLogErrorHandler(errorLogger);
 
@@ -50,7 +49,7 @@ bool QATColorManager::initialize()
         return true;
     cleanup();
 
-    if (!loadProfiles())
+    if (!loadProfiles(srgbIccPath, cmykIccPath))
         return false;
 
     m_ok = true;
@@ -70,22 +69,36 @@ QString QATColorManager::errorString() const
 }
 
 // ================================================================
+//  IColorTransform 接口实现
+// ================================================================
+
+QColor QATColorManager::toRgb(double c, double m, double y, double k)
+{
+    return toRgb(Cmyk{c, m, y, k});
+}
+
+void QATColorManager::toCmyk(const QColor &rgb, double &c, double &m, double &y, double &k)
+{
+    Cmyk cmyk = toCmyk(rgb);
+    c = cmyk.c;
+    m = cmyk.m;
+    y = cmyk.y;
+    k = cmyk.k;
+}
+
+// ================================================================
 //  ICC Profile 加载
 // ================================================================
 
-bool QATColorManager::loadProfiles()
+bool QATColorManager::loadProfiles(const QString &srgbIccPath, const QString &cmykIccPath)
 {
-    AppConfig &cfg = AppConfig::instance();
-
-    m_srgb = cmsOpenProfileFromFile(
-        cfg.srgbIccPath().toStdString().c_str(), "r");
+    m_srgb = cmsOpenProfileFromFile(srgbIccPath.toStdString().c_str(), "r");
     if (!m_srgb) {
         m_ok = false;
         return false;
     }
 
-    m_cmyk = cmsOpenProfileFromFile(
-        cfg.cmykIccPath().toStdString().c_str(), "r");
+    m_cmyk = cmsOpenProfileFromFile(cmykIccPath.toStdString().c_str(), "r");
     if (!m_cmyk) {
         cmsCloseProfile(m_srgb);
         m_srgb = nullptr;

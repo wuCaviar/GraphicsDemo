@@ -10,6 +10,8 @@
 #include "mainwindow.h"
 #include "SingleInstance.h"
 #include "AppConfig.h"
+#include "colortransform.h"
+#include "QtColorWidgets/color_dialog.hpp"
 
 class ComboBoxAdjuster : public QObject {
 public:
@@ -61,6 +63,12 @@ int main(int argc, char *argv[])
 
     // 加载全局配置
     AppConfig::instance().loadConfig();
+
+    // 初始化颜色管理器并注册到 UI 组件
+    QATColorManager &cm = QATColorManager::instance();
+    cm.initialize(AppConfig::instance().srgbIccPath(),
+                  AppConfig::instance().cmykIccPath());
+    color_widgets::ColorDialog::setColorTransform(&cm);
 
     QString name = "com.athc.darwingtools";
     SingleInstance instance;

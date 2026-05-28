@@ -3,7 +3,7 @@
 
 #include <QWidget>
 #include <QMap>
-#include "ColorTrans/colortransform.h"
+#include "ColorTypes.h"
 
 class GradientPreview : public QWidget
 {

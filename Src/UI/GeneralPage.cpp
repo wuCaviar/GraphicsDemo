@@ -1,5 +1,7 @@
 #include "GeneralPage.h"
 #include "AppConfig.h"
+#include "colortransform.h"
+#include "QtColorWidgets/color_dialog.hpp"
 
 #include <QFileDialog>
 #include <QFormLayout>
@@ -95,5 +97,11 @@ bool GeneralPage::save()
     AppConfig::instance().setRipConfigPath(m_ripConfigPathEdit->text());
     AppConfig::instance().setIccProfileBasePath(m_iccProfilePathEdit->text());
     AppConfig::instance().saveConfig();
+
+    QATColorManager &cm = QATColorManager::instance();
+    cm.initialize(AppConfig::instance().srgbIccPath(),
+                  AppConfig::instance().cmykIccPath());
+    color_widgets::ColorDialog::setColorTransform(&cm);
+
     return true;
 }
