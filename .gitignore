@@ -125,6 +125,8 @@ release
 .claude
 .agents
 .cache
+CLAUDE.md
+skill-lock.json
 
 # 许可证与复用
 .reuse
