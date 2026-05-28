@@ -3,8 +3,8 @@
 
 #include <QDialog>
 
+class QComboBox;
 class QLineEdit;
-class QSpinBox;
 
 class SettingsDialog : public QDialog
 {
@@ -25,8 +25,8 @@ private:
     void loadConfig();
     void saveConfig();
 
-    QSpinBox *m_resolutionXSpin = nullptr;
-    QSpinBox *m_resolutionYSpin = nullptr;
+    QComboBox *m_resolutionXCombo = nullptr;
+    QComboBox *m_resolutionYCombo = nullptr;
     QLineEdit *m_dotCurveEdit = nullptr;
     QLineEdit *m_colorCurveEdit = nullptr;
     QLineEdit *m_outputPathEdit = nullptr;

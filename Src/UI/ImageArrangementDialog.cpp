@@ -1,10 +1,10 @@
 #include "ImageArrangementDialog.h"
 
+#include <QDialogButtonBox>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
-#include <QPushButton>
 #include <QRadioButton>
 #include <QVBoxLayout>
 
@@ -54,16 +54,12 @@ void ImageArrangementDialog::setupUI()
     mainLayout->addLayout(topLayout);
 
     // ---- bottom: OK / Cancel ----
-    auto *btnLayout = new QHBoxLayout;
-    auto *okBtn = new QPushButton(tr("OK"));
-    auto *cancelBtn = new QPushButton(tr("Cancel"));
-    btnLayout->addStretch();
-    btnLayout->addWidget(okBtn);
-    btnLayout->addWidget(cancelBtn);
-    mainLayout->addLayout(btnLayout);
+    auto *buttonBox = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    mainLayout->addWidget(buttonBox);
 
-    connect(okBtn, &QPushButton::clicked, this, &QDialog::accept);
-    connect(cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
+    connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 }
 
 void ImageArrangementDialog::setFilePaths(const QStringList &paths)

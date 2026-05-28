@@ -34,7 +34,7 @@ private:
     void rebuildFormatGroup(const QString &format);
 
     // ===== 通用控件 =====
-    QSpinBox *m_dpiSpin;
+    QComboBox *m_dpiCombo;
     QComboBox *m_colorCombo;
     QComboBox *m_transparencyCombo;
 

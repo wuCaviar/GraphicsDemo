@@ -34,6 +34,8 @@ HEADERS += \
     UI/AlignLayoutDialog.h \
     UI/SettingsDialog.h \
     UI/PreferencesDialog.h \
+    UI/PreferencesPage.h \
+    UI/GeneralPage.h \
     Items/IGraphicsItem.h \
     Items/RectItem.h \
     Items/EllipseItem.h \
@@ -63,6 +65,7 @@ HEADERS += \
     Utils/ProjectFile.h \
     Tiff/tifffile.h \
     version.h \
+    ATHCPresets.h \
 
 SOURCES += \
     App/SingleInstance.cpp \
@@ -82,6 +85,7 @@ SOURCES += \
     UI/AlignLayoutDialog.cpp \
     UI/SettingsDialog.cpp \
     UI/PreferencesDialog.cpp \
+    UI/GeneralPage.cpp \
     Items/IGraphicsItem.cpp \
     Items/RectItem.cpp \
     Items/EllipseItem.cpp \
@@ -125,12 +129,12 @@ TRANSLATIONS += \
 INCLUDEPATH += \
     $$PWD/App \
     $$PWD/UI \
-    $$PWD/Common \
+    $$PWD/Action \
     $$PWD/Items \
     $$PWD/Commands \
     $$PWD/Utils \
     $$PWD/ColorTrans \
     $$PWD/NetWork \
-    $$PWD/Tiff \
+    $$PWD/Tiff \    
     
 include(../Common.pri)

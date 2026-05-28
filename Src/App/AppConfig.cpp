@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QDomDocument>
 #include <QFile>
+#include <QTextStream>
 
 AppConfig &AppConfig::instance()
 {
@@ -63,6 +64,50 @@ void AppConfig::loadConfig()
             << "\n  ripExe:" << m_ripExePath
             << "\n  ripConfig:" << m_ripConfigPath
             << "\n  iccBase:" << iccProfileBasePath();
+}
+
+void AppConfig::saveConfig() const
+{
+    const QString cfgPath =
+        QCoreApplication::applicationDirPath() + "/config.xml";
+
+    QDomDocument doc;
+    doc.appendChild(doc.createProcessingInstruction(
+        QStringLiteral("xml"), QStringLiteral("version=\"1.0\" encoding=\"UTF-8\"")));
+
+    QDomElement root = doc.createElement(QStringLiteral("Config"));
+    doc.appendChild(root);
+
+    // <Rip>
+    QDomElement ripEl = doc.createElement(QStringLiteral("Rip"));
+    root.appendChild(ripEl);
+
+    QDomElement exeEl = doc.createElement(QStringLiteral("ExePath"));
+    exeEl.appendChild(doc.createTextNode(m_ripExePath));
+    ripEl.appendChild(exeEl);
+
+    QDomElement cfgEl = doc.createElement(QStringLiteral("ConfigPath"));
+    cfgEl.appendChild(doc.createTextNode(m_ripConfigPath));
+    ripEl.appendChild(cfgEl);
+
+    // <ICC>
+    QDomElement iccEl = doc.createElement(QStringLiteral("ICC"));
+    root.appendChild(iccEl);
+
+    QDomElement pathEl = doc.createElement(QStringLiteral("Path"));
+    pathEl.appendChild(doc.createTextNode(m_iccProfileBasePath));
+    iccEl.appendChild(pathEl);
+
+    QFile file(cfgPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        qWarning() << "[AppConfig] Failed to write config.xml:" << cfgPath;
+        return;
+    }
+    QTextStream ts(&file);
+    doc.save(ts, 4);
+    file.close();
+
+    qInfo() << "[AppConfig] Saved config.xml";
 }
 
 QString AppConfig::iccProfileBasePath() const

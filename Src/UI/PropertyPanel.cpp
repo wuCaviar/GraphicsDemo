@@ -30,6 +30,14 @@ PropertyPanel::PropertyPanel(QWidget *parent) : QDockWidget(tr("Properties"), pa
     setupUI();
 }
 
+void PropertyPanel::setDisplayUnit(RulerBar::RulerUnit unit, qreal ppi)
+{
+    m_displayUnit = unit;
+    m_ppi = ppi;
+    if (m_currentItem)
+        updatePanel();
+}
+
 void PropertyPanel::setupUI()
 {
     auto *scrollArea = new QScrollArea(this);
@@ -55,10 +63,17 @@ void PropertyPanel::setupUI()
     m_wSpin->setRange(0, 999999);
     m_hSpin = new QDoubleSpinBox;
     m_hSpin->setRange(0, 999999);
+    m_zValueSpin = new QDoubleSpinBox;
+    m_zValueSpin->setRange(-999999, 999999);
+    m_zValueSpin->setDecimals(1);
+    m_zValueSpin->setSingleStep(1.0);
+    m_zValueSpin->setReadOnly(true);
+    m_zValueSpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
     geomLayout->addRow(tr("X:"), m_xSpin);
     geomLayout->addRow(tr("Y:"), m_ySpin);
     geomLayout->addRow(tr("Width:"), m_wSpin);
     geomLayout->addRow(tr("Height:"), m_hSpin);
+    geomLayout->addRow(tr("Z:"), m_zValueSpin);
     mainLayout->addWidget(m_geomGroup);
 
     // ---- 边框 ----
@@ -106,7 +121,7 @@ void PropertyPanel::setupUI()
     auto *textLayout = new QFormLayout(m_textGroup);
     m_fontCombo = new QFontComboBox;
     m_fontSizeSpin = new QSpinBox;
-    m_fontSizeSpin->setRange(1, 200);
+    m_fontSizeSpin->setRange(1, 999);
     m_boldBtn = new QPushButton(tr("B"));
     m_boldBtn->setCheckable(true);
     m_boldBtn->setFixedSize(30, 24);
@@ -502,16 +517,27 @@ void PropertyPanel::updatePanel()
         if (corners[i].y() > maxY) maxY = corners[i].y();
     }
 
-    m_xSpin->setValue(minX);
-    m_ySpin->setValue(minY);
+    // 根据显示单位设置后缀并转换值
+    bool isMm = (m_displayUnit == RulerBar::Millimeter);
+    qreal kPxToMm = 25.4 / m_ppi;
+    QString suffix = isMm ? QStringLiteral(" mm") : QStringLiteral(" px");
+    m_xSpin->setSuffix(suffix);
+    m_ySpin->setSuffix(suffix);
+    m_wSpin->setSuffix(suffix);
+    m_hSpin->setSuffix(suffix);
+
+    m_xSpin->setValue(isMm ? minX * kPxToMm : minX);
+    m_ySpin->setValue(isMm ? minY * kPxToMm : minY);
 
     // 判断 W/H 是否可编辑：支持 setGeometryRect 的图元
     bool canResizeRect = gi->supportsSetGeometryRect();
     m_wSpin->setReadOnly(!canResizeRect);
     m_hSpin->setReadOnly(!canResizeRect);
 
-    m_wSpin->setValue(maxX - minX);
-    m_hSpin->setValue(maxY - minY);
+    m_wSpin->setValue(isMm ? (maxX - minX) * kPxToMm : (maxX - minX));
+    m_hSpin->setValue(isMm ? (maxY - minY) * kPxToMm : (maxY - minY));
+
+    m_zValueSpin->setValue(m_currentItem->zValue());
 
     // ---- 边框 ----
     m_penGroup->setVisible(flags & IGraphicsItem::HasPen);
@@ -855,10 +881,20 @@ void PropertyPanel::onGeometryChanged()
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
     if (!gi) return;
 
+    // 读取用户输入值（可能是 mm 或 px）
     qreal x = m_xSpin->value();
     qreal y = m_ySpin->value();
     qreal w = m_wSpin->value();
     qreal h = m_hSpin->value();
+
+    // 若为 mm 模式，转换回 px
+    if (m_displayUnit == RulerBar::Millimeter) {
+        qreal kMmToPx = m_ppi / 25.4;
+        x *= kMmToPx;
+        y *= kMmToPx;
+        w *= kMmToPx;
+        h *= kMmToPx;
+    }
 
     // 位置变更：X/Y 显示的是视觉包围盒的 minX/minY，需要转为 item 的 pos
     QRectF currentGeom = (gi->supportsGeometryRect()) ? gi->geometryRect() : m_currentItem->boundingRect();

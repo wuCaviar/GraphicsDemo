@@ -3,6 +3,7 @@
 
 #include "GradientDialog.h"
 #include "IGraphicsItem.h"
+#include "RulerBar.h"
 #include <QDockWidget>
 #include <QGraphicsItem>
 
@@ -36,6 +37,7 @@ public:
     explicit PropertyPanel(QWidget *parent = nullptr);
 
     void setItem(QGraphicsItem *item);
+    void setDisplayUnit(RulerBar::RulerUnit unit, qreal ppi);
     QGraphicsItem *currentItem() const { return m_currentItem; }
 
 signals:
@@ -93,6 +95,9 @@ private:
     QGraphicsItem *m_currentItem = nullptr;
     bool m_updating = false; // 防止信号循环
 
+    RulerBar::RulerUnit m_displayUnit = RulerBar::Pixel;
+    qreal m_ppi = 96.0;
+
     // 分组框
     QGroupBox *m_geomGroup = nullptr;
     QGroupBox *m_penGroup = nullptr;
@@ -110,6 +115,7 @@ private:
     QDoubleSpinBox *m_ySpin = nullptr;
     QDoubleSpinBox *m_wSpin = nullptr;
     QDoubleSpinBox *m_hSpin = nullptr;
+    QDoubleSpinBox *m_zValueSpin = nullptr;
 
     // 边框
     ColorSelector *m_penColorSelector = nullptr;

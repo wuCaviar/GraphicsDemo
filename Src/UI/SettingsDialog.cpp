@@ -1,5 +1,7 @@
 #include "SettingsDialog.h"
+#include "ATHCPresets.h"
 
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDomDocument>
 #include <QFile>
@@ -10,7 +12,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QSpinBox>
 #include <QVBoxLayout>
 #include "AppConfig.h"
 
@@ -37,18 +38,18 @@ void SettingsDialog::setupUI()
     auto *resLayout = new QHBoxLayout(resGroup);
 
     resLayout->addWidget(new QLabel(tr("X:")));
-    m_resolutionXSpin = new QSpinBox;
-    m_resolutionXSpin->setRange(1, 99999);
-    m_resolutionXSpin->setSuffix(tr(" dpi"));
-    m_resolutionXSpin->setValue(300);
-    resLayout->addWidget(m_resolutionXSpin);
+    m_resolutionXCombo = new QComboBox;
+    for (int dpi : X_DPIValues)
+        m_resolutionXCombo->addItem(QString::number(dpi) + tr(" dpi"), dpi);
+    m_resolutionXCombo->setCurrentIndex(1); // 默认 360 dpi
+    resLayout->addWidget(m_resolutionXCombo);
 
     resLayout->addWidget(new QLabel(tr("Y:")));
-    m_resolutionYSpin = new QSpinBox;
-    m_resolutionYSpin->setRange(1, 99999);
-    m_resolutionYSpin->setSuffix(tr(" dpi"));
-    m_resolutionYSpin->setValue(300);
-    resLayout->addWidget(m_resolutionYSpin);
+    m_resolutionYCombo = new QComboBox;
+    for (int dpi : Y_DPIValues)
+        m_resolutionYCombo->addItem(QString::number(dpi) + tr(" dpi"), dpi);
+    m_resolutionYCombo->setCurrentIndex(0); // 默认 600 dpi
+    resLayout->addWidget(m_resolutionYCombo);
 
     mainLayout->addWidget(resGroup);
 
@@ -123,12 +124,12 @@ void SettingsDialog::setupUI()
 
 int SettingsDialog::resolutionX() const
 {
-    return m_resolutionXSpin->value();
+    return m_resolutionXCombo->currentData().toInt();
 }
 
 int SettingsDialog::resolutionY() const
 {
-    return m_resolutionYSpin->value();
+    return m_resolutionYCombo->currentData().toInt();
 }
 
 QString SettingsDialog::dotCurvePath() const
@@ -169,12 +170,16 @@ void SettingsDialog::loadConfig()
     // <DPI X="..." Y="..."/>
     QDomElement dpiEl = root.firstChildElement(QLatin1String("DPI"));
     if (!dpiEl.isNull()) {
-        if (dpiEl.hasAttribute(QLatin1String("X")))
-            m_resolutionXSpin->setValue(
-                dpiEl.attribute(QLatin1String("X")).toInt());
-        if (dpiEl.hasAttribute(QLatin1String("Y")))
-            m_resolutionYSpin->setValue(
-                dpiEl.attribute(QLatin1String("Y")).toInt());
+        if (dpiEl.hasAttribute(QLatin1String("X"))) {
+            int xVal = dpiEl.attribute(QLatin1String("X")).toInt();
+            int xIdx = m_resolutionXCombo->findData(xVal);
+            m_resolutionXCombo->setCurrentIndex(qMax(0, xIdx));
+        }
+        if (dpiEl.hasAttribute(QLatin1String("Y"))) {
+            int yVal = dpiEl.attribute(QLatin1String("Y")).toInt();
+            int yIdx = m_resolutionYCombo->findData(yVal);
+            m_resolutionYCombo->setCurrentIndex(qMax(0, yIdx));
+        }
     }
 
     // <ICC ProofFile="..." ICCFile="..."/>
@@ -191,8 +196,8 @@ void SettingsDialog::loadConfig()
 
     // 同步到 AppConfig
     AppConfig &cfg = AppConfig::instance();
-    cfg.setRipResolutionX(m_resolutionXSpin->value());
-    cfg.setRipResolutionY(m_resolutionYSpin->value());
+    cfg.setRipResolutionX(m_resolutionXCombo->currentData().toInt());
+    cfg.setRipResolutionY(m_resolutionYCombo->currentData().toInt());
     cfg.setDotCurveIccPath(m_dotCurveEdit->text());
     cfg.setProofIccPath(m_colorCurveEdit->text());
 }
@@ -212,8 +217,8 @@ void SettingsDialog::saveConfig()
 
     // <DPI X="..." Y="..."/>
     QDomElement dpiEl = doc.createElement(QStringLiteral("DPI"));
-    dpiEl.setAttribute(QStringLiteral("X"), m_resolutionXSpin->value());
-    dpiEl.setAttribute(QStringLiteral("Y"), m_resolutionYSpin->value());
+    dpiEl.setAttribute(QStringLiteral("X"), m_resolutionXCombo->currentData().toInt());
+    dpiEl.setAttribute(QStringLiteral("Y"), m_resolutionYCombo->currentData().toInt());
     root.appendChild(dpiEl);
 
     // <ICC ProofFile="..." ICCFile="..."/>
@@ -233,8 +238,8 @@ void SettingsDialog::saveConfig()
 
     // 同步到 AppConfig
     AppConfig &cfg = AppConfig::instance();
-    cfg.setRipResolutionX(m_resolutionXSpin->value());
-    cfg.setRipResolutionY(m_resolutionYSpin->value());
+    cfg.setRipResolutionX(m_resolutionXCombo->currentData().toInt());
+    cfg.setRipResolutionY(m_resolutionYCombo->currentData().toInt());
     cfg.setDotCurveIccPath(m_dotCurveEdit->text());
     cfg.setProofIccPath(m_colorCurveEdit->text());
 }

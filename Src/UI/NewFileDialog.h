@@ -28,7 +28,7 @@ private:
     QComboBox *m_presetCombo = nullptr;
     QDoubleSpinBox *m_widthSpin = nullptr;
     QDoubleSpinBox *m_heightSpin = nullptr;
-    QDoubleSpinBox *m_ppiSpin = nullptr;
+    QComboBox *m_ppiCombo = nullptr;
 };
 
 #endif // NEWFILEDIALOG_H

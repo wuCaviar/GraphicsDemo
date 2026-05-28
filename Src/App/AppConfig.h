@@ -11,6 +11,9 @@ public:
     // 从 config.xml 加载配置，加载失败保留默认值
     void loadConfig();
 
+    // 保存当前配置到 config.xml
+    void saveConfig() const;
+
     // -- RIP 可执行文件路径 (config.xml: /Config/Rip/ExePath) --
     QString ripExePath() const { return m_ripExePath; }
     void setRipExePath(const QString &path) { m_ripExePath = path; }

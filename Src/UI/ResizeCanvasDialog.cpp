@@ -1,10 +1,12 @@
 #include "ResizeCanvasDialog.h"
+#include "ATHCPresets.h"
 
+#include <QComboBox>
+#include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QPushButton>
 #include <QVBoxLayout>
 
 ResizeCanvasDialog::ResizeCanvasDialog(QWidget *parent) : QDialog(parent)
@@ -31,28 +33,35 @@ void ResizeCanvasDialog::setupUI()
     m_heightSpin->setDecimals(1);
     formLayout->addRow(tr("Height:"), m_heightSpin);
 
+    m_dpiCombo = new QComboBox;
+    for (int dpi : kDpiValues)
+        m_dpiCombo->addItem(QString::number(dpi) + tr(" dpi"), dpi);
+    m_dpiCombo->setCurrentIndex(2); // 默认 300 dpi
+    formLayout->addRow(tr("DPI:"), m_dpiCombo);
+
     mainLayout->addLayout(formLayout);
 
     m_infoLabel = new QLabel;
     m_infoLabel->setStyleSheet("color: gray;");
     mainLayout->addWidget(m_infoLabel);
 
-    auto *btnLayout = new QHBoxLayout;
-    auto *okBtn = new QPushButton(tr("OK"));
-    auto *cancelBtn = new QPushButton(tr("Cancel"));
-    btnLayout->addStretch();
-    btnLayout->addWidget(okBtn);
-    btnLayout->addWidget(cancelBtn);
-    mainLayout->addLayout(btnLayout);
+    auto *buttonBox = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    mainLayout->addWidget(buttonBox);
 
-    connect(okBtn, &QPushButton::clicked, this, &QDialog::accept);
-    connect(cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
+    connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 }
 
 void ResizeCanvasDialog::setCurrentSize(const QSizeF &pixelSize, qreal ppi, bool isMmMode)
 {
     m_ppi = ppi;
     m_isMmMode = isMmMode;
+
+    // 选中当前 DPI
+    int dpiIdx = m_dpiCombo->findData(qRound(ppi));
+    if (dpiIdx >= 0)
+        m_dpiCombo->setCurrentIndex(dpiIdx);
 
     if (isMmMode) {
         qreal factor = 25.4 / ppi;
@@ -80,9 +89,15 @@ void ResizeCanvasDialog::setCurrentSize(const QSizeF &pixelSize, qreal ppi, bool
 
 QSizeF ResizeCanvasDialog::newPixelSize() const
 {
+    qreal ppi = selectedDpi();
     if (m_isMmMode) {
-        qreal factor = m_ppi / 25.4;
+        qreal factor = ppi / 25.4;
         return QSizeF(m_widthSpin->value() * factor, m_heightSpin->value() * factor);
     }
     return QSizeF(m_widthSpin->value(), m_heightSpin->value());
+}
+
+int ResizeCanvasDialog::selectedDpi() const
+{
+    return m_dpiCombo->currentData().toInt();
 }

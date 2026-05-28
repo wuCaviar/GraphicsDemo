@@ -162,7 +162,8 @@ private:
     QAction *m_gridAction = nullptr;
 
     // 刻度尺单位切换
-    QAction *m_rulerUnitAction = nullptr;
+    QAction *m_rulerUnitPxAction = nullptr;
+    QAction *m_rulerUnitMmAction = nullptr;
 
     // 主题切换
     QAction *m_lightThemeAction = nullptr;

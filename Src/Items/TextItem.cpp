@@ -10,6 +10,8 @@ TextItem::TextItem(QGraphicsItem *parent) : QGraphicsTextItem(parent)
     setFlag(ItemIsFocusable, false);
     setFlag(ItemIsSelectable, true);
     setFlag(ItemIsMovable, true);
+
+    m_bgBrush = QBrush(Qt::white);
 }
 
 TextItem::TextItem(const QString &text, QGraphicsItem *parent)
@@ -19,6 +21,8 @@ TextItem::TextItem(const QString &text, QGraphicsItem *parent)
     setFlag(ItemIsFocusable, false);
     setFlag(ItemIsSelectable, true);
     setFlag(ItemIsMovable, true);
+
+    m_bgBrush = QBrush(Qt::white);
 }
 
 QGraphicsItem *TextItem::cloneItem() const

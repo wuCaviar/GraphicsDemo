@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <cmath>
 
 #include <QActionGroup>
 #include <QApplication>
@@ -322,8 +323,7 @@ void MainWindow::_initMenuBar()
         ->setToolTip(tr("About this application"));
 
     // 网格显示/隐藏
-    m_gridAction = viewMenu->addAction(QIcon(":/icons/icons/view-grid.svg"),
-                                       tr("Show Grid"));
+    m_gridAction = viewMenu->addAction(tr("Show Grid"));
     m_gridAction->setCheckable(true);
     m_gridAction->setChecked(true);
     m_gridAction->setToolTip(tr("Show or hide the grid"));
@@ -331,17 +331,33 @@ void MainWindow::_initMenuBar()
             [this](bool checked) { m_pView->setGridVisible(checked); });
 
     // 刻度尺单位切换（px ↔ mm）
-    m_rulerUnitAction = viewMenu->addAction(tr("Ruler Unit: mm"));
-    m_rulerUnitAction->setCheckable(true);
-    m_rulerUnitAction->setToolTip(
-        tr("Toggle ruler unit between millimeters and pixels"));
-    connect(m_rulerUnitAction, &QAction::toggled, this, [this](bool checked) {
-        auto unit = checked ? RulerBar::Millimeter : RulerBar::Pixel;
-        m_hRuler->setUnit(unit);
-        m_vRuler->setUnit(unit);
-        m_rulerUnitAction->setText(checked ? tr("Ruler Unit: mm")
-                                           : tr("Ruler Unit: px"));
-        // 同步更新状态栏坐标和画布尺寸的单位显示
+    QMenu *rulerUnitMenu = viewMenu->addMenu(tr("Ruler Unit"));
+    auto *rulerUnitGroup = new QActionGroup(this);
+    rulerUnitGroup->setExclusive(true);
+
+    m_rulerUnitPxAction = rulerUnitMenu->addAction(tr("Pixels"));
+    m_rulerUnitPxAction->setCheckable(true);
+    rulerUnitGroup->addAction(m_rulerUnitPxAction);
+
+    m_rulerUnitMmAction = rulerUnitMenu->addAction(tr("Millimeters"));
+    m_rulerUnitMmAction->setCheckable(true);
+    rulerUnitGroup->addAction(m_rulerUnitMmAction);
+
+    m_rulerUnitPxAction->setChecked(true);
+
+    connect(m_rulerUnitPxAction, &QAction::triggered, this, [this]() {
+        m_hRuler->setUnit(RulerBar::Pixel);
+        m_vRuler->setUnit(RulerBar::Pixel);
+        qreal ppi = m_pView->canvasItem() ? m_pView->canvasItem()->ppi() : 96.0;
+        m_pPropertyPanel->setDisplayUnit(RulerBar::Pixel, ppi);
+        _updateCanvasLabel();
+        _updatePosLabel(m_lastScenePos);
+    });
+    connect(m_rulerUnitMmAction, &QAction::triggered, this, [this]() {
+        m_hRuler->setUnit(RulerBar::Millimeter);
+        m_vRuler->setUnit(RulerBar::Millimeter);
+        qreal ppi = m_pView->canvasItem() ? m_pView->canvasItem()->ppi() : 96.0;
+        m_pPropertyPanel->setDisplayUnit(RulerBar::Millimeter, ppi);
         _updateCanvasLabel();
         _updatePosLabel(m_lastScenePos);
     });
@@ -635,6 +651,9 @@ void MainWindow::_initConnections()
         m_pView->refreshResizeHandle();
         _updateCanvasLabel();
         m_projectModified = true;
+        // 刷新属性面板（如 Z 值等属性可能已变更）
+        if (m_pPropertyPanel && m_pPropertyPanel->currentItem())
+            m_pPropertyPanel->setItem(m_pPropertyPanel->currentItem());
     });
 
     // 视图滚动/缩放时更新刻度尺
@@ -971,6 +990,7 @@ void MainWindow::onNew()
     // 同步刻度尺 PPI
     m_hRuler->setPpi(ppi);
     m_vRuler->setPpi(ppi);
+    m_pPropertyPanel->setDisplayUnit(m_hRuler->unit(), ppi);
 
     m_pProgressMgr->resetAll();
 
@@ -1015,6 +1035,7 @@ void MainWindow::onOpenProject()
         m_resizeCanvasBtn->setVisible(true);
         m_hRuler->setPpi(canvasInfo.dpi);
         m_vRuler->setPpi(canvasInfo.dpi);
+        m_pPropertyPanel->setDisplayUnit(m_hRuler->unit(), canvasInfo.dpi);
         m_hRuler->updateRuler();
         m_vRuler->updateRuler();
         _updateCanvasLabel();
@@ -1069,6 +1090,7 @@ void MainWindow::onOpenProject()
 
                 m_hRuler->setPpi(canvasInfo.dpi);
                 m_vRuler->setPpi(canvasInfo.dpi);
+                m_pPropertyPanel->setDisplayUnit(m_hRuler->unit(), canvasInfo.dpi);
                 m_hRuler->updateRuler();
                 m_vRuler->updateRuler();
                 _updateCanvasLabel();
@@ -1448,9 +1470,6 @@ void MainWindow::onExportImage()
             m_pView->scene()->itemsBoundingRect().adjusted(-10, -10, 10, 10);
     }
     int targetDpi = canvas ? qRound(canvas->ppi()) : 72;
-    if (bRip) {
-        targetDpi = qMax(targetDpi, qMax(ripXRes, ripYRes));
-    }
 
     // 4. 构建源 TIFF 输入列表
     QList<ImageUtils::SourceTiffInput> sources;
@@ -1506,66 +1525,131 @@ void MainWindow::onExportImage()
             auto *gi = dynamic_cast<IGraphicsItem *>(item);
 
             // 检查是否可以使用存储的精确 CMYK 值直接填充（跳过 QPainter + LCMS2）
-            bool useDirectCmyk = false;
-            double dC = 0, dM = 0, dY = 0, dK = 0;
+            bool hasBrushCmykDirect = false;
+            bool hasPenCmykDirect = false;
+            double brushC = 0, brushM = 0, brushY = 0, brushK = 0;
+            double penC = 0, penM = 0, penY = 0, penK = 0;
             if (gi) {
-                // 纯色填充且无边框：直接用存储的 brush CMYK
+                // 纯色填充：直接用存储的 brush CMYK（允许同时有边框）
                 if (gi->hasBrushCmyk()) {
                     QBrush b = gi->itemBrush();
                     if (b.style() == Qt::SolidPattern) {
-                        QPen p = gi->itemPen();
-                        if (p.style() == Qt::NoPen || p.width() == 0) {
-                            gi->brushCmyk(dC, dM, dY, dK);
-                            useDirectCmyk = true;
-                        }
+                        gi->brushCmyk(brushC, brushM, brushY, brushK);
+                        hasBrushCmykDirect = true;
                     }
                 }
-                // 只有边框无填充：直接用存储的 pen CMYK
-                if (!useDirectCmyk && gi->hasPenCmyk()) {
-                    QBrush b = gi->itemBrush();
-                    if (b.style() == Qt::NoBrush) {
-                        gi->penCmyk(dC, dM, dY, dK);
-                        useDirectCmyk = true;
+                // 边框：直接用存储的 pen CMYK（允许同时有填充）
+                if (gi->hasPenCmyk()) {
+                    QPen p = gi->itemPen();
+                    if (p.style() != Qt::NoPen && p.width() > 0) {
+                        gi->penCmyk(penC, penM, penY, penK);
+                        hasPenCmykDirect = true;
                     }
                 }
             }
 
-            if (useDirectCmyk) {
-                // 直接使用存储的 CMYK 值填充整个 overlay
-                // CMYK 值 0-100 → 0-255
-                uint8_t cmyk[4] = {
-                    static_cast<uint8_t>(qBound(0.0, dC * 2.55, 255.0)),
-                    static_cast<uint8_t>(qBound(0.0, dM * 2.55, 255.0)),
-                    static_cast<uint8_t>(qBound(0.0, dY * 2.55, 255.0)),
-                    static_cast<uint8_t>(qBound(0.0, dK * 2.55, 255.0))
-                };
-                size_t totalPixels = static_cast<size_t>(w) * h;
-                overlay.data.resize(totalPixels * 4);
-                uint8_t *dst = overlay.data.data();
-                for (size_t i = 0; i < totalPixels; ++i) {
-                    dst[i * 4 + 0] = cmyk[0];
-                    dst[i * 4 + 1] = cmyk[1];
-                    dst[i * 4 + 2] = cmyk[2];
-                    dst[i * 4 + 3] = cmyk[3];
-                }
-                // 使用场景渲染来获取形状蒙版（只保留图元实际覆盖的像素）
-                // 先渲染到临时图像获取 alpha 通道
-                {
-                    QSet<QGraphicsItem *> keepVisible;
-                    std::function<void(QGraphicsItem *)> collectDescendants =
-                        [&](QGraphicsItem *root) {
-                            keepVisible.insert(root);
-                            for (auto *child : root->childItems())
-                                collectDescendants(child);
-                        };
-                    collectDescendants(item);
+            if (hasBrushCmykDirect || hasPenCmykDirect) {
+                overlay.data.resize(static_cast<size_t>(w) * h * 4);
 
-                    QHash<QGraphicsItem *, bool> savedVisibility;
-                    m_pView->scene()->setBackgroundBrush(Qt::NoBrush);
-                    for (auto *other : allSceneItems) {
-                        savedVisibility[other] = other->isVisible();
-                        if (!keepVisible.contains(other))
-                            other->setVisible(false);
+                // 收集该项及其所有子项（处理分组）
+                QSet<QGraphicsItem *> keepVisible;
+                std::function<void(QGraphicsItem *)> collectDescendants =
+                    [&](QGraphicsItem *root) {
+                        keepVisible.insert(root);
+                        for (auto *child : root->childItems())
+                            collectDescendants(child);
+                    };
+                collectDescendants(item);
+
+                QHash<QGraphicsItem *, bool> savedVisibility;
+                m_pView->scene()->setBackgroundBrush(Qt::NoBrush);
+                for (auto *other : allSceneItems) {
+                    savedVisibility[other] = other->isVisible();
+                    if (!keepVisible.contains(other))
+                        other->setVisible(false);
+                }
+
+                if (hasBrushCmykDirect && hasPenCmykDirect) {
+                    // 两者都有 CMYK：分别渲染填充和边框蒙版，各自使用精确 CMYK 值
+
+                    // 渲染填充蒙版（临时去掉 pen，只保留 brush 区域）
+                    QImage fillMask(w, h, QImage::Format_ARGB32);
+                    fillMask.fill(Qt::transparent);
+                    {
+                        QPen savedPen = gi->itemPen();
+                        gi->setItemPen(Qt::NoPen);
+                        QPainter painter(&fillMask);
+                        painter.setRenderHint(QPainter::Antialiasing);
+                        painter.setRenderHint(QPainter::TextAntialiasing);
+                        m_pView->scene()->render(&painter, QRectF(0, 0, w, h),
+                                                 sceneRect.intersected(exportRect));
+                        gi->setItemPen(savedPen);
+                    }
+
+                    // 渲染边框蒙版（临时去掉 brush，只保留 pen 区域）
+                    QImage borderMask(w, h, QImage::Format_ARGB32);
+                    borderMask.fill(Qt::transparent);
+                    {
+                        QBrush savedBrush = gi->itemBrush();
+                        gi->setItemBrush(Qt::NoBrush);
+                        QPainter painter(&borderMask);
+                        painter.setRenderHint(QPainter::Antialiasing);
+                        painter.setRenderHint(QPainter::TextAntialiasing);
+                        m_pView->scene()->render(&painter, QRectF(0, 0, w, h),
+                                                 sceneRect.intersected(exportRect));
+                        gi->setItemBrush(savedBrush);
+                    }
+
+                    uint8_t brushCmyk[4] = {
+                        static_cast<uint8_t>(qBound(0.0, std::round(brushC * 2.55), 255.0)),
+                        static_cast<uint8_t>(qBound(0.0, std::round(brushM * 2.55), 255.0)),
+                        static_cast<uint8_t>(qBound(0.0, std::round(brushY * 2.55), 255.0)),
+                        static_cast<uint8_t>(qBound(0.0, std::round(brushK * 2.55), 255.0))
+                    };
+                    uint8_t penCmyk[4] = {
+                        static_cast<uint8_t>(qBound(0.0, std::round(penC * 2.55), 255.0)),
+                        static_cast<uint8_t>(qBound(0.0, std::round(penM * 2.55), 255.0)),
+                        static_cast<uint8_t>(qBound(0.0, std::round(penY * 2.55), 255.0)),
+                        static_cast<uint8_t>(qBound(0.0, std::round(penK * 2.55), 255.0))
+                    };
+
+                    // 边框优先于填充：先判断边框，再判断填充
+                    for (int y = 0; y < h; ++y) {
+                        const uchar *fillSrc = fillMask.constScanLine(y);
+                        const uchar *borderSrc = borderMask.constScanLine(y);
+                        uint8_t *row = overlay.data.data() + static_cast<size_t>(y) * w * 4;
+                        for (int x = 0; x < w; ++x) {
+                            bool inBorder = borderSrc[x * 4 + 3] > 0;
+                            bool inFill = fillSrc[x * 4 + 3] > 0;
+                            if (inBorder) {
+                                std::memcpy(row + x * 4, penCmyk, 4);
+                            } else if (inFill) {
+                                std::memcpy(row + x * 4, brushCmyk, 4);
+                            } else {
+                                std::memset(row + x * 4, 0, 4);
+                            }
+                        }
+                    }
+                } else {
+                    // 只有一个属性有 CMYK：用该 CMYK 值填充，通过蒙版限定范围
+                    double dC = hasBrushCmykDirect ? brushC : penC;
+                    double dM = hasBrushCmykDirect ? brushM : penM;
+                    double dY = hasBrushCmykDirect ? brushY : penY;
+                    double dK = hasBrushCmykDirect ? brushK : penK;
+
+                    uint8_t cmyk[4] = {
+                        static_cast<uint8_t>(qBound(0.0, std::round(dC * 2.55), 255.0)),
+                        static_cast<uint8_t>(qBound(0.0, std::round(dM * 2.55), 255.0)),
+                        static_cast<uint8_t>(qBound(0.0, std::round(dY * 2.55), 255.0)),
+                        static_cast<uint8_t>(qBound(0.0, std::round(dK * 2.55), 255.0))
+                    };
+                    size_t totalPixels = static_cast<size_t>(w) * h;
+                    uint8_t *dst = overlay.data.data();
+                    for (size_t i = 0; i < totalPixels; ++i) {
+                        dst[i * 4 + 0] = cmyk[0];
+                        dst[i * 4 + 1] = cmyk[1];
+                        dst[i * 4 + 2] = cmyk[2];
+                        dst[i * 4 + 3] = cmyk[3];
                     }
 
                     QImage maskImg(w, h, QImage::Format_ARGB32);
@@ -1578,11 +1662,6 @@ void MainWindow::onExportImage()
                                                  sceneRect.intersected(exportRect));
                     }
 
-                    for (auto *other : allSceneItems)
-                        other->setVisible(savedVisibility.value(other, true));
-                    m_pView->scene()->setBackgroundBrush(oldSceneBg);
-
-                    // 只保留图元实际覆盖的像素（alpha > 0）
                     for (int y = 0; y < h; ++y) {
                         const uchar *src = maskImg.constScanLine(y);
                         uint8_t *row = overlay.data.data() + static_cast<size_t>(y) * w * 4;
@@ -1592,6 +1671,11 @@ void MainWindow::onExportImage()
                         }
                     }
                 }
+
+                // 恢复可见性和场景背景
+                for (auto *other : allSceneItems)
+                    other->setVisible(savedVisibility.value(other, true));
+                m_pView->scene()->setBackgroundBrush(oldSceneBg);
             } else {
                 // 收集该项及其所有子项（处理分组）
                 QSet<QGraphicsItem *> keepVisible;
@@ -2268,12 +2352,30 @@ void MainWindow::onResizeCanvas()
 
     QSizeF newSize = dlg.newPixelSize();
     QSizeF oldSize = canvas->canvasSize();
-    if (newSize == oldSize)
+    int newDpi = dlg.selectedDpi();
+
+    bool sizeChanged = (newSize != oldSize);
+    bool dpiChanged = (newDpi != qRound(canvas->ppi()));
+
+    if (!sizeChanged && !dpiChanged)
         return;
 
-    m_undoStack->push(
-        new CanvasResizeCommand(canvas, oldSize, newSize, m_pView->scene()));
+    if (sizeChanged) {
+        m_undoStack->push(
+            new CanvasResizeCommand(canvas, oldSize, newSize, m_pView->scene()));
+    }
+
+    if (dpiChanged) {
+        canvas->setPpi(newDpi);
+        m_hRuler->setPpi(newDpi);
+        m_vRuler->setPpi(newDpi);
+        m_pPropertyPanel->setDisplayUnit(m_hRuler->unit(), newDpi);
+    }
+
+    m_hRuler->updateRuler();
+    m_vRuler->updateRuler();
     _updateCanvasLabel();
+    _updatePosLabel(m_lastScenePos);
     m_pView->fitToCanvas();
 }
 

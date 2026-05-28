@@ -4,4 +4,7 @@
         <ExePath>D:\WorkSpace\Caviar\FileRip\FileRIP0523.exe</ExePath>
         <ConfigPath>D:\WorkSpace\Caviar\FileRip\ripconfig.xml</ConfigPath>
     </Rip>
+    <ICC>
+        <Path>D:\WorkSpace\Caviar\ATGraphics\Bin\ICC Profile</Path>
+    </ICC>
 </Config>

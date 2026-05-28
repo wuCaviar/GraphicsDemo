@@ -1,8 +1,8 @@
 #include "ImportImageDialog.h"
+#include "ATHCPresets.h"
 
 #include <QCheckBox>
 #include <QFormLayout>
-#include <QSpinBox>
 #include <QSlider>
 #include <QLabel>
 #include <QDialogButtonBox>
@@ -29,10 +29,11 @@ ImportImageDialog::ImportImageDialog(QWidget *parent, const ImportParameters &pa
     layout->addRow(tr("DPI Policy:"), m_dpiCombo);
 
     // 强制 DPI 值
-    m_dpiSpin = new QSpinBox(this);
-    m_dpiSpin->setRange(1, 1200);
-    m_dpiSpin->setSuffix(tr(" DPI"));
-    layout->addRow(tr("Forced DPI:"), m_dpiSpin);
+    m_forcedDpiCombo = new QComboBox(this);
+    for (int dpi : kDpiValues)
+        m_forcedDpiCombo->addItem(QString::number(dpi) + tr(" DPI"), dpi);
+    m_forcedDpiCombo->setCurrentIndex(1); // 默认 300 DPI
+    layout->addRow(tr("Forced DPI:"), m_forcedDpiCombo);
 
     // 颜色空间
     m_colorCombo = new QComboBox(this);
@@ -85,7 +86,7 @@ ImportParameters ImportImageDialog::getParameters() const
     ImportParameters params;
     params.dpiPolicy = static_cast<ImportParameters::DpiPolicy>(
         m_dpiCombo->currentData().toInt());
-    params.forcedDpi = m_dpiSpin->value();
+    params.forcedDpi = m_forcedDpiCombo->currentData().toInt();
     params.colorSpace = static_cast<ImportParameters::ColorSpace>(
         m_colorCombo->currentData().toInt());
     params.alphaHandling = static_cast<ImportParameters::AlphaHandling>(
@@ -100,7 +101,8 @@ void ImportImageDialog::setParameters(const ImportParameters &params)
 {
     int dpiIndex = m_dpiCombo->findData(static_cast<int>(params.dpiPolicy));
     m_dpiCombo->setCurrentIndex(qMax(0, dpiIndex));
-    m_dpiSpin->setValue(params.forcedDpi);
+    int forcedDpiIdx = m_forcedDpiCombo->findData(params.forcedDpi);
+    m_forcedDpiCombo->setCurrentIndex(qMax(0, forcedDpiIdx));
 
     int colorIndex = m_colorCombo->findData(static_cast<int>(params.colorSpace));
     m_colorCombo->setCurrentIndex(qMax(0, colorIndex));
@@ -117,7 +119,7 @@ void ImportImageDialog::onDpiPolicyChanged(int index)
 {
     bool enable = m_dpiCombo->itemData(index).toInt() ==
                   static_cast<int>(ImportParameters::DpiPolicy::ForceDpi);
-    m_dpiSpin->setEnabled(enable);
+    m_forcedDpiCombo->setEnabled(enable);
 }
 
 void ImportImageDialog::onScaleChanged(int value)

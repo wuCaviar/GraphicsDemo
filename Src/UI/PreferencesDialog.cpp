@@ -1,16 +1,46 @@
 #include "PreferencesDialog.h"
+#include "PreferencesPage.h"
+#include "GeneralPage.h"
 
+#include <QDialogButtonBox>
+#include <QTabWidget>
 #include <QVBoxLayout>
 
 PreferencesDialog::PreferencesDialog(QWidget *parent) : QDialog(parent)
 {
-    setWindowTitle(tr("Preferences"));
-    setMinimumWidth(400);
+    setWindowTitle(tr("首选项"));
+    setMinimumSize(600, 400);
     setupUI();
+
+    addPage(new GeneralPage(this));
+
+    for (auto *page : m_pages)
+        page->load();
 }
 
 void PreferencesDialog::setupUI()
 {
-    auto *layout = new QVBoxLayout(this);
-    // Reserved for future preferences
+    auto *mainLayout = new QVBoxLayout(this);
+
+    m_tabWidget = new QTabWidget(this);
+    m_tabWidget->setTabPosition(QTabWidget::North);
+    mainLayout->addWidget(m_tabWidget);
+
+    auto *buttonBox = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    connect(buttonBox, &QDialogButtonBox::accepted, this, [this]() {
+        for (auto *page : m_pages) {
+            if (!page->save())
+                return;
+        }
+        accept();
+    });
+    connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    mainLayout->addWidget(buttonBox);
+}
+
+void PreferencesDialog::addPage(PreferencesPage *page)
+{
+    m_pages.append(page);
+    m_tabWidget->addTab(page, page->title());
 }

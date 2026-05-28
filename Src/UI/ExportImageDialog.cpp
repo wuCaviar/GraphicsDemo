@@ -1,4 +1,5 @@
 #include "ExportImageDialog.h"
+#include "ATHCPresets.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -37,9 +38,11 @@ ExportImageDialog::ExportImageDialog(QWidget *parent,
     auto *mainLayout = new QFormLayout(this);
 
     // ===== 通用参数 =====
-    m_dpiSpin = new QSpinBox(this);
-    m_dpiSpin->setRange(1, 1200);
-    mainLayout->addRow(tr("DPI:"), m_dpiSpin);
+    m_dpiCombo = new QComboBox(this);
+    for (int dpi : kDpiValues)
+        m_dpiCombo->addItem(QString::number(dpi) + tr(" dpi"), dpi);
+    m_dpiCombo->setCurrentIndex(1); // 默认 300 dpi
+    mainLayout->addRow(tr("DPI:"), m_dpiCombo);
 
     m_colorCombo = new QComboBox(this);
     m_colorCombo->addItem(tr("Keep Original"),
@@ -235,7 +238,7 @@ void ExportImageDialog::rebuildFormatGroup(const QString &format)
 ExportParameters ExportImageDialog::getParameters() const
 {
     ExportParameters params;
-    params.dpi = m_dpiSpin->value();
+    params.dpi = m_dpiCombo->currentData().toInt();
     params.colorSpace = static_cast<ExportParameters::ColorSpace>(
         m_colorCombo->currentData().toInt());
     params.transparency = static_cast<ExportParameters::TransparencyHandling>(
@@ -271,7 +274,8 @@ ExportParameters ExportImageDialog::getParameters() const
 
 void ExportImageDialog::setParameters(const ExportParameters &params)
 {
-    m_dpiSpin->setValue(params.dpi);
+    int dpiIdx = m_dpiCombo->findData(params.dpi);
+    m_dpiCombo->setCurrentIndex(qMax(0, dpiIdx));
 
     int colorIndex = m_colorCombo->findData(static_cast<int>(params.colorSpace));
     m_colorCombo->setCurrentIndex(qMax(0, colorIndex));

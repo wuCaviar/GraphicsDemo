@@ -5,7 +5,6 @@
 #include <QDialog>
 
 class QComboBox;
-class QSpinBox;
 class QSlider;
 class QCheckBox;
 class QLabel;
@@ -29,7 +28,7 @@ private slots:
 
 private:
     QComboBox *m_dpiCombo;
-    QSpinBox *m_dpiSpin;
+    QComboBox *m_forcedDpiCombo;
     QComboBox *m_colorCombo;
     QComboBox *m_alphaCombo;
     QCheckBox *m_scaleCheck;
