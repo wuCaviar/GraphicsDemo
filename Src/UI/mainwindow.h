@@ -115,6 +115,9 @@ private:
     void loadWindowState();
     void saveWindowState();
 
+    void importSingleImage(const QStringList &paths);
+    void importMultipleImages(const QStringList &paths);
+
     void copyItemsToClipboard(const QList<QGraphicsItem *> &items);
     QList<QGraphicsItem *> pasteItemsFromClipboard();
     QList<QGraphicsItem *> filterSelectableItems() const;

@@ -6,6 +6,7 @@
 
 #include <QtCore/QObject>
 #include <QtCore/QMap>
+#include "qtgradienteditor_global.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -13,7 +14,7 @@ class QColor;
 
 class QtGradientStopsModel;
 
-class QtGradientStop
+class QTGRADIENTEDITOR_EXPORT QtGradientStop
 {
 public:
     qreal position() const;
@@ -29,7 +30,7 @@ private:
     QScopedPointer<class QtGradientStopPrivate> d_ptr;
 };
 
-class QtGradientStopsModel : public QObject
+class QTGRADIENTEDITOR_EXPORT QtGradientStopsModel : public QObject
 {
     Q_OBJECT
 public:

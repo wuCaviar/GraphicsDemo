@@ -35,6 +35,7 @@ void LineItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidge
 void LineItem::serialize(QDataStream &out) const
 {
     out << line() << pen() << pos() << rotation();
+    writeCmykIfValid(out, m_penCmyk);
 }
 
 bool LineItem::deserialize(QDataStream &in)
@@ -50,5 +51,7 @@ bool LineItem::deserialize(QDataStream &in)
     setPen(p);
     setPos(pos_);
     setRotation(rot);
+    if (!readCmykIfAvailable(in, in.device(), m_penCmyk))
+        return false;
     return true;
 }

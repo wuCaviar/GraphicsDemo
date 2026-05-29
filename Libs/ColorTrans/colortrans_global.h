@@ -1,0 +1,12 @@
+#ifndef COLORTRANS_GLOBAL_H
+#define COLORTRANS_GLOBAL_H
+
+#include <QtCore/QtGlobal>
+
+#if defined(COLORTRANS_LIBRARY)
+#    define COLORTRANS_EXPORT Q_DECL_EXPORT
+#else
+#    define COLORTRANS_EXPORT Q_DECL_IMPORT
+#endif
+
+#endif // COLORTRANS_GLOBAL_H

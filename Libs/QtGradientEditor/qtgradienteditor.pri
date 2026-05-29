@@ -16,7 +16,8 @@ SOURCES +=   $$PWD/qtgradientstopsmodel.cpp \
              $$PWD/qtgradientviewdialog.cpp \
              $$PWD/qtgradientmanager.cpp \
              $$PWD/qtgradientutils.cpp
-HEADERS +=   $$PWD/qtgradientstopsmodel.h \
+HEADERS +=   $$PWD/qtgradienteditor_global.h \
+             $$PWD/qtgradientstopsmodel.h \
              $$PWD/qtgradientstopswidget.h \
              $$PWD/qtgradientstopscontroller.h \
              $$PWD/qtgradientwidget.h \

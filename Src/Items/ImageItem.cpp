@@ -68,6 +68,7 @@ void ImageItem::serialize(QDataStream &out) const
     out << pixmap() << pos() << rotation() << m_filePath;
     out << m_rect << m_originalSize << m_dpiX << m_dpiY << m_isCmykSource
         << m_isMultiPage;
+    writeCmykIfValid(out, m_penCmyk);
 }
 
 bool ImageItem::deserialize(QDataStream &in)
@@ -84,5 +85,7 @@ bool ImageItem::deserialize(QDataStream &in)
     setPixmap(pix);
     setPos(pos_);
     setRotation(rot);
+    if (!readCmykIfAvailable(in, in.device(), m_penCmyk))
+        return false;
     return true;
 }

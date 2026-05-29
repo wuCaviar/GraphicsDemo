@@ -7,6 +7,7 @@
 #include <QtWidgets/QWidget>
 #include <QMap>
 #include "Common/ColorTypes.h"
+#include "qtgradienteditor_global.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -14,7 +15,7 @@ namespace Ui {
     class QtGradientEditor;
 }
 
-class QtGradientStopsController : public QObject
+class QTGRADIENTEDITOR_EXPORT QtGradientStopsController : public QObject
 {
     Q_OBJECT
 public:

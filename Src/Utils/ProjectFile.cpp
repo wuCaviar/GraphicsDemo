@@ -18,6 +18,7 @@ SerializedItem serializeItemWorker(const SerializeInput &input)
     result.posY = input.posY;
     result.rotation = input.rotation;
     result.base64Data = input.binary.toBase64();
+    result.cmyk = input.cmyk;
     return result;
 }
 
@@ -30,6 +31,7 @@ DeserializedItem deserializeItemWorker(const DeserialTask &task)
     result.posX = task.posX;
     result.posY = task.posY;
     result.rotation = task.rotation;
+    result.cmyk = task.cmyk;
     return result;
 }
 
@@ -50,11 +52,17 @@ QGraphicsItem *createItemFromDeserialized(const DeserializedItem &data)
         return nullptr;
     }
 
+    // 应用 CMYK 数据（从 XML 属性读取，优先级高于二进制流中的 CMYK）
+    if (data.cmyk.hasPen)
+        igi->setItemPenCmyk(data.cmyk.penC, data.cmyk.penM, data.cmyk.penY, data.cmyk.penK);
+    if (data.cmyk.hasBrush)
+        igi->setItemBrushCmyk(data.cmyk.brushC, data.cmyk.brushM, data.cmyk.brushY, data.cmyk.brushK);
+    if (!data.cmyk.gradient.isEmpty())
+        igi->setGradientStopCmykMap(data.cmyk.gradient);
+
     auto *gi = dynamic_cast<QGraphicsItem *>(igi);
     if (gi) {
         gi->setZValue(data.zValue);
-        gi->setPos(data.posX, data.posY);
-        gi->setRotation(data.rotation);
         return gi;
     }
 
@@ -147,6 +155,33 @@ bool ProjectFile::saveFromSerialized(const QString &filePath,
             QDomElement dataEl = doc.createElement(QStringLiteral("Data"));
             dataEl.appendChild(doc.createTextNode(QString::fromLatin1(si.base64Data)));
             itemEl.appendChild(dataEl);
+        }
+
+        // CMYK 颜色数据（可选，旧代码读取时忽略未知属性）
+        if (si.cmyk.hasPen) {
+            itemEl.setAttribute(QStringLiteral("PenC"), si.cmyk.penC);
+            itemEl.setAttribute(QStringLiteral("PenM"), si.cmyk.penM);
+            itemEl.setAttribute(QStringLiteral("PenY"), si.cmyk.penY);
+            itemEl.setAttribute(QStringLiteral("PenK"), si.cmyk.penK);
+        }
+        if (si.cmyk.hasBrush) {
+            itemEl.setAttribute(QStringLiteral("BrushC"), si.cmyk.brushC);
+            itemEl.setAttribute(QStringLiteral("BrushM"), si.cmyk.brushM);
+            itemEl.setAttribute(QStringLiteral("BrushY"), si.cmyk.brushY);
+            itemEl.setAttribute(QStringLiteral("BrushK"), si.cmyk.brushK);
+        }
+        if (!si.cmyk.gradient.isEmpty()) {
+            QDomElement gradEl = doc.createElement(QStringLiteral("GradientCmyk"));
+            for (auto it = si.cmyk.gradient.constBegin(); it != si.cmyk.gradient.constEnd(); ++it) {
+                QDomElement stopEl = doc.createElement(QStringLiteral("Stop"));
+                stopEl.setAttribute(QStringLiteral("Pos"), it.key());
+                stopEl.setAttribute(QStringLiteral("C"), it.value().c);
+                stopEl.setAttribute(QStringLiteral("M"), it.value().m);
+                stopEl.setAttribute(QStringLiteral("Y"), it.value().y);
+                stopEl.setAttribute(QStringLiteral("K"), it.value().k);
+                gradEl.appendChild(stopEl);
+            }
+            itemEl.appendChild(gradEl);
         }
 
         itemsEl.appendChild(itemEl);
@@ -262,6 +297,35 @@ bool ProjectFile::parseForDeserialize(const QString &filePath,
             if (!dataEl.isNull())
                 task.base64Data = dataEl.text().toLatin1();
 
+            // CMYK 颜色数据（可选属性，旧文件中不存在时保持默认值）
+            if (el.hasAttribute(QStringLiteral("PenC"))) {
+                task.cmyk.hasPen = true;
+                task.cmyk.penC = el.attribute(QStringLiteral("PenC")).toDouble();
+                task.cmyk.penM = el.attribute(QStringLiteral("PenM")).toDouble();
+                task.cmyk.penY = el.attribute(QStringLiteral("PenY")).toDouble();
+                task.cmyk.penK = el.attribute(QStringLiteral("PenK")).toDouble();
+            }
+            if (el.hasAttribute(QStringLiteral("BrushC"))) {
+                task.cmyk.hasBrush = true;
+                task.cmyk.brushC = el.attribute(QStringLiteral("BrushC")).toDouble();
+                task.cmyk.brushM = el.attribute(QStringLiteral("BrushM")).toDouble();
+                task.cmyk.brushY = el.attribute(QStringLiteral("BrushY")).toDouble();
+                task.cmyk.brushK = el.attribute(QStringLiteral("BrushK")).toDouble();
+            }
+            QDomElement gradEl = el.firstChildElement(QStringLiteral("GradientCmyk"));
+            if (!gradEl.isNull()) {
+                QDomNodeList stops = gradEl.elementsByTagName(QStringLiteral("Stop"));
+                for (int j = 0; j < stops.count(); ++j) {
+                    QDomElement stopEl = stops.at(j).toElement();
+                    double pos = stopEl.attribute(QStringLiteral("Pos")).toDouble();
+                    double c = stopEl.attribute(QStringLiteral("C")).toDouble();
+                    double m = stopEl.attribute(QStringLiteral("M")).toDouble();
+                    double y = stopEl.attribute(QStringLiteral("Y")).toDouble();
+                    double k = stopEl.attribute(QStringLiteral("K")).toDouble();
+                    task.cmyk.gradient[pos] = {c, m, y, k, true};
+                }
+            }
+
             tasks.append(task);
         }
     }
@@ -291,6 +355,17 @@ bool ProjectFile::save(const QString &filePath, const ProjectInfo &info,
             out << static_cast<int>(igi->itemType());
             igi->serialize(out);
             input.binary = binary;
+
+            // 采集 CMYK 数据
+            if (igi->hasPenCmyk()) {
+                input.cmyk.hasPen = true;
+                igi->penCmyk(input.cmyk.penC, input.cmyk.penM, input.cmyk.penY, input.cmyk.penK);
+            }
+            if (igi->hasBrushCmyk()) {
+                input.cmyk.hasBrush = true;
+                igi->brushCmyk(input.cmyk.brushC, input.cmyk.brushM, input.cmyk.brushY, input.cmyk.brushK);
+            }
+            input.cmyk.gradient = igi->gradientStopCmykMap();
         }
         serialized.append(serializeItemWorker(input));
     }

@@ -1,5 +1,6 @@
 TEMPLATE = lib
-CONFIG += staticlib c++17
+CONFIG += shared c++17
+DEFINES += QSU_SHARED
 
 TARGET = QSimpleUpdater
 

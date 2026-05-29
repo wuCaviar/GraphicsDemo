@@ -7,12 +7,13 @@
 #include <QtWidgets/QWidget>
 #include <QtCore/QMap>
 #include "ui_qtgradientviewdialog.h"
+#include "qtgradienteditor_global.h"
 
 QT_BEGIN_NAMESPACE
 
 class QtGradientManager;
 
-class QtGradientViewDialog : public QDialog
+class QTGRADIENTEDITOR_EXPORT QtGradientViewDialog : public QDialog
 {
     Q_OBJECT
 public:

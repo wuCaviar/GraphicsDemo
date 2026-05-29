@@ -169,6 +169,9 @@ void TextItem::serialize(QDataStream &out) const
 {
     out << toPlainText() << defaultTextColor() << font() << m_bgBrush << pos() << rotation()
         << m_rect;
+    writeCmykIfValid(out, m_penCmyk);
+    writeCmykIfValid(out, m_brushCmyk);
+    writeGradientCmykIfValid(out, m_gradientCmyk);
 }
 
 bool TextItem::deserialize(QDataStream &in)
@@ -191,5 +194,11 @@ bool TextItem::deserialize(QDataStream &in)
     setRotation(rot);
     if (r.isValid())
         setRect(r);
+    if (!readCmykIfAvailable(in, in.device(), m_penCmyk))
+        return false;
+    if (!readCmykIfAvailable(in, in.device(), m_brushCmyk))
+        return false;
+    if (!readGradientCmykIfAvailable(in, in.device(), m_gradientCmyk))
+        return false;
     return true;
 }

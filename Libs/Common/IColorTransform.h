@@ -3,8 +3,9 @@
 
 #include <QColor>
 #include "ColorTypes.h"
+#include "colortrans_global.h"
 
-class IColorTransform
+class COLORTRANS_EXPORT IColorTransform
 {
 public:
     virtual ~IColorTransform() = default;

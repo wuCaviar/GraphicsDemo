@@ -1,5 +1,6 @@
 TEMPLATE = lib
-CONFIG += staticlib c++17
+CONFIG += shared c++17
+DEFINES += COLORTRANS_LIBRARY
 
 TARGET = ColorTrans
 
@@ -8,6 +9,7 @@ QT += core
 INCLUDEPATH += $$PWD/..
 
 HEADERS += \
+    colortrans_global.h \
     colortransform.h \
     ../Common/ColorTypes.h \
     ../Common/IColorTransform.h

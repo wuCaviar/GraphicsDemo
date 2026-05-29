@@ -7,10 +7,11 @@
 #include <QtWidgets/QDialog>
 #include <QMap>
 #include "Common/ColorTypes.h"
+#include "qtgradienteditor_global.h"
 
 QT_BEGIN_NAMESPACE
 
-class QtGradientDialog : public QDialog
+class QTGRADIENTEDITOR_EXPORT QtGradientDialog : public QDialog
 {
     Q_OBJECT
     Q_PROPERTY(QGradient gradient READ gradient WRITE setGradient)

@@ -11,7 +11,8 @@
 
 namespace ImageUtils {
 
-ImportImageDialog::ImportImageDialog(QWidget *parent, const ImportParameters &params)
+ImportImageDialog::ImportImageDialog(QWidget *parent,
+                                     const ImportParameters &params)
     : QDialog(parent)
 {
     setWindowTitle(tr("Import Image - Parameters"));
@@ -21,9 +22,15 @@ ImportImageDialog::ImportImageDialog(QWidget *parent, const ImportParameters &pa
 
     // DPI 策略
     m_dpiCombo = new QComboBox(this);
-    m_dpiCombo->addItem(tr("Use Image DPI"), static_cast<int>(ImportParameters::DpiPolicy::UseImageDpi));
-    m_dpiCombo->addItem(tr("Force DPI"), static_cast<int>(ImportParameters::DpiPolicy::ForceDpi));
-    m_dpiCombo->addItem(tr("Ignore DPI (72 DPI)"), static_cast<int>(ImportParameters::DpiPolicy::IgnoreDpi));
+    m_dpiCombo->addItem(
+        tr("Use Image DPI"),
+        static_cast<int>(ImportParameters::DpiPolicy::UseImageDpi));
+    m_dpiCombo->addItem(
+        tr("Force DPI"),
+        static_cast<int>(ImportParameters::DpiPolicy::ForceDpi));
+    m_dpiCombo->addItem(
+        tr("Ignore DPI (72 DPI)"),
+        static_cast<int>(ImportParameters::DpiPolicy::IgnoreDpi));
     connect(m_dpiCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ImportImageDialog::onDpiPolicyChanged);
     layout->addRow(tr("DPI Policy:"), m_dpiCombo);
@@ -37,16 +44,28 @@ ImportImageDialog::ImportImageDialog(QWidget *parent, const ImportParameters &pa
 
     // 颜色空间
     m_colorCombo = new QComboBox(this);
-    m_colorCombo->addItem(tr("Keep Original"), static_cast<int>(ImportParameters::ColorSpace::KeepOriginal));
-    m_colorCombo->addItem(tr("Convert to sRGB"), static_cast<int>(ImportParameters::ColorSpace::ConvertToSRGB));
-    m_colorCombo->addItem(tr("Convert to Adobe RGB"), static_cast<int>(ImportParameters::ColorSpace::ConvertToAdobeRGB));
+    m_colorCombo->addItem(
+        tr("Keep Original"),
+        static_cast<int>(ImportParameters::ColorSpace::KeepOriginal));
+    m_colorCombo->addItem(
+        tr("Convert to sRGB"),
+        static_cast<int>(ImportParameters::ColorSpace::ConvertToSRGB));
+    m_colorCombo->addItem(
+        tr("Convert to Adobe RGB"),
+        static_cast<int>(ImportParameters::ColorSpace::ConvertToAdobeRGB));
     layout->addRow(tr("Color Space:"), m_colorCombo);
 
     // Alpha 通道处理
     m_alphaCombo = new QComboBox(this);
-    m_alphaCombo->addItem(tr("Keep Alpha"), static_cast<int>(ImportParameters::AlphaHandling::Keep));
-    m_alphaCombo->addItem(tr("Discard Alpha (replace with white)"), static_cast<int>(ImportParameters::AlphaHandling::Discard));
-    m_alphaCombo->addItem(tr("Premultiply Alpha"), static_cast<int>(ImportParameters::AlphaHandling::Premultiply));
+    m_alphaCombo->addItem(
+        tr("Keep Alpha"),
+        static_cast<int>(ImportParameters::AlphaHandling::Keep));
+    m_alphaCombo->addItem(
+        tr("Discard Alpha (replace with white)"),
+        static_cast<int>(ImportParameters::AlphaHandling::Discard));
+    m_alphaCombo->addItem(
+        tr("Premultiply Alpha"),
+        static_cast<int>(ImportParameters::AlphaHandling::Premultiply));
     layout->addRow(tr("Alpha Handling:"), m_alphaCombo);
 
     // 图像缩放
@@ -58,7 +77,8 @@ ImportImageDialog::ImportImageDialog(QWidget *parent, const ImportParameters &pa
     m_scaleSlider->setValue(100);
     m_scaleSlider->setTickPosition(QSlider::TicksBelow);
     m_scaleSlider->setTickInterval(50);
-    connect(m_scaleSlider, &QSlider::valueChanged, this, &ImportImageDialog::onScaleChanged);
+    connect(m_scaleSlider, &QSlider::valueChanged, this,
+            &ImportImageDialog::onScaleChanged);
     layout->addRow(tr("Scale:"), m_scaleSlider);
 
     m_scaleLabel = new QLabel("100%", this);
@@ -72,7 +92,8 @@ ImportImageDialog::ImportImageDialog(QWidget *parent, const ImportParameters &pa
     // 按钮
     auto *buttonBox = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
-    buttonBox->button(QDialogButtonBox::Ok)->setToolTip(tr("Import the image with the selected settings"));
+    buttonBox->button(QDialogButtonBox::Ok)
+        ->setToolTip(tr("Import the image with the selected settings"));
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
     layout->addRow(buttonBox);
@@ -104,10 +125,12 @@ void ImportImageDialog::setParameters(const ImportParameters &params)
     int forcedDpiIdx = m_forcedDpiCombo->findData(params.forcedDpi);
     m_forcedDpiCombo->setCurrentIndex(qMax(0, forcedDpiIdx));
 
-    int colorIndex = m_colorCombo->findData(static_cast<int>(params.colorSpace));
+    int colorIndex =
+        m_colorCombo->findData(static_cast<int>(params.colorSpace));
     m_colorCombo->setCurrentIndex(qMax(0, colorIndex));
 
-    int alphaIndex = m_alphaCombo->findData(static_cast<int>(params.alphaHandling));
+    int alphaIndex =
+        m_alphaCombo->findData(static_cast<int>(params.alphaHandling));
     m_alphaCombo->setCurrentIndex(qMax(0, alphaIndex));
 
     m_scaleCheck->setChecked(params.enableScaling);
@@ -117,8 +140,8 @@ void ImportImageDialog::setParameters(const ImportParameters &params)
 
 void ImportImageDialog::onDpiPolicyChanged(int index)
 {
-    bool enable = m_dpiCombo->itemData(index).toInt() ==
-                  static_cast<int>(ImportParameters::DpiPolicy::ForceDpi);
+    bool enable = m_dpiCombo->itemData(index).toInt()
+                  == static_cast<int>(ImportParameters::DpiPolicy::ForceDpi);
     m_forcedDpiCombo->setEnabled(enable);
 }
 

@@ -1,13 +1,13 @@
 TEMPLATE = lib
-CONFIG += staticlib c++17
+CONFIG += shared c++17
 
 TARGET = QtColorWidgets
 
 QT += core gui widgets
 
-DEFINES += QTCOLORWIDGETS_STATICALLY_LINKED
+DEFINES += QTCOLORWIDGETS_LIBRARY
 
-INCLUDEPATH += $$PWD/src $$PWD/include $$PWD/..
+INCLUDEPATH += $$PWD/src $$PWD/include $$PWD/../ColorTrans $$PWD/..
 
 include(color_widgets.pri)
 

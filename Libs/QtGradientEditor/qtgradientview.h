@@ -7,6 +7,7 @@
 #include <QtWidgets/QWidget>
 #include <QtCore/QHash>
 #include "ui_qtgradientview.h"
+#include "qtgradienteditor_global.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -14,7 +15,7 @@ class QtGradientManager;
 class QListViewItem;
 class QAction;
 
-class QtGradientView : public QWidget
+class QTGRADIENTEDITOR_EXPORT QtGradientView : public QWidget
 {
     Q_OBJECT
 public:

@@ -2,6 +2,7 @@
 #define IGRAPHICSITEM_H
 
 #include <QBrush>
+#include <QBuffer>
 #include <QDataStream>
 #include <QFont>
 #include <QGraphicsItem>
@@ -16,7 +17,8 @@ class IGraphicsItem
 {
 public:
     // 序列化版本号 — 剪贴板数据头部，用于前向兼容
-    static constexpr int kSerializationVersion = 1;
+    // v2: 添加 CMYK 颜色数据序列化
+    static constexpr int kSerializationVersion = 2;
 
     enum ItemType {
         RectItemType       = 1,
@@ -64,12 +66,12 @@ public:
     // CMYK 颜色存储（可选，用于 TIFF 导出精确 CMYK 值）
     virtual void setItemPenCmyk(double c, double m, double y, double k) { Q_UNUSED(c); Q_UNUSED(m); Q_UNUSED(y); Q_UNUSED(k); }
     virtual bool hasPenCmyk() const { return false; }
-    virtual void penCmyk(double &c, double &m, double &y, double &k) const { c = m = y = k = 0; }
+    virtual void penCmyk(double &c, double &m, double &y, double &k) const { c = m = y = k = 100; }
     virtual void clearPenCmyk() {}
 
     virtual void setItemBrushCmyk(double c, double m, double y, double k) { Q_UNUSED(c); Q_UNUSED(m); Q_UNUSED(y); Q_UNUSED(k); }
     virtual bool hasBrushCmyk() const { return false; }
-    virtual void brushCmyk(double &c, double &m, double &y, double &k) const { c = m = y = k = 0; }
+    virtual void brushCmyk(double &c, double &m, double &y, double &k) const { c = m = y = k = 100; }
     virtual void clearBrushCmyk() {}
 
     // 渐变 CMYK 颜色存储（按停止点位置索引，用于 TIFF 导出精确 CMYK 渐变）
@@ -99,6 +101,79 @@ public:
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(IGraphicsItem::PropertyFlags)
+
+// CMYK 序列化辅助函数
+// 写入标记字节 + CMYK 数据（仅当 valid 时写入）
+inline void writeCmykIfValid(QDataStream &out, const CmykColor &cmyk)
+{
+    if (cmyk.valid) {
+        out << static_cast<quint8>(1) << cmyk.c << cmyk.m << cmyk.y << cmyk.k;
+    }
+}
+
+// 读取 CMYK 数据（尝试读取标记字节，流末尾则跳过）
+// 返回 true 表示成功读取或无需读取（旧格式），false 表示读取错误
+inline bool readCmykIfAvailable(QDataStream &in, QIODevice *device, CmykColor &cmyk)
+{
+    if (device->atEnd())
+        return true; // 旧格式，无 CMYK 数据
+    quint8 marker;
+    in >> marker;
+    if (in.status() != QDataStream::Ok)
+        return false;
+    if (marker == 1) {
+        in >> cmyk.c >> cmyk.m >> cmyk.y >> cmyk.k;
+        if (in.status() != QDataStream::Ok)
+            return false;
+        cmyk.valid = true;
+    }
+    return true;
+}
+
+// 写入渐变停止点 CMYK 数据
+inline void writeGradientCmykIfValid(QDataStream &out, const QMap<double, CmykColor> &map)
+{
+    if (map.isEmpty())
+        return;
+    out << static_cast<quint8>(1);
+    out << static_cast<quint32>(map.size());
+    for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
+        out << it.key() << it.value().c << it.value().m << it.value().y << it.value().k;
+    }
+}
+
+// 读取渐变停止点 CMYK 数据
+inline bool readGradientCmykIfAvailable(QDataStream &in, QIODevice *device, QMap<double, CmykColor> &map)
+{
+    if (device->atEnd())
+        return true;
+    quint8 marker;
+    in >> marker;
+    if (in.status() != QDataStream::Ok)
+        return false;
+    if (marker == 1) {
+        quint32 count;
+        in >> count;
+        for (quint32 i = 0; i < count; ++i) {
+            double pos, c, m, y, k;
+            in >> pos >> c >> m >> y >> k;
+            if (in.status() != QDataStream::Ok)
+                return false;
+            map[pos] = {c, m, y, k, true};
+        }
+    }
+    return true;
+}
+
+// 计算序列化后的总字节数（用于剪贴板长度前缀）
+inline QByteArray serializeItemToBytes(IGraphicsItem *item)
+{
+    QByteArray binary;
+    QDataStream out(&binary, QIODevice::WriteOnly);
+    out << static_cast<int>(item->itemType());
+    item->serialize(out);
+    return binary;
+}
 
 // 从 QDataStream 反序列化创建图元
 IGraphicsItem *createItemByType(IGraphicsItem::ItemType type);

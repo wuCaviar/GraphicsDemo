@@ -10,6 +10,7 @@
 #include <QtXml/QDomDocument>
 #include <QtXml/QDomElement>
 #include <QtGui/QGradient>
+#include "qtgradienteditor_global.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -17,7 +18,7 @@ class QGradient;
 class QPixmap;
 class QColor;
 
-class QtGradientManager : public QObject
+class QTGRADIENTEDITOR_EXPORT QtGradientManager : public QObject
 {
     Q_OBJECT
 public:

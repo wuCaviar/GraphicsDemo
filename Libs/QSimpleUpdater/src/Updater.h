@@ -36,7 +36,7 @@ class Downloader;
  * @brief Downloads and interprets the update definition file for a single
  *        module.
  */
-class Updater : public QObject
+class QSU_DECL Updater : public QObject
 {
     Q_OBJECT
 

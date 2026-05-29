@@ -54,6 +54,9 @@ void RectItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidge
 void RectItem::serialize(QDataStream &out) const
 {
     out << rect() << pen() << brush() << m_cornerRadius << pos() << rotation();
+    writeCmykIfValid(out, m_penCmyk);
+    writeCmykIfValid(out, m_brushCmyk);
+    writeGradientCmykIfValid(out, m_gradientCmyk);
 }
 
 bool RectItem::deserialize(QDataStream &in)
@@ -72,5 +75,12 @@ bool RectItem::deserialize(QDataStream &in)
     m_cornerRadius = cr;
     setPos(pos_);
     setRotation(rot);
+    // CMYK 扩展数据（向后兼容：旧格式无数据时跳过）
+    if (!readCmykIfAvailable(in, in.device(), m_penCmyk))
+        return false;
+    if (!readCmykIfAvailable(in, in.device(), m_brushCmyk))
+        return false;
+    if (!readGradientCmykIfAvailable(in, in.device(), m_gradientCmyk))
+        return false;
     return true;
 }

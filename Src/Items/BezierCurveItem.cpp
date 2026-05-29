@@ -37,6 +37,7 @@ void BezierCurveItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *,
 void BezierCurveItem::serialize(QDataStream &out) const
 {
     out << path() << pen() << pos() << rotation();
+    writeCmykIfValid(out, m_penCmyk);
 }
 
 bool BezierCurveItem::deserialize(QDataStream &in)
@@ -52,5 +53,7 @@ bool BezierCurveItem::deserialize(QDataStream &in)
     setPen(pen_);
     setPos(pos_);
     setRotation(rot);
+    if (!readCmykIfAvailable(in, in.device(), m_penCmyk))
+        return false;
     return true;
 }

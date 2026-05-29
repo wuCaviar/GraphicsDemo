@@ -143,7 +143,13 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
 
     buf.width = w;
     buf.height = h;
-    buf.data.resize(static_cast<size_t>(w) * h * 4); // CMYK output
+    try {
+        buf.data.resize(static_cast<size_t>(w) * h * 4); // CMYK output
+    } catch (const std::bad_alloc &) {
+        buf.errorMessage = QString("Not enough memory for %1x%2 CMYK buffer")
+                               .arg(w).arg(h);
+        return buf;
+    }
 
     // Determine source color type and setup conversion
     enum SrcColorType { CMYK, RGB, GRAY };
@@ -429,7 +435,20 @@ ExportWorkerResult exportTiff(const QString &outputPath,
     }
 
     // ===== Phase 3: 并行合成 (40→90%) =====
-    std::vector<uint8_t> outBuf(static_cast<size_t>(outW) * static_cast<size_t>(outH) * 4);
+    constexpr size_t kMaxOutputPixels = static_cast<size_t>(30000) * 30000;
+    size_t outputPixels = static_cast<size_t>(outW) * static_cast<size_t>(outH);
+    if (outputPixels > kMaxOutputPixels) {
+        result.errorMessage = QString("Output too large: %1x%2").arg(outW).arg(outH);
+        return result;
+    }
+
+    std::vector<uint8_t> outBuf;
+    try {
+        outBuf.resize(outputPixels * 4);
+    } catch (const std::bad_alloc &) {
+        result.errorMessage = QString("Not enough memory for %1x%2 output").arg(outW).arg(outH);
+        return result;
+    }
 
     int numThreads = std::max(1, QThread::idealThreadCount());
     int rowsPerChunk = (outH + numThreads - 1) / numThreads;

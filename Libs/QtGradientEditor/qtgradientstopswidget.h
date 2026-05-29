@@ -5,13 +5,14 @@
 #define QTGRADIENTSTOPSWIDGET_H
 
 #include <QtWidgets/QAbstractScrollArea>
+#include "qtgradienteditor_global.h"
 
 QT_BEGIN_NAMESPACE
 
 class QtGradientStopsModel;
 class QtGradientStopsWidgetPrivate;
 
-class QtGradientStopsWidget : public QAbstractScrollArea
+class QTGRADIENTEDITOR_EXPORT QtGradientStopsWidget : public QAbstractScrollArea
 {
     Q_OBJECT
     Q_PROPERTY(bool backgroundCheckered READ isBackgroundCheckered WRITE setBackgroundCheckered)

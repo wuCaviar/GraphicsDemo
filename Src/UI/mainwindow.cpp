@@ -174,14 +174,16 @@ void MainWindow::_initMenuBar()
 
     fileMenu->addSeparator();
 
-    QAction *openProjAct = fileMenu->addAction(
-        style()->standardIcon(QStyle::SP_DialogOpenButton), tr("&Open Project..."));
+    QAction *openProjAct =
+        fileMenu->addAction(style()->standardIcon(QStyle::SP_DialogOpenButton),
+                            tr("&Open Project..."));
     openProjAct->setShortcut(QKeySequence::Open);
     openProjAct->setToolTip(tr("Open a project file"));
     connect(openProjAct, &QAction::triggered, this, &MainWindow::onOpenProject);
 
-    QAction *saveProjAct = fileMenu->addAction(
-        style()->standardIcon(QStyle::SP_DialogSaveButton), tr("&Save Project..."));
+    QAction *saveProjAct =
+        fileMenu->addAction(style()->standardIcon(QStyle::SP_DialogSaveButton),
+                            tr("&Save Project..."));
     saveProjAct->setShortcut(QKeySequence::Save);
     saveProjAct->setToolTip(tr("Save the current project"));
     connect(saveProjAct, &QAction::triggered, this, &MainWindow::onSaveProject);
@@ -305,10 +307,12 @@ void MainWindow::_initMenuBar()
 
     // ---- 设置 ----
     QMenu *settingsMenu = menu->addMenu(tr("&Settings"));
-    settingsMenu->addAction(tr("&RIP Settings..."), this, &MainWindow::onSettings)
+    settingsMenu
+        ->addAction(tr("&RIP Settings..."), this, &MainWindow::onSettings)
         ->setToolTip(tr("Configure RIP settings"));
     settingsMenu->addSeparator();
-    settingsMenu->addAction(tr("&Preferences..."), this, &MainWindow::onPreferences)
+    settingsMenu
+        ->addAction(tr("&Preferences..."), this, &MainWindow::onPreferences)
         ->setToolTip(tr("Open application preferences"));
 
     // ---- 视图 ----
@@ -593,6 +597,7 @@ void MainWindow::_initToolBar()
 void MainWindow::_initPropertyPanel()
 {
     m_pPropertyPanel = new PropertyPanel(this);
+    m_pPropertyPanel->setObjectName("PropertyPanel");
     m_pPropertyPanel->setMinimumWidth(300);
     addDockWidget(Qt::RightDockWidgetArea, m_pPropertyPanel);
 
@@ -942,8 +947,9 @@ bool MainWindow::_maybeSaveProject()
             auto items = ::filterSelectableItems(m_pView->scene()->items());
             ProjectFile pf;
             if (!pf.save(m_currentProjectPath, info, canvasInfo, items)) {
-                QMessageBox::warning(this, tr("Save Project"),
-                                     tr("Failed to save:\n%1").arg(pf.lastError()));
+                QMessageBox::warning(
+                    this, tr("Save Project"),
+                    tr("Failed to save:\n%1").arg(pf.lastError()));
                 return false;
             }
             m_projectModified = false;
@@ -1019,8 +1025,9 @@ void MainWindow::onOpenProject()
     QList<DeserialTask> tasks;
 
     if (!pf.parseForDeserialize(path, info, canvasInfo, tasks)) {
-        QMessageBox::warning(this, tr("Open Project"),
-                             tr("Failed to open project:\n%1").arg(pf.lastError()));
+        QMessageBox::warning(
+            this, tr("Open Project"),
+            tr("Failed to open project:\n%1").arg(pf.lastError()));
         return;
     }
 
@@ -1048,7 +1055,8 @@ void MainWindow::onOpenProject()
     }
 
     // ---- 阶段 2：并发 Base64 解码（纯 CPU，不创建 QGraphicsItem） ----
-    const QString taskId = m_pProgressMgr->startTask(tr("Open Project"), tasks.size());
+    const QString taskId =
+        m_pProgressMgr->startTask(tr("Open Project"), tasks.size());
 
     // 禁用视图，防止用户在加载期间操作画布
     m_pView->setEnabled(false);
@@ -1060,48 +1068,49 @@ void MainWindow::onOpenProject()
                 m_pProgressMgr->updateTask(taskId, value);
             });
 
-    connect(watcher, &QFutureWatcher<DeserializedItem>::finished, this,
-            [this, watcher, taskId, info, canvasInfo, path]() {
-                m_pProgressMgr->finishTask(taskId);
+    connect(
+        watcher, &QFutureWatcher<DeserializedItem>::finished, this,
+        [this, watcher, taskId, info, canvasInfo, path]() {
+            m_pProgressMgr->finishTask(taskId);
 
-                // 在主线程创建 QGraphicsItem（安全的做法）
-                QList<QGraphicsItem *> loadedItems;
-                auto future = watcher->future();
-                for (int i = 0; i < future.resultCount(); ++i) {
-                    QGraphicsItem *item = createItemFromDeserialized(future.resultAt(i));
-                    if (item)
-                        loadedItems.append(item);
-                }
+            // 在主线程创建 QGraphicsItem（安全的做法）
+            QList<QGraphicsItem *> loadedItems;
+            auto future = watcher->future();
+            for (int i = 0; i < future.resultCount(); ++i) {
+                QGraphicsItem *item =
+                    createItemFromDeserialized(future.resultAt(i));
+                if (item)
+                    loadedItems.append(item);
+            }
 
-                // 清空当前画布并重建
-                m_undoStack->clear();
-                m_pPropertyPanel->setItem(nullptr);
-                m_pView->resetCanvas(
-                    QSizeF(canvasInfo.width, canvasInfo.height));
+            // 清空当前画布并重建
+            m_undoStack->clear();
+            m_pPropertyPanel->setItem(nullptr);
+            m_pView->resetCanvas(QSizeF(canvasInfo.width, canvasInfo.height));
 
-                if (m_pView->canvasItem())
-                    m_pView->canvasItem()->setPpi(canvasInfo.dpi);
+            if (m_pView->canvasItem())
+                m_pView->canvasItem()->setPpi(canvasInfo.dpi);
 
-                for (auto *item : loadedItems)
-                    m_pView->scene()->addItem(item);
+            for (auto *item : loadedItems)
+                m_pView->scene()->addItem(item);
 
-                m_pView->setEnabled(true);
-                m_resizeCanvasBtn->setVisible(true);
+            m_pView->setEnabled(true);
+            m_resizeCanvasBtn->setVisible(true);
 
-                m_hRuler->setPpi(canvasInfo.dpi);
-                m_vRuler->setPpi(canvasInfo.dpi);
-                m_pPropertyPanel->setDisplayUnit(m_hRuler->unit(), canvasInfo.dpi);
-                m_hRuler->updateRuler();
-                m_vRuler->updateRuler();
-                _updateCanvasLabel();
-                _updatePosLabel(m_lastScenePos);
+            m_hRuler->setPpi(canvasInfo.dpi);
+            m_vRuler->setPpi(canvasInfo.dpi);
+            m_pPropertyPanel->setDisplayUnit(m_hRuler->unit(), canvasInfo.dpi);
+            m_hRuler->updateRuler();
+            m_vRuler->updateRuler();
+            _updateCanvasLabel();
+            _updatePosLabel(m_lastScenePos);
 
-                m_currentProjectPath = path;
-                m_projectModified = false;
-                setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
+            m_currentProjectPath = path;
+            m_projectModified = false;
+            setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
 
-                watcher->deleteLater();
-            });
+            watcher->deleteLater();
+        });
 
     auto future = QtConcurrent::mapped(tasks, deserializeItemWorker);
     watcher->setFuture(future);
@@ -1111,8 +1120,9 @@ void MainWindow::onSaveProject()
 {
     CanvasItem *canvas = m_pView->canvasItem();
     if (!canvas) {
-        QMessageBox::warning(this, tr("Save Project"),
-                             tr("No canvas to save. Create a new canvas first."));
+        QMessageBox::warning(
+            this, tr("Save Project"),
+            tr("No canvas to save. Create a new canvas first."));
         return;
     }
 
@@ -1156,12 +1166,26 @@ void MainWindow::onSaveProject()
             out << static_cast<int>(igi->itemType());
             igi->serialize(out);
             input.binary = binary;
+
+            // 采集 CMYK 数据（写入 XML 属性，用于 TIFF 导出精确颜色）
+            if (igi->hasPenCmyk()) {
+                input.cmyk.hasPen = true;
+                igi->penCmyk(input.cmyk.penC, input.cmyk.penM, input.cmyk.penY,
+                             input.cmyk.penK);
+            }
+            if (igi->hasBrushCmyk()) {
+                input.cmyk.hasBrush = true;
+                igi->brushCmyk(input.cmyk.brushC, input.cmyk.brushM,
+                               input.cmyk.brushY, input.cmyk.brushK);
+            }
+            input.cmyk.gradient = igi->gradientStopCmykMap();
         }
         inputs.append(input);
     }
 
     // ---- 并发序列化（禁用视图防止用户在序列化期间修改图元） ----
-    const QString taskId = m_pProgressMgr->startTask(tr("Save Project"), inputs.size());
+    const QString taskId =
+        m_pProgressMgr->startTask(tr("Save Project"), inputs.size());
 
     m_pView->setEnabled(false);
 
@@ -1218,92 +1242,26 @@ void MainWindow::onImportImage()
     if (paths.isEmpty())
         return;
 
+    if (!m_pView->canvasItem())
+        return;
+
+    if (paths.size() == 1)
+        importSingleImage(paths);
+    else
+        importMultipleImages(paths);
+}
+
+void MainWindow::importSingleImage(const QStringList &paths)
+{
     CanvasItem *canvas = m_pView->canvasItem();
-    if (!canvas)
+
+    FitCanvasDlg dlg;
+    dlg.setParam(canvas->canvasSize());
+    if (dlg.exec() != QDialog::Accepted)
         return;
+    FitCanvasType fitType = dlg.fitType();
+    double fitVal = dlg.fitValue();
 
-    // Single image: show fit-canvas dialog
-    FitCanvasType fitType = fctNone;
-    double fitVal = 0;
-
-    if (paths.size() == 1) {
-        FitCanvasDlg dlg;
-        dlg.setParam(canvas->canvasSize());
-        if (dlg.exec() != QDialog::Accepted)
-            return;
-        fitType = dlg.fitType();
-        fitVal = dlg.fitValue();
-    } else {
-        // Multiple images: show arrangement dialog
-        ImageArrangementDialog dlg;
-        dlg.setFilePaths(paths);
-        if (dlg.exec() != QDialog::Accepted)
-            return;
-
-        const ImageArrangement arr = dlg.arrangement();
-        const QStringList ordered = dlg.orderedPaths();
-
-        const QString taskId =
-            m_pProgressMgr->startTask(tr("Import"), ordered.size());
-
-        auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
-        auto *importedItems = new QList<ImageItem *>();
-        auto runningCoord = std::make_shared<qreal>(0);
-
-        connect(
-            watcher,
-            &QFutureWatcher<ImageUtils::ImportWorkerResult>::progressValueChanged,
-            this, [this, taskId](int progressValue) {
-                m_pProgressMgr->updateTask(taskId, progressValue);
-            });
-
-        connect(
-            watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
-            this, [this, watcher, importedItems, runningCoord, arr](int index) {
-                auto result = watcher->resultAt(index);
-                if (result.isValid()) {
-                    auto *item = new ImageItem(result.pixmap);
-                    item->setItemPen(QPen(Qt::NoPen));
-                    item->setFilePath(result.path);
-
-                    if (arr == ArrangeHorizontal) {
-                        item->setPos(*runningCoord, 0);
-                        *runningCoord += result.pixmap.width();
-                    } else {
-                        item->setPos(0, *runningCoord);
-                        *runningCoord += result.pixmap.height();
-                    }
-
-                    m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
-                    importedItems->append(item);
-                } else {
-                    qWarning() << "Import failed:" << result.path
-                               << result.errorMessage;
-                }
-            });
-
-        connect(
-            watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished,
-            this, [this, watcher, taskId, importedItems]() {
-                m_pProgressMgr->finishTask(taskId);
-                watcher->deleteLater();
-
-                if (!importedItems->isEmpty()) {
-                    m_pView->fitToCanvas();
-                }
-
-                delete importedItems;
-                qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz")
-                         << "Finished import";
-            });
-
-        auto future = QtConcurrent::mapped(ordered, ImageUtils::runImportWorker);
-        watcher->setFuture(future);
-        qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz");
-        return;
-    }
-
-    // Single image: original flow
     const QString taskId =
         m_pProgressMgr->startTask(tr("Import"), paths.size());
 
@@ -1409,7 +1367,147 @@ void MainWindow::onImportImage()
         });
 
     auto future = QtConcurrent::mapped(paths, ImageUtils::runImportWorker);
+    watcher->setFuture(future);
+    qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz");
+}
 
+void MainWindow::importMultipleImages(const QStringList &paths)
+{
+    CanvasItem *canvas = m_pView->canvasItem();
+
+    ImageArrangementDialog dlg;
+    dlg.setFilePaths(paths);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    const ImageArrangement arr = dlg.arrangement();
+    const QStringList ordered = dlg.orderedPaths();
+
+    FitCanvasDlg fitDlg;
+    fitDlg.setParam(canvas->canvasSize());
+    if (fitDlg.exec() != QDialog::Accepted)
+        return;
+    FitCanvasType fitType = fitDlg.fitType();
+    double fitVal = fitDlg.fitValue();
+
+    const QString taskId =
+        m_pProgressMgr->startTask(tr("Import"), ordered.size());
+
+    auto *watcher =
+        new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
+    auto *importedItems = new QList<ImageItem *>();
+    auto runningCoord = std::make_shared<qreal>(0);
+
+    connect(watcher,
+            &QFutureWatcher<
+                ImageUtils::ImportWorkerResult>::progressValueChanged,
+            this, [this, taskId](int progressValue) {
+                m_pProgressMgr->updateTask(taskId, progressValue);
+            });
+
+    connect(watcher,
+            &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
+            this,
+            [this, watcher, importedItems, runningCoord, arr](int index) {
+                auto result = watcher->resultAt(index);
+                if (result.isValid()) {
+                    auto *item = new ImageItem(result.pixmap);
+                    item->setItemPen(QPen(Qt::NoPen));
+                    item->setFilePath(result.path);
+
+                    if (arr == ArrangeHorizontal) {
+                        item->setPos(*runningCoord, 0);
+                        *runningCoord += result.pixmap.width();
+                    } else {
+                        item->setPos(0, *runningCoord);
+                        *runningCoord += result.pixmap.height();
+                    }
+
+                    m_undoStack->push(
+                        new AddItemCommand(m_pView->scene(), item));
+                    importedItems->append(item);
+                } else {
+                    qWarning() << "Import failed:" << result.path
+                               << result.errorMessage;
+                }
+            });
+
+    connect(watcher,
+            &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished, this,
+            [this, watcher, taskId, importedItems, fitType, fitVal]() {
+                m_pProgressMgr->finishTask(taskId);
+                watcher->deleteLater();
+
+                if (fitType != fctNone && !importedItems->isEmpty()) {
+                    CanvasItem *canvas = m_pView->canvasItem();
+                    if (canvas) {
+                        QRectF unitedRect;
+                        for (auto *item : *importedItems) {
+                            QRectF r = item->mapToScene(item->boundingRect())
+                                           .boundingRect();
+                            unitedRect =
+                                unitedRect.isValid() ? unitedRect.united(r) : r;
+                        }
+
+                        qreal offsetX =
+                            unitedRect.left() < 0 ? -unitedRect.left() : 0;
+                        qreal offsetY =
+                            unitedRect.top() < 0 ? -unitedRect.top() : 0;
+
+                        QSizeF oldSize = canvas->canvasSize();
+                        QSizeF newSize;
+                        switch (fitType) {
+                        case fctAdapt:
+                            newSize = QSizeF(unitedRect.right() + offsetX,
+                                             unitedRect.bottom() + offsetY);
+                            break;
+                        case fctWidth:
+                            newSize = QSizeF(fitVal, oldSize.height());
+                            break;
+                        case fctHeight:
+                            newSize = QSizeF(oldSize.width(), fitVal);
+                            break;
+                        default:
+                            break;
+                        }
+
+                        if (newSize.isValid() && newSize.width() > 0
+                            && newSize.height() > 0 && newSize != oldSize) {
+                            m_undoStack->beginMacro(tr("Fit Canvas on Import"));
+
+                            if (offsetX > 0 || offsetY > 0) {
+                                QPointF delta(offsetX, offsetY);
+                                QList<QPointF> oldPositions, newPositions;
+                                for (auto *item : *importedItems) {
+                                    oldPositions << item->pos();
+                                    newPositions << item->pos() + delta;
+                                    item->setPos(item->pos() + delta);
+                                }
+                                m_undoStack->push(new MoveItemsCommand(
+                                    QList<QGraphicsItem *>(
+                                        importedItems->begin(),
+                                        importedItems->end()),
+                                    oldPositions, newPositions,
+                                    m_pView->scene()));
+                            }
+
+                            m_undoStack->push(new CanvasResizeCommand(
+                                canvas, oldSize, newSize,
+                                m_pView->scene()));
+                            m_undoStack->endMacro();
+                            _updateCanvasLabel();
+                            m_pView->fitToCanvas();
+                        }
+                    }
+                }
+
+                delete importedItems;
+                qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz")
+                         << "Finished import";
+            });
+
+    auto future =
+        QtConcurrent::mapped(ordered, ImageUtils::runImportWorker);
     watcher->setFuture(future);
     qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz");
 }
@@ -1581,8 +1679,9 @@ void MainWindow::onExportImage()
                         QPainter painter(&fillMask);
                         painter.setRenderHint(QPainter::Antialiasing);
                         painter.setRenderHint(QPainter::TextAntialiasing);
-                        m_pView->scene()->render(&painter, QRectF(0, 0, w, h),
-                                                 sceneRect.intersected(exportRect));
+                        m_pView->scene()->render(
+                            &painter, QRectF(0, 0, w, h),
+                            sceneRect.intersected(exportRect));
                         gi->setItemPen(savedPen);
                     }
 
@@ -1595,29 +1694,39 @@ void MainWindow::onExportImage()
                         QPainter painter(&borderMask);
                         painter.setRenderHint(QPainter::Antialiasing);
                         painter.setRenderHint(QPainter::TextAntialiasing);
-                        m_pView->scene()->render(&painter, QRectF(0, 0, w, h),
-                                                 sceneRect.intersected(exportRect));
+                        m_pView->scene()->render(
+                            &painter, QRectF(0, 0, w, h),
+                            sceneRect.intersected(exportRect));
                         gi->setItemBrush(savedBrush);
                     }
 
                     uint8_t brushCmyk[4] = {
-                        static_cast<uint8_t>(qBound(0.0, std::round(brushC * 2.55), 255.0)),
-                        static_cast<uint8_t>(qBound(0.0, std::round(brushM * 2.55), 255.0)),
-                        static_cast<uint8_t>(qBound(0.0, std::round(brushY * 2.55), 255.0)),
-                        static_cast<uint8_t>(qBound(0.0, std::round(brushK * 2.55), 255.0))
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(brushC * 2.55), 255.0)),
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(brushM * 2.55), 255.0)),
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(brushY * 2.55), 255.0)),
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(brushK * 2.55), 255.0))
                     };
                     uint8_t penCmyk[4] = {
-                        static_cast<uint8_t>(qBound(0.0, std::round(penC * 2.55), 255.0)),
-                        static_cast<uint8_t>(qBound(0.0, std::round(penM * 2.55), 255.0)),
-                        static_cast<uint8_t>(qBound(0.0, std::round(penY * 2.55), 255.0)),
-                        static_cast<uint8_t>(qBound(0.0, std::round(penK * 2.55), 255.0))
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(penC * 2.55), 255.0)),
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(penM * 2.55), 255.0)),
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(penY * 2.55), 255.0)),
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(penK * 2.55), 255.0))
                     };
 
                     // 边框优先于填充：先判断边框，再判断填充
                     for (int y = 0; y < h; ++y) {
                         const uchar *fillSrc = fillMask.constScanLine(y);
                         const uchar *borderSrc = borderMask.constScanLine(y);
-                        uint8_t *row = overlay.data.data() + static_cast<size_t>(y) * w * 4;
+                        uint8_t *row = overlay.data.data()
+                                       + static_cast<size_t>(y) * w * 4;
                         for (int x = 0; x < w; ++x) {
                             bool inBorder = borderSrc[x * 4 + 3] > 0;
                             bool inFill = fillSrc[x * 4 + 3] > 0;
@@ -1638,10 +1747,14 @@ void MainWindow::onExportImage()
                     double dK = hasBrushCmykDirect ? brushK : penK;
 
                     uint8_t cmyk[4] = {
-                        static_cast<uint8_t>(qBound(0.0, std::round(dC * 2.55), 255.0)),
-                        static_cast<uint8_t>(qBound(0.0, std::round(dM * 2.55), 255.0)),
-                        static_cast<uint8_t>(qBound(0.0, std::round(dY * 2.55), 255.0)),
-                        static_cast<uint8_t>(qBound(0.0, std::round(dK * 2.55), 255.0))
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(dC * 2.55), 255.0)),
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(dM * 2.55), 255.0)),
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(dY * 2.55), 255.0)),
+                        static_cast<uint8_t>(
+                            qBound(0.0, std::round(dK * 2.55), 255.0))
                     };
                     size_t totalPixels = static_cast<size_t>(w) * h;
                     uint8_t *dst = overlay.data.data();
@@ -1658,13 +1771,15 @@ void MainWindow::onExportImage()
                         QPainter painter(&maskImg);
                         painter.setRenderHint(QPainter::Antialiasing);
                         painter.setRenderHint(QPainter::TextAntialiasing);
-                        m_pView->scene()->render(&painter, QRectF(0, 0, w, h),
-                                                 sceneRect.intersected(exportRect));
+                        m_pView->scene()->render(
+                            &painter, QRectF(0, 0, w, h),
+                            sceneRect.intersected(exportRect));
                     }
 
                     for (int y = 0; y < h; ++y) {
                         const uchar *src = maskImg.constScanLine(y);
-                        uint8_t *row = overlay.data.data() + static_cast<size_t>(y) * w * 4;
+                        uint8_t *row = overlay.data.data()
+                                       + static_cast<size_t>(y) * w * 4;
                         for (int x = 0; x < w; ++x) {
                             if (src[x * 4 + 3] == 0)
                                 std::memset(row + x * 4, 0, 4);
@@ -1725,8 +1840,8 @@ void MainWindow::onExportImage()
                     // 透明像素（A=0）→ CMYK 全零，避免将透明区域导出为黑色
                     for (int y = 0; y < h; ++y) {
                         const uchar *src = img.constScanLine(y);
-                        uint8_t *dst =
-                            overlay.data.data() + static_cast<size_t>(y) * w * 4;
+                        uint8_t *dst = overlay.data.data()
+                                       + static_cast<size_t>(y) * w * 4;
                         for (int x = 0; x < w; ++x) {
                             if (src[x * 4 + 3] == 0)
                                 std::memset(dst + x * 4, 0, 4);
@@ -1735,8 +1850,8 @@ void MainWindow::onExportImage()
                 } else {
                     for (int y = 0; y < h; ++y) {
                         const uchar *src = img.constScanLine(y);
-                        uint8_t *dst =
-                            overlay.data.data() + static_cast<size_t>(y) * w * 4;
+                        uint8_t *dst = overlay.data.data()
+                                       + static_cast<size_t>(y) * w * 4;
                         for (int x = 0; x < w; ++x) {
                             if (src[x * 4 + 3] == 0) {
                                 std::memset(dst + x * 4, 0, 4);
@@ -1746,7 +1861,7 @@ void MainWindow::onExportImage()
                             double g = src[x * 4 + 1] / 255.0;
                             double r = src[x * 4 + 2] / 255.0;
                             double cd = 1.0 - r, md = 1.0 - g, yd = 1.0 - b;
-                            double kd = std::min({cd, md, yd});
+                            double kd = std::min({ cd, md, yd });
                             if (kd < 1.0) {
                                 cd = (cd - kd) / (1.0 - kd) * 100.0;
                                 md = (md - kd) / (1.0 - kd) * 100.0;
@@ -1756,14 +1871,14 @@ void MainWindow::onExportImage()
                             }
                             kd *= 100.0;
                             int off = static_cast<int>(x) * 4;
-                            dst[off + 0] =
-                                static_cast<uint8_t>(std::clamp(cd * 2.55, 0.0, 255.0));
-                            dst[off + 1] =
-                                static_cast<uint8_t>(std::clamp(md * 2.55, 0.0, 255.0));
-                            dst[off + 2] =
-                                static_cast<uint8_t>(std::clamp(yd * 2.55, 0.0, 255.0));
-                            dst[off + 3] =
-                                static_cast<uint8_t>(std::clamp(kd * 2.55, 0.0, 255.0));
+                            dst[off + 0] = static_cast<uint8_t>(
+                                std::clamp(cd * 2.55, 0.0, 255.0));
+                            dst[off + 1] = static_cast<uint8_t>(
+                                std::clamp(md * 2.55, 0.0, 255.0));
+                            dst[off + 2] = static_cast<uint8_t>(
+                                std::clamp(yd * 2.55, 0.0, 255.0));
+                            dst[off + 3] = static_cast<uint8_t>(
+                                std::clamp(kd * 2.55, 0.0, 255.0));
                         }
                     }
                 }
@@ -1787,37 +1902,70 @@ void MainWindow::onExportImage()
         QMetaObject::invokeMethod(
             guard.data(),
             [guard, taskId, pct]() {
-                if (!guard) return;
+                if (!guard)
+                    return;
                 guard->m_pProgressMgr->updateTask(taskId, pct);
             },
             Qt::QueuedConnection);
     };
 
     auto *thread = QThread::create([guard, tiffPath, sources,
-                                     overlays = std::move(overlays), outSize,
-                                     settings, progress, taskId, bRip, ripXRes,
-                                     ripYRes]() {
-        auto result = ImageUtils::exportTiff(tiffPath, sources, overlays,
-                                             outSize, settings, progress);
+                                    overlays = std::move(overlays), outSize,
+                                    settings, progress, taskId, bRip, ripXRes,
+                                    ripYRes]() {
+        try {
+            auto result = ImageUtils::exportTiff(tiffPath, sources, overlays,
+                                                 outSize, settings, progress);
 
-        QMetaObject::invokeMethod(
-            guard.data(),
-            [guard, result, taskId, bRip, ripXRes, ripYRes, tiffPath]() {
-                if (!guard) return;
-                guard->m_exporting = false;
-                if (result.success) {
-                    guard->m_pProgressMgr->finishTask(taskId);
-                    if (bRip && guard->m_pNetWorkUtils) {
-                        guard->m_pNetWorkUtils->doAddRip(ripXRes, ripYRes,
-                                                         result.filePath);
+            QMetaObject::invokeMethod(
+                guard.data(),
+                [guard, result, taskId, bRip, ripXRes, ripYRes, tiffPath]() {
+                    if (!guard)
+                        return;
+                    guard->m_exporting = false;
+                    if (result.success) {
+                        guard->m_pProgressMgr->finishTask(taskId);
+                        if (bRip && guard->m_pNetWorkUtils) {
+                            guard->m_pNetWorkUtils->doAddRip(ripXRes, ripYRes,
+                                                             result.filePath);
+                        }
+                    } else {
+                        guard->m_pProgressMgr->cancelTask(taskId);
+                        qWarning() << "Export failed:" << result.filePath
+                                   << result.errorMessage;
                     }
-                } else {
+                },
+                Qt::QueuedConnection);
+        } catch (const std::exception &ex) {
+            qCritical() << "Export exception:" << ex.what();
+            QMetaObject::invokeMethod(
+                guard.data(),
+                [guard, taskId, msg = QString::fromUtf8(ex.what())]() {
+                    if (!guard)
+                        return;
+                    guard->m_exporting = false;
                     guard->m_pProgressMgr->cancelTask(taskId);
-                    qWarning() << "Export failed:" << result.filePath
-                               << result.errorMessage;
-                }
-            },
-            Qt::QueuedConnection);
+                    QMessageBox::warning(
+                        guard.data(), QObject::tr("Export"),
+                        QObject::tr("Export failed: %1").arg(msg));
+                },
+                Qt::QueuedConnection);
+        } catch (...) {
+            qCritical() << "Export unknown exception";
+            QMetaObject::invokeMethod(
+                guard.data(),
+                [guard, taskId]() {
+                    if (!guard)
+                        return;
+                    guard->m_exporting = false;
+                    guard->m_pProgressMgr->cancelTask(taskId);
+
+                    QMessageBox::warning(
+                        guard.data(), QObject::tr("Export"),
+                        QObject::tr("Export failed!"));
+                },
+                Qt::QueuedConnection);
+        }
     });
 
     connect(thread, &QThread::finished, thread, &QObject::deleteLater);
@@ -2289,8 +2437,7 @@ void MainWindow::onFitCanvasToItems()
         QRectF localRect = (igi && igi->supportsGeometryRect())
                                ? igi->geometryRect()
                                : item->boundingRect();
-        QRectF itemSceneRect =
-            item->mapToScene(localRect).boundingRect();
+        QRectF itemSceneRect = item->mapToScene(localRect).boundingRect();
         unitedRect = unitedRect.isValid() ? unitedRect.united(itemSceneRect)
                                           : itemSceneRect;
     }
@@ -2361,8 +2508,8 @@ void MainWindow::onResizeCanvas()
         return;
 
     if (sizeChanged) {
-        m_undoStack->push(
-            new CanvasResizeCommand(canvas, oldSize, newSize, m_pView->scene()));
+        m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize,
+                                                  m_pView->scene()));
     }
 
     if (dpiChanged) {
@@ -2493,8 +2640,10 @@ void MainWindow::copyItemsToClipboard(const QList<QGraphicsItem *> &items)
         auto *gi = dynamic_cast<IGraphicsItem *>(item);
         if (!gi)
             continue;
-        out << static_cast<int>(gi->itemType());
-        gi->serialize(out);
+        // 序列化到独立缓冲区，写入长度前缀（支持 CMYK 扩展数据）
+        QByteArray itemBinary = serializeItemToBytes(gi);
+        out << static_cast<quint32>(itemBinary.size());
+        out.writeRawData(itemBinary.constData(), itemBinary.size());
     }
 
     auto *mime = new QMimeData;
@@ -2524,19 +2673,58 @@ QList<QGraphicsItem *> MainWindow::pasteItemsFromClipboard()
     int count = 0;
     in >> count;
     for (int i = 0; i < count; ++i) {
-        int typeInt = 0;
-        in >> typeInt;
-        auto *gi =
-            createItemByType(static_cast<IGraphicsItem::ItemType>(typeInt));
-        if (!gi)
-            continue;
-        if (!gi->deserialize(in)) {
-            qWarning("Failed to deserialize item type %d (stream corrupted)",
-                     typeInt);
-            delete gi;
-            continue;
+        if (version >= 2) {
+            // v2+: 长度前缀格式，每个图元数据独立
+            quint32 dataLen = 0;
+            in >> dataLen;
+            if (in.status() != QDataStream::Ok || dataLen == 0) {
+                qWarning("Clipboard: invalid item data length at index %d", i);
+                break;
+            }
+            QByteArray itemData(dataLen, '\0');
+            in.readRawData(itemData.data(), dataLen);
+            if (in.status() != QDataStream::Ok) {
+                qWarning("Clipboard: failed to read item data at index %d", i);
+                break;
+            }
+            QDataStream itemIn(&itemData, QIODevice::ReadOnly);
+            int typeInt = 0;
+            itemIn >> typeInt;
+            auto *gi =
+                createItemByType(static_cast<IGraphicsItem::ItemType>(typeInt));
+            if (!gi) {
+                qWarning("Clipboard: unknown item type %d at index %d", typeInt,
+                         i);
+                continue;
+            }
+            if (!gi->deserialize(itemIn)) {
+                qWarning(
+                    "Clipboard: failed to deserialize item type %d at index %d",
+                    typeInt, i);
+                delete gi;
+                continue;
+            }
+            result << dynamic_cast<QGraphicsItem *>(gi);
+        } else {
+            // v1: 旧格式，直接从流中读取
+            int typeInt = 0;
+            in >> typeInt;
+            auto *gi =
+                createItemByType(static_cast<IGraphicsItem::ItemType>(typeInt));
+            if (!gi) {
+                qWarning("Clipboard: unknown item type %d at index %d", typeInt,
+                         i);
+                continue;
+            }
+            if (!gi->deserialize(in)) {
+                qWarning("Clipboard: failed to deserialize item type %d "
+                         "(stream corrupted)",
+                         typeInt);
+                delete gi;
+                continue;
+            }
+            result << dynamic_cast<QGraphicsItem *>(gi);
         }
-        result << dynamic_cast<QGraphicsItem *>(gi);
     }
     return result;
 }

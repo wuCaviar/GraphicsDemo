@@ -6,12 +6,13 @@
 
 #include <QtGui/QGradient>
 #include <QtGui/QPainter>
+#include "qtgradienteditor_global.h"
 
 QT_BEGIN_NAMESPACE
 
 class QtGradientManager;
 
-class QtGradientUtils
+class QTGRADIENTEDITOR_EXPORT QtGradientUtils
 {
 public:
     static QString styleSheetCode(const QGradient &gradient);

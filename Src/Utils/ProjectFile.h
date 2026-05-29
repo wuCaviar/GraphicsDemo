@@ -7,7 +7,18 @@
 #include <QDomDocument>
 #include <QGraphicsItem>
 #include <QList>
+#include <QMap>
 #include <QString>
+
+// ---- CMYK 颜色数据（用于 XML 中精确存储） ----
+
+struct CmykData {
+    bool hasPen = false;
+    double penC = 0, penM = 0, penY = 0, penK = 0;
+    bool hasBrush = false;
+    double brushC = 0, brushM = 0, brushY = 0, brushK = 0;
+    QMap<double, CmykColor> gradient; // position → CmykColor
+};
 
 // ---- 并发序列化/反序列化的数据结构 ----
 
@@ -18,6 +29,7 @@ struct SerializedItem {
     double posY = 0;
     double rotation = 0;
     QByteArray base64Data; // QDataStream 序列化后 Base64 编码
+    CmykData cmyk;         // CMYK 颜色数据（存入 XML 属性）
 };
 
 struct DeserialTask {
@@ -27,6 +39,7 @@ struct DeserialTask {
     double posX = 0;
     double posY = 0;
     double rotation = 0;
+    CmykData cmyk;         // CMYK 颜色数据（从 XML 属性读取）
 };
 
 // Worker 产出的纯数据结构（不含 QGraphicsItem，线程安全）
@@ -37,6 +50,7 @@ struct DeserializedItem {
     double posX = 0;
     double posY = 0;
     double rotation = 0;
+    CmykData cmyk;         // CMYK 颜色数据
 };
 
 // 序列化输入快照（在主线程采集，线程安全）
@@ -47,6 +61,7 @@ struct SerializeInput {
     double posX = 0;
     double posY = 0;
     double rotation = 0;
+    CmykData cmyk;         // CMYK 颜色数据
 };
 
 // ---- 线程安全的 Worker 函数（供 QtConcurrent::mapped 使用） ----

@@ -5,10 +5,11 @@
 #define QTCOLORLINE_H
 
 #include <QtWidgets/QWidget>
+#include "qtgradienteditor_global.h"
 
 QT_BEGIN_NAMESPACE
 
-class QtColorLine : public QWidget
+class QTGRADIENTEDITOR_EXPORT QtColorLine : public QWidget
 {
     Q_OBJECT
     Q_PROPERTY(QColor color READ color WRITE setColor)

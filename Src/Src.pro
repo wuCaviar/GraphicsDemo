@@ -19,11 +19,6 @@ LIBS += -L$$PROJECT_PATH/Bin -lQtColorWidgets
 LIBS += -L$$PROJECT_PATH/Bin -lQtGradientEditor
 LIBS += -L$$PROJECT_PATH/Bin -lQSimpleUpdater
 
-PRE_TARGETDEPS += \
-    $$PROJECT_PATH/Bin/$${QMAKE_PREFIX_STATICLIB}ColorTrans.$${QMAKE_EXTENSION_STATICLIB} \
-    $$PROJECT_PATH/Bin/$${QMAKE_PREFIX_STATICLIB}QtColorWidgets.$${QMAKE_EXTENSION_STATICLIB} \
-    $$PROJECT_PATH/Bin/$${QMAKE_PREFIX_STATICLIB}QtGradientEditor.$${QMAKE_EXTENSION_STATICLIB} \
-    $$PROJECT_PATH/Bin/$${QMAKE_PREFIX_STATICLIB}QSimpleUpdater.$${QMAKE_EXTENSION_STATICLIB}
 
 HEADERS += \
     App/SingleInstance.h \
@@ -119,7 +114,9 @@ SOURCES += \
     Tiff/tifffile.cpp \
 
 FORMS += \
+    UI/FileInfoWidget.ui \
     UI/FitCanvasDlg.ui \
+    UI/ImageArrangementDialog.ui \
     UI/mainwindow.ui \
 
 RESOURCES += \

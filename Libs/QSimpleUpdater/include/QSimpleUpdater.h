@@ -55,7 +55,7 @@ class Updater;
  * By default, the downloader will try to open the downloaded file using the
  * operating system's default handler.
  */
-class QSimpleUpdater : public QObject
+class QSU_DECL QSimpleUpdater : public QObject
 {
     Q_OBJECT
 

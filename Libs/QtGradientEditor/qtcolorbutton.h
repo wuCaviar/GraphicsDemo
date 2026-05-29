@@ -5,10 +5,11 @@
 #define QTCOLORBUTTON_H
 
 #include <QtWidgets/QToolButton>
+#include "qtgradienteditor_global.h"
 
 QT_BEGIN_NAMESPACE
 
-class QtColorButton : public QToolButton
+class QTGRADIENTEDITOR_EXPORT QtColorButton : public QToolButton
 {
     Q_OBJECT
     Q_PROPERTY(bool backgroundCheckered READ isBackgroundCheckered WRITE setBackgroundCheckered)

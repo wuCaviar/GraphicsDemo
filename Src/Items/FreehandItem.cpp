@@ -41,6 +41,7 @@ void FreehandItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QW
 void FreehandItem::serialize(QDataStream &out) const
 {
     out << path() << pen() << pos() << rotation();
+    writeCmykIfValid(out, m_penCmyk);
 }
 
 bool FreehandItem::deserialize(QDataStream &in)
@@ -56,5 +57,7 @@ bool FreehandItem::deserialize(QDataStream &in)
     setPen(pen_);
     setPos(pos_);
     setRotation(rot);
+    if (!readCmykIfAvailable(in, in.device(), m_penCmyk))
+        return false;
     return true;
 }

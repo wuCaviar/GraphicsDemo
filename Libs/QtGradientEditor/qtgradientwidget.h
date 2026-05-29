@@ -5,10 +5,11 @@
 #define QTGRADIENTWIDGET_H
 
 #include <QtWidgets/QWidget>
+#include "qtgradienteditor_global.h"
 
 QT_BEGIN_NAMESPACE
 
-class QtGradientWidget : public QWidget
+class QTGRADIENTEDITOR_EXPORT QtGradientWidget : public QWidget
 {
     Q_OBJECT
     Q_PROPERTY(bool backgroundCheckered READ isBackgroundCheckered WRITE setBackgroundCheckered)

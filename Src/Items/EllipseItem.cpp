@@ -39,6 +39,9 @@ void EllipseItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWi
 void EllipseItem::serialize(QDataStream &out) const
 {
     out << rect() << pen() << brush() << pos() << rotation();
+    writeCmykIfValid(out, m_penCmyk);
+    writeCmykIfValid(out, m_brushCmyk);
+    writeGradientCmykIfValid(out, m_gradientCmyk);
 }
 
 bool EllipseItem::deserialize(QDataStream &in)
@@ -56,5 +59,11 @@ bool EllipseItem::deserialize(QDataStream &in)
     setBrush(b);
     setPos(pos_);
     setRotation(rot);
+    if (!readCmykIfAvailable(in, in.device(), m_penCmyk))
+        return false;
+    if (!readCmykIfAvailable(in, in.device(), m_brushCmyk))
+        return false;
+    if (!readGradientCmykIfAvailable(in, in.device(), m_gradientCmyk))
+        return false;
     return true;
 }
