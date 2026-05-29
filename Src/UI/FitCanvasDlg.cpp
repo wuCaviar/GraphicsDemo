@@ -74,13 +74,15 @@ void FitCanvasDlg::_slotIndexChanged(int index)
 
     QString text = "";
     if (index == fctWidth) {
-        text = tr("Width:");
+        text = tr("Width (mm):");
         ui->doubleSpinBox->setMaximum(m_sDefaultSize.width() * 10.0);
         ui->doubleSpinBox->setValue(m_sDefaultSize.width());
+        ui->doubleSpinBox->setSuffix(QStringLiteral(" mm"));
     } else if (index == fctHeight) {
-        text = tr("Height:");
+        text = tr("Height (mm):");
         ui->doubleSpinBox->setMaximum(m_sDefaultSize.height() * 10.0);
         ui->doubleSpinBox->setValue(m_sDefaultSize.height());
+        ui->doubleSpinBox->setSuffix(QStringLiteral(" mm"));
     }
 
     ui->label->setText(text);

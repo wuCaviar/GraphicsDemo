@@ -334,38 +334,6 @@ void MainWindow::_initMenuBar()
     connect(m_gridAction, &QAction::toggled, this,
             [this](bool checked) { m_pView->setGridVisible(checked); });
 
-    // 刻度尺单位切换（px ↔ mm）
-    QMenu *rulerUnitMenu = viewMenu->addMenu(tr("Ruler Unit"));
-    auto *rulerUnitGroup = new QActionGroup(this);
-    rulerUnitGroup->setExclusive(true);
-
-    m_rulerUnitPxAction = rulerUnitMenu->addAction(tr("Pixels"));
-    m_rulerUnitPxAction->setCheckable(true);
-    rulerUnitGroup->addAction(m_rulerUnitPxAction);
-
-    m_rulerUnitMmAction = rulerUnitMenu->addAction(tr("Millimeters"));
-    m_rulerUnitMmAction->setCheckable(true);
-    rulerUnitGroup->addAction(m_rulerUnitMmAction);
-
-    m_rulerUnitPxAction->setChecked(true);
-
-    connect(m_rulerUnitPxAction, &QAction::triggered, this, [this]() {
-        m_hRuler->setUnit(RulerBar::Pixel);
-        m_vRuler->setUnit(RulerBar::Pixel);
-        qreal ppi = m_pView->canvasItem() ? m_pView->canvasItem()->ppi() : 96.0;
-        m_pPropertyPanel->setDisplayUnit(RulerBar::Pixel, ppi);
-        _updateCanvasLabel();
-        _updatePosLabel(m_lastScenePos);
-    });
-    connect(m_rulerUnitMmAction, &QAction::triggered, this, [this]() {
-        m_hRuler->setUnit(RulerBar::Millimeter);
-        m_vRuler->setUnit(RulerBar::Millimeter);
-        qreal ppi = m_pView->canvasItem() ? m_pView->canvasItem()->ppi() : 96.0;
-        m_pPropertyPanel->setDisplayUnit(RulerBar::Millimeter, ppi);
-        _updateCanvasLabel();
-        _updatePosLabel(m_lastScenePos);
-    });
-
     _initThemeMenu(viewMenu);
 
     viewMenu->addSeparator();
@@ -799,19 +767,15 @@ void MainWindow::_updateUndoRedoActions()
 void MainWindow::_updatePosLabel(const QPointF &scenePos)
 {
     m_lastScenePos = scenePos;
-    bool isMm = m_hRuler->unit() == RulerBar::Millimeter;
-    if (isMm) {
-        qreal ppi = m_pView->canvasItem() ? m_pView->canvasItem()->ppi() : 96.0;
-        qreal kPxToMm = 25.4 / ppi;
-        qreal xmm = scenePos.x() * kPxToMm;
-        qreal ymm = scenePos.y() * kPxToMm;
-        m_posLabel->setText(
-            tr("X: %1 mm  Y: %2 mm").arg(xmm, 0, 'f', 1).arg(ymm, 0, 'f', 1));
-    } else {
-        m_posLabel->setText(tr("X: %1 px  Y: %2 px")
-                                .arg(scenePos.x(), 0, 'f', 1)
-                                .arg(scenePos.y(), 0, 'f', 1));
-    }
+    // 始终以 mm 显示（无 DPI 时 pixelsPerMm=1.0）
+    qreal ppm = 1.0;
+    if (m_pView->canvasItem())
+        ppm = m_pView->canvasItem()->pixelsPerMm();
+    qreal kPxToMm = 1.0 / ppm;
+    qreal xmm = scenePos.x() * kPxToMm;
+    qreal ymm = scenePos.y() * kPxToMm;
+    m_posLabel->setText(
+        tr("X: %1 mm  Y: %2 mm").arg(xmm, 0, 'f', 1).arg(ymm, 0, 'f', 1));
 }
 
 void MainWindow::_updateCanvasLabel()
@@ -825,20 +789,16 @@ void MainWindow::_updateCanvasLabel()
         return;
     }
 
-    QSizeF sz = canvas->canvasSize();
-    qreal ppi = canvas->ppi();
-    bool isMm = m_hRuler->unit() == RulerBar::Millimeter;
-    if (isMm) {
-        qreal kPxToMm = 25.4 / ppi;
-        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm \u00b7 %3 DPI")
-                                   .arg(sz.width() * kPxToMm, 0, 'f', 1)
-                                   .arg(sz.height() * kPxToMm, 0, 'f', 1)
-                                   .arg(ppi, 0, 'f', 0));
+    QSizeF szMm = canvas->canvasSizeMm();
+    if (canvas->hasDpi()) {
+        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm | %3 DPI")
+                                   .arg(szMm.width(), 0, 'f', 1)
+                                   .arg(szMm.height(), 0, 'f', 1)
+                                   .arg(qRound(canvas->ppi())));
     } else {
-        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 px \u00b7 %3 DPI")
-                                   .arg(sz.width(), 0, 'f', 1)
-                                   .arg(sz.height(), 0, 'f', 1)
-                                   .arg(ppi, 0, 'f', 0));
+        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm")
+                                   .arg(szMm.width(), 0, 'f', 1)
+                                   .arg(szMm.height(), 0, 'f', 1));
     }
 }
 
@@ -971,8 +931,7 @@ void MainWindow::onNew()
     if (dlg.exec() != QDialog::Accepted)
         return;
 
-    QSizeF canvasSize = dlg.selectedSize();
-    qreal ppi = dlg.selectedPpi();
+    QSizeF canvasSizeMm = dlg.selectedSize(); // mm 尺寸
 
     // 先清空 undo 栈，避免命令引用即将被删除的图元
     m_undoStack->clear();
@@ -984,23 +943,18 @@ void MainWindow::onNew()
     // 清空属性面板引用
     m_pPropertyPanel->setItem(nullptr);
 
-    // 安全清空场景并重建画布
-    m_pView->resetCanvas(canvasSize);
-    m_pView->setEnabled(true); // 画板就绪，允许操作
+    // 安全清空场景并重建画布（无 DPI 时 pixelsPerMm=1.0，scene 尺寸 = mm 值）
+    m_pView->resetCanvas(canvasSizeMm);
+    m_pView->setEnabled(true);
     m_resizeCanvasBtn->setVisible(true);
 
-    // 设置画布 PPI
-    if (m_pView->canvasItem())
-        m_pView->canvasItem()->setPpi(ppi);
-
-    // 同步刻度尺 PPI
-    m_hRuler->setPpi(ppi);
-    m_vRuler->setPpi(ppi);
-    m_pPropertyPanel->setDisplayUnit(m_hRuler->unit(), ppi);
+    // 画布默认无 DPI（m_ppi=0），传播给标尺和属性面板
+    m_hRuler->setPpi(0);
+    m_vRuler->setPpi(0);
+    m_pPropertyPanel->setPpi(0);
 
     m_pProgressMgr->resetAll();
 
-    // PPI 变化后刷新刻度尺和状态栏
     m_hRuler->updateRuler();
     m_vRuler->updateRuler();
     _updateCanvasLabel();
@@ -1042,7 +996,7 @@ void MainWindow::onOpenProject()
         m_resizeCanvasBtn->setVisible(true);
         m_hRuler->setPpi(canvasInfo.dpi);
         m_vRuler->setPpi(canvasInfo.dpi);
-        m_pPropertyPanel->setDisplayUnit(m_hRuler->unit(), canvasInfo.dpi);
+        m_pPropertyPanel->setPpi(canvasInfo.dpi);
         m_hRuler->updateRuler();
         m_vRuler->updateRuler();
         _updateCanvasLabel();
@@ -1099,7 +1053,7 @@ void MainWindow::onOpenProject()
 
             m_hRuler->setPpi(canvasInfo.dpi);
             m_vRuler->setPpi(canvasInfo.dpi);
-            m_pPropertyPanel->setDisplayUnit(m_hRuler->unit(), canvasInfo.dpi);
+            m_pPropertyPanel->setPpi(canvasInfo.dpi);
             m_hRuler->updateRuler();
             m_vRuler->updateRuler();
             _updateCanvasLabel();
@@ -1251,16 +1205,75 @@ void MainWindow::onImportImage()
         importMultipleImages(paths);
 }
 
+void MainWindow::_applyImageDpi(int dpi)
+{
+    CanvasItem *canvas = m_pView->canvasItem();
+    if (!canvas || dpi <= 0)
+        return;
+
+    if (!canvas->hasDpi()) {
+        // 首次设置 DPI：缩放所有已有图元和画布
+        qreal oldPPM = canvas->pixelsPerMm(); // 无 DPI 时为 1.0
+        canvas->setPpi(dpi);
+        qreal newPPM = canvas->pixelsPerMm();
+        qreal factor = newPPM / oldPPM;
+
+        if (!qFuzzyCompare(factor, 1.0)) {
+            // 缩放已有图元（排除 CanvasItem、ResizeHandleItem 和导入的图片）
+            for (auto *item : m_pView->scene()->items()) {
+                if (item->type() == CanvasItem::Type ||
+                    item->type() == QGraphicsItem::UserType + 200 ||
+                    item->type() == ImageItem::Type)
+                    continue;
+                item->setPos(item->pos() * factor);
+                auto *gi = dynamic_cast<IGraphicsItem *>(item);
+                if (gi && gi->supportsSetGeometryRect()) {
+                    QRectF r = gi->geometryRect();
+                    gi->setGeometryRect(
+                        QRectF(r.x() * factor, r.y() * factor,
+                               r.width() * factor, r.height() * factor));
+                }
+            }
+
+            // 缩放画布
+            QSizeF oldSz = canvas->canvasSize();
+            canvas->setCanvasSize(QSizeF(oldSz.width() * factor,
+                                         oldSz.height() * factor));
+
+            // 更新场景矩形
+            QSizeF newSz = canvas->canvasSize();
+            m_pView->scene()->setSceneRect(-500, -500,
+                                           newSz.width() + 1000,
+                                           newSz.height() + 1000);
+        }
+
+        // 传播 PPI
+        m_hRuler->setPpi(dpi);
+        m_vRuler->setPpi(dpi);
+        m_pPropertyPanel->setPpi(dpi);
+        m_hRuler->updateRuler();
+        m_vRuler->updateRuler();
+        _updateCanvasLabel();
+    } else {
+        // 画布已有 DPI — 验证匹配
+        if (qRound(canvas->ppi()) != dpi) {
+            QMessageBox::warning(this, tr("DPI Mismatch"),
+                tr("Canvas DPI is %1, but the imported image is %2 DPI.")
+                    .arg(qRound(canvas->ppi())).arg(dpi));
+        }
+    }
+}
+
 void MainWindow::importSingleImage(const QStringList &paths)
 {
     CanvasItem *canvas = m_pView->canvasItem();
 
     FitCanvasDlg dlg;
-    dlg.setParam(canvas->canvasSize());
+    dlg.setParam(canvas->canvasSizeMm()); // mm 值
     if (dlg.exec() != QDialog::Accepted)
         return;
     FitCanvasType fitType = dlg.fitType();
-    double fitVal = dlg.fitValue();
+    double fitValMm = dlg.fitValue(); // mm 值
 
     const QString taskId =
         m_pProgressMgr->startTask(tr("Import"), paths.size());
@@ -1268,6 +1281,7 @@ void MainWindow::importSingleImage(const QStringList &paths)
     auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
     auto *importedItems = new QList<ImageItem *>();
     auto runningY = std::make_shared<qreal>(0);
+    auto firstDpi = std::make_shared<int>(0);
 
     connect(
         watcher,
@@ -1278,9 +1292,15 @@ void MainWindow::importSingleImage(const QStringList &paths)
 
     connect(
         watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
-        this, [this, watcher, importedItems, runningY](int index) {
+        this, [this, watcher, importedItems, runningY, firstDpi](int index) {
             auto result = watcher->resultAt(index);
             if (result.isValid()) {
+                // 捕获第一张图片的 DPI（TIFF 从文件读取，非 TIFF 默认 72）
+                if (*firstDpi == 0) {
+                    *firstDpi = (result.dpiX > 0) ? result.dpiX : 72;
+                }
+
+                // 图片保持原始像素尺寸，由画布适配图片大小
                 auto *item = new ImageItem(result.pixmap);
                 item->setItemPen(QPen(Qt::NoPen));
                 item->setFilePath(result.path);
@@ -1297,9 +1317,13 @@ void MainWindow::importSingleImage(const QStringList &paths)
 
     connect(
         watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished,
-        this, [this, watcher, taskId, importedItems, fitType, fitVal]() {
+        this, [this, watcher, taskId, importedItems, fitType, fitValMm, firstDpi]() {
             m_pProgressMgr->finishTask(taskId);
             watcher->deleteLater();
+
+            // 应用图片 DPI（首次设置时会缩放所有图元和画布）
+            if (*firstDpi > 0)
+                _applyImageDpi(*firstDpi);
 
             if (fitType != fctNone && !importedItems->isEmpty()) {
                 CanvasItem *canvas = m_pView->canvasItem();
@@ -1318,6 +1342,7 @@ void MainWindow::importSingleImage(const QStringList &paths)
                         unitedRect.top() < 0 ? -unitedRect.top() : 0;
 
                     QSizeF oldSize = canvas->canvasSize();
+                    qreal ppm = canvas->pixelsPerMm();
                     QSizeF newSize;
                     switch (fitType) {
                     case fctAdapt:
@@ -1325,10 +1350,10 @@ void MainWindow::importSingleImage(const QStringList &paths)
                                          unitedRect.bottom() + offsetY);
                         break;
                     case fctWidth:
-                        newSize = QSizeF(fitVal, oldSize.height());
+                        newSize = QSizeF(fitValMm * ppm, oldSize.height());
                         break;
                     case fctHeight:
-                        newSize = QSizeF(oldSize.width(), fitVal);
+                        newSize = QSizeF(oldSize.width(), fitValMm * ppm);
                         break;
                     default:
                         break;
@@ -1377,6 +1402,8 @@ void MainWindow::importMultipleImages(const QStringList &paths)
 
     ImageArrangementDialog dlg;
     dlg.setFilePaths(paths);
+    if (canvas && canvas->hasDpi())
+        dlg.setCanvasDpi(qRound(canvas->ppi()));
     if (dlg.exec() != QDialog::Accepted)
         return;
 
@@ -1384,11 +1411,11 @@ void MainWindow::importMultipleImages(const QStringList &paths)
     const QStringList ordered = dlg.orderedPaths();
 
     FitCanvasDlg fitDlg;
-    fitDlg.setParam(canvas->canvasSize());
+    fitDlg.setParam(canvas->canvasSizeMm()); // mm 值
     if (fitDlg.exec() != QDialog::Accepted)
         return;
     FitCanvasType fitType = fitDlg.fitType();
-    double fitVal = fitDlg.fitValue();
+    double fitValMm = fitDlg.fitValue(); // mm 值
 
     const QString taskId =
         m_pProgressMgr->startTask(tr("Import"), ordered.size());
@@ -1397,6 +1424,7 @@ void MainWindow::importMultipleImages(const QStringList &paths)
         new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
     auto *importedItems = new QList<ImageItem *>();
     auto runningCoord = std::make_shared<qreal>(0);
+    auto firstDpi = std::make_shared<int>(0);
 
     connect(watcher,
             &QFutureWatcher<
@@ -1408,9 +1436,14 @@ void MainWindow::importMultipleImages(const QStringList &paths)
     connect(watcher,
             &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
             this,
-            [this, watcher, importedItems, runningCoord, arr](int index) {
+            [this, watcher, importedItems, runningCoord, arr, firstDpi](int index) {
                 auto result = watcher->resultAt(index);
                 if (result.isValid()) {
+                    if (*firstDpi == 0) {
+                        *firstDpi = (result.dpiX > 0) ? result.dpiX : 72;
+                    }
+
+                    // 图片保持原始像素尺寸，由画布适配图片大小
                     auto *item = new ImageItem(result.pixmap);
                     item->setItemPen(QPen(Qt::NoPen));
                     item->setFilePath(result.path);
@@ -1434,9 +1467,13 @@ void MainWindow::importMultipleImages(const QStringList &paths)
 
     connect(watcher,
             &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished, this,
-            [this, watcher, taskId, importedItems, fitType, fitVal]() {
+            [this, watcher, taskId, importedItems, fitType, fitValMm, firstDpi]() {
                 m_pProgressMgr->finishTask(taskId);
                 watcher->deleteLater();
+
+                // 应用图片 DPI
+                if (*firstDpi > 0)
+                    _applyImageDpi(*firstDpi);
 
                 if (fitType != fctNone && !importedItems->isEmpty()) {
                     CanvasItem *canvas = m_pView->canvasItem();
@@ -1455,6 +1492,7 @@ void MainWindow::importMultipleImages(const QStringList &paths)
                             unitedRect.top() < 0 ? -unitedRect.top() : 0;
 
                         QSizeF oldSize = canvas->canvasSize();
+                        qreal ppm = canvas->pixelsPerMm();
                         QSizeF newSize;
                         switch (fitType) {
                         case fctAdapt:
@@ -1462,10 +1500,10 @@ void MainWindow::importMultipleImages(const QStringList &paths)
                                              unitedRect.bottom() + offsetY);
                             break;
                         case fctWidth:
-                            newSize = QSizeF(fitVal, oldSize.height());
+                            newSize = QSizeF(fitValMm * ppm, oldSize.height());
                             break;
                         case fctHeight:
-                            newSize = QSizeF(oldSize.width(), fitVal);
+                            newSize = QSizeF(oldSize.width(), fitValMm * ppm);
                             break;
                         default:
                             break;
@@ -1567,7 +1605,19 @@ void MainWindow::onExportImage()
         exportRect =
             m_pView->scene()->itemsBoundingRect().adjusted(-10, -10, 10, 10);
     }
-    int targetDpi = canvas ? qRound(canvas->ppi()) : 72;
+    int targetDpi = 72;
+    if (canvas && canvas->hasDpi()) {
+        targetDpi = qRound(canvas->ppi());
+    } else {
+        // 画布无 DPI（从未导入图片），需要用户设置导出 DPI
+        bool ok = false;
+        targetDpi = QInputDialog::getInt(
+            this, tr("Export DPI"),
+            tr("No image has been imported. Please set the export DPI:"),
+            300, 1, 9999, 1, &ok);
+        if (!ok)
+            return;
+    }
 
     // 4. 构建源 TIFF 输入列表
     QList<ImageUtils::SourceTiffInput> sources;
@@ -2492,32 +2542,23 @@ void MainWindow::onResizeCanvas()
         return;
 
     ResizeCanvasDialog dlg(this);
-    bool isMm = m_hRuler->unit() == RulerBar::Millimeter;
-    dlg.setCurrentSize(canvas->canvasSize(), canvas->ppi(), isMm);
+    dlg.setCurrentSize(canvas->canvasSizeMm(), canvas->ppi());
     if (dlg.exec() != QDialog::Accepted)
         return;
 
-    QSizeF newSize = dlg.newPixelSize();
-    QSizeF oldSize = canvas->canvasSize();
-    int newDpi = dlg.selectedDpi();
+    QSizeF newSizeMm = dlg.newSizeMm();
+    QSizeF oldSizeMm = canvas->canvasSizeMm();
 
-    bool sizeChanged = (newSize != oldSize);
-    bool dpiChanged = (newDpi != qRound(canvas->ppi()));
-
-    if (!sizeChanged && !dpiChanged)
+    if (newSizeMm == oldSizeMm)
         return;
 
-    if (sizeChanged) {
-        m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize,
-                                                  m_pView->scene()));
-    }
+    // mm → scene px
+    qreal ppm = canvas->pixelsPerMm();
+    QSizeF oldSizePx = canvas->canvasSize();
+    QSizeF newSizePx(newSizeMm.width() * ppm, newSizeMm.height() * ppm);
 
-    if (dpiChanged) {
-        canvas->setPpi(newDpi);
-        m_hRuler->setPpi(newDpi);
-        m_vRuler->setPpi(newDpi);
-        m_pPropertyPanel->setDisplayUnit(m_hRuler->unit(), newDpi);
-    }
+    m_undoStack->push(new CanvasResizeCommand(canvas, oldSizePx, newSizePx,
+                                              m_pView->scene()));
 
     m_hRuler->updateRuler();
     m_vRuler->updateRuler();

@@ -89,6 +89,7 @@ void ImageArrangementDialog::setFilePaths(const QStringList &paths)
     // 清除旧的 FileInfoWidget
     qDeleteAll(m_lstFileInfoWidget);
     m_lstFileInfoWidget.clear();
+    m_dpiGroups.clear();
 
     // 清除旧的 radio button 分组
     for (auto *btn : m_radioGroup->buttons())
@@ -104,6 +105,23 @@ void ImageArrangementDialog::setFilePaths(const QStringList &paths)
     m_dpiWatcher->setFuture(QtConcurrent::mapped(paths, getTiffDpi));
 }
 
+void ImageArrangementDialog::setCanvasDpi(int dpi)
+{
+    m_canvasDpi = dpi;
+}
+
+int ImageArrangementDialog::selectedGroupDpi() const
+{
+    for (int i = 0; i < m_lstFileInfoWidget.size(); ++i) {
+        if (m_lstFileInfoWidget[i]->radioButton()->isChecked()) {
+            if (i < m_dpiGroups.size() && m_dpiGroups[i].type == fitSuccess)
+                return m_dpiGroups[i].dpi.first;
+            return 0;
+        }
+    }
+    return 0;
+}
+
 void ImageArrangementDialog::onDpiFinished()
 {
     // 移除加载提示，启用 OK 按钮
@@ -116,13 +134,13 @@ void ImageArrangementDialog::onDpiFinished()
     const auto results = m_dpiWatcher->future().results();
 
     // 按类型和 DPI 合并
-    QList<FileDpiInfo> mergedList;
+    m_dpiGroups.clear();
     for (const auto &info : results) {
         if (info.empty())
             continue;
 
         bool merged = false;
-        for (auto &existing : mergedList) {
+        for (auto &existing : m_dpiGroups) {
             int oldSize = existing.paths.size();
             existing += info;
             if (existing.paths.size() > oldSize) {
@@ -131,13 +149,15 @@ void ImageArrangementDialog::onDpiFinished()
             }
         }
         if (!merged)
-            mergedList.append(info);
+            m_dpiGroups.append(info);
     }
 
     // 创建 FileInfoWidget 并加入滚动区域
     QVBoxLayout *scrollLayout =
         qobject_cast<QVBoxLayout *>(ui->scrollContent->layout());
-    for (const auto &info : mergedList) {
+    int firstValidIndex = -1;
+    for (int i = 0; i < m_dpiGroups.size(); ++i) {
+        const auto &info = m_dpiGroups[i];
         if (info.empty())
             continue;
 
@@ -146,10 +166,23 @@ void ImageArrangementDialog::onDpiFinished()
         scrollLayout->addWidget(widget);
         m_lstFileInfoWidget.append(widget);
         m_radioGroup->addButton(widget->radioButton());
+
+        // 如果画布已有 DPI，禁用不匹配的组
+        if (m_canvasDpi > 0 && info.type == fitSuccess &&
+            info.dpi.first != m_canvasDpi) {
+            widget->radioButton()->setEnabled(false);
+            widget->radioButton()->setToolTip(
+                tr("Canvas DPI is %1, this group is %2 DPI")
+                    .arg(m_canvasDpi).arg(info.dpi.first));
+        } else if (firstValidIndex < 0) {
+            firstValidIndex = m_lstFileInfoWidget.size() - 1;
+        }
     }
 
-    // 默认选中第一个
-    if (!m_lstFileInfoWidget.isEmpty())
+    // 默认选中第一个匹配的组
+    if (firstValidIndex >= 0)
+        m_lstFileInfoWidget[firstValidIndex]->radioButton()->setChecked(true);
+    else if (!m_lstFileInfoWidget.isEmpty())
         m_lstFileInfoWidget.first()->radioButton()->setChecked(true);
 }
 

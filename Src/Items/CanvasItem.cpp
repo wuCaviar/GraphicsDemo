@@ -2,7 +2,7 @@
 #include <QPainter>
 
 CanvasItem::CanvasItem(QGraphicsItem *parent)
-    : QGraphicsRectItem(QRectF(0, 0, 793.7, 1122.5), parent) // A4 默认 210x297mm @96dpi
+    : QGraphicsRectItem(QRectF(0, 0, 210, 297), parent) // A4 默认 210x297mm（无 DPI 时 1mm = 1 scene unit）
 {
     setFlag(ItemIsSelectable, false);
     setFlag(ItemIsMovable, false);
@@ -30,7 +30,20 @@ void CanvasItem::setCanvasSize(const QSizeF &size)
 
 void CanvasItem::setPpi(qreal ppi)
 {
-    m_ppi = qBound(1.0, ppi, 9999.0);
+    m_ppi = (ppi <= 0.0) ? 0.0 : qBound(1.0, ppi, 9999.0);
+}
+
+void CanvasItem::setCanvasSizeMm(const QSizeF &sizeMm)
+{
+    qreal k = pixelsPerMm();
+    setRect(QRectF(0, 0, sizeMm.width() * k, sizeMm.height() * k));
+}
+
+QSizeF CanvasItem::canvasSizeMm() const
+{
+    qreal k = pixelsPerMm();
+    QSizeF sz = rect().size();
+    return QSizeF(sz.width() / k, sz.height() / k);
 }
 
 QSizeF CanvasItem::canvasSize() const

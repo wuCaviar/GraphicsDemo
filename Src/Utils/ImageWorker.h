@@ -60,6 +60,8 @@ struct ImportWorkerResult
 {
     QPixmap pixmap;
     QString path;
+    int dpiX = 0; // TIFF 图片的 X DPI（非 TIFF 或无 DPI 信息时为 0）
+    int dpiY = 0; // TIFF 图片的 Y DPI
 
     bool isValid() const { return !pixmap.isNull(); }
 

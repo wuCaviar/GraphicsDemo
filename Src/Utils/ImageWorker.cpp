@@ -72,17 +72,32 @@ ImportWorkerResult runImportWorker(const QString &filePath)
     ImportWorkerResult result;
     result.path = filePath;
 
-    QImageReader reader(filePath);
-    reader.setAutoTransform(true);
-    reader.setAllocationLimit(0);
-    QImage image = reader.read();
+    if (ImageUtils::isTiffFile(filePath)) {
+        // TIFF 文件：使用 libtiff 加载，可获取 DPI
+        QPair<int, int> dpi;
+        QImage image = ImageUtils::loadTiffImage(filePath, &dpi);
+        if (image.isNull()) {
+            result.errorMessage = QString("Failed to load TIFF: %1").arg(filePath);
+            return result;
+        }
+        result.pixmap = QPixmap::fromImage(image);
+        result.dpiX = dpi.first;
+        result.dpiY = dpi.second;
+    } else {
+        // 非 TIFF 文件：使用 QImageReader，无嵌入 DPI 信息
+        QImageReader reader(filePath);
+        reader.setAutoTransform(true);
+        reader.setAllocationLimit(0);
+        QImage image = reader.read();
 
-    if (image.isNull()) {
-        result.errorMessage = QString("Failed to load image: %1").arg(filePath);
-        return result;
+        if (image.isNull()) {
+            result.errorMessage = QString("Failed to load image: %1").arg(filePath);
+            return result;
+        }
+        result.pixmap = QPixmap::fromImage(image);
+        // dpiX/dpiY 保持 0，调用方处理为默认 72
     }
 
-    result.pixmap = QPixmap::fromImage(image);
     return result;
 }
 

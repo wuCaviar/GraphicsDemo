@@ -15,8 +15,7 @@ class NewFileDialog : public QDialog
 public:
     explicit NewFileDialog(QWidget *parent = nullptr);
 
-    QSizeF selectedSize() const;
-    qreal selectedPpi() const;
+    QSizeF selectedSize() const; // 返回 mm 尺寸
     QString selectedPresetName() const;
 
 private slots:
@@ -28,7 +27,6 @@ private:
     QComboBox *m_presetCombo = nullptr;
     QDoubleSpinBox *m_widthSpin = nullptr;
     QDoubleSpinBox *m_heightSpin = nullptr;
-    QComboBox *m_ppiCombo = nullptr;
 };
 
 #endif // NEWFILEDIALOG_H

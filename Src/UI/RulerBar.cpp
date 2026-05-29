@@ -47,23 +47,9 @@ void RulerBar::setGraphicsView(QGraphicsView *view)
     updateRuler();
 }
 
-void RulerBar::setRulerUnit(qreal pixelsPerUnit)
-{
-    m_pixelsPerUnit = qMax(0.01, pixelsPerUnit);
-    update();
-}
-
-void RulerBar::setUnit(RulerUnit unit)
-{
-    if (m_unit == unit)
-        return;
-    m_unit = unit;
-    update();
-}
-
 void RulerBar::setPpi(qreal ppi)
 {
-    m_ppi = qBound(1.0, ppi, 9999.0);
+    m_ppi = (ppi <= 0.0) ? 0.0 : qBound(1.0, ppi, 9999.0);
     update();
 }
 
@@ -110,9 +96,7 @@ void RulerBar::setMousePosition(const QPointF &scenePos)
 
 qreal RulerBar::toDisplayValue(qreal scenePixels) const
 {
-    if (m_unit == Millimeter)
-        return scenePixels / (m_ppi / 25.4);
-    return scenePixels;
+    return scenePixels / pixelsPerMm();
 }
 
 qreal RulerBar::sceneToScreen(qreal scenePos) const
@@ -125,54 +109,39 @@ qreal RulerBar::sceneToScreen(qreal scenePos) const
 
 void RulerBar::calcInterval(qreal &interval, qreal &subInterval) const
 {
-    // 目标主刻度屏幕间距：80px，保证标签不重叠
     static constexpr qreal kTargetSpacing = 80.0;
 
-    if (m_unit == Pixel) {
-        // px 模式：根据当前缩放动态选择 1-2-5 序列的刻度间隔
-        qreal idealInterval = kTargetSpacing / m_scale;
-        interval = roundToNiceNumber(idealInterval);
-        subInterval = interval / 5.0;
-    } else {
-        // mm 模式：先计算 mm 单位的间隔，再转换为场景像素
-        const qreal pixelsPerMm = m_ppi / 25.4;
-        const qreal mmScreenPx = pixelsPerMm * m_scale;
-        const qreal idealMm = kTargetSpacing / mmScreenPx;
-        const qreal intervalMm = roundToNiceNumber(idealMm);
+    const qreal ppm = pixelsPerMm();
+    const qreal mmScreenPx = ppm * m_scale;
+    const qreal idealMm = kTargetSpacing / mmScreenPx;
+    const qreal intervalMm = roundToNiceNumber(idealMm);
 
-        // 次刻度间隔（mm 单位）
-        qreal subMm;
-        qreal intPart;
-        qreal frac = std::modf(intervalMm, &intPart);
-        if (qFuzzyCompare(frac, 0.0)) {
-            int n = qRound(intPart);
-            if (n % 5 == 0)
-                subMm = intervalMm / 5.0;
-            else if (n % 2 == 0)
-                subMm = intervalMm / 4.0;
-            else
-                subMm = intervalMm / 5.0;
-        } else {
+    qreal subMm;
+    qreal intPart;
+    qreal frac = std::modf(intervalMm, &intPart);
+    if (qFuzzyCompare(frac, 0.0)) {
+        int n = qRound(intPart);
+        if (n % 5 == 0)
             subMm = intervalMm / 5.0;
-        }
-
-        interval = intervalMm * pixelsPerMm;
-        subInterval = subMm * pixelsPerMm;
+        else if (n % 2 == 0)
+            subMm = intervalMm / 4.0;
+        else
+            subMm = intervalMm / 5.0;
+    } else {
+        subMm = intervalMm / 5.0;
     }
+
+    interval = intervalMm * ppm;
+    subInterval = subMm * ppm;
 }
 
 QString RulerBar::formatLabel(qreal value) const
 {
-    if (m_unit == Millimeter) {
-        // mm 模式：智能格式化
-        if (qFuzzyCompare(value, qRound(value)))
-            return QString::number(qRound(value));
-        if (qAbs(value) >= 1.0)
-            return QString::number(value, 'f', 1);
-        return QString::number(value, 'f', 2);
-    }
-    // px 模式：整数
-    return QString::number(qRound(value));
+    if (qFuzzyCompare(value, qRound(value)))
+        return QString::number(qRound(value));
+    if (qAbs(value) >= 1.0)
+        return QString::number(value, 'f', 1);
+    return QString::number(value, 'f', 2);
 }
 
 void RulerBar::paintEvent(QPaintEvent *)
@@ -263,7 +232,7 @@ void RulerBar::paintEvent(QPaintEvent *)
         painter.setPen(QColor(140, 140, 140));
         QFont unitFont("SF Pro Display", 7);
         painter.setFont(unitFont);
-        QString unitLabel = (m_unit == Millimeter) ? QStringLiteral("mm") : QStringLiteral("px");
+        QString unitLabel = QStringLiteral("mm");
         painter.drawText(QRectF(width() - 24, kRulerSize - 14, 22, 12),
                          Qt::AlignRight | Qt::AlignBottom, unitLabel);
 
@@ -339,7 +308,7 @@ void RulerBar::paintEvent(QPaintEvent *)
         painter.setPen(QColor(140, 140, 140));
         QFont unitFont("SF Pro Display", 7);
         painter.setFont(unitFont);
-        QString unitLabel = (m_unit == Millimeter) ? QStringLiteral("mm") : QStringLiteral("px");
+        QString unitLabel = QStringLiteral("mm");
         painter.save();
         painter.translate(10, height() - 4);
         painter.rotate(-90);

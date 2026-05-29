@@ -30,10 +30,9 @@ PropertyPanel::PropertyPanel(QWidget *parent) : QDockWidget(tr("Properties"), pa
     setupUI();
 }
 
-void PropertyPanel::setDisplayUnit(RulerBar::RulerUnit unit, qreal ppi)
+void PropertyPanel::setPpi(qreal ppi)
 {
-    m_displayUnit = unit;
-    m_ppi = ppi;
+    m_ppi = (ppi <= 0.0) ? 0.0 : ppi;
     if (m_currentItem)
         updatePanel();
 }
@@ -517,25 +516,24 @@ void PropertyPanel::updatePanel()
         if (corners[i].y() > maxY) maxY = corners[i].y();
     }
 
-    // 根据显示单位设置后缀并转换值
-    bool isMm = (m_displayUnit == RulerBar::Millimeter);
-    qreal kPxToMm = 25.4 / m_ppi;
-    QString suffix = isMm ? QStringLiteral(" mm") : QStringLiteral(" px");
-    m_xSpin->setSuffix(suffix);
-    m_ySpin->setSuffix(suffix);
-    m_wSpin->setSuffix(suffix);
-    m_hSpin->setSuffix(suffix);
+    // 始终以 mm 显示（无 DPI 时 pixelsPerMm=1.0）
+    qreal ppm = (m_ppi > 0.0) ? (m_ppi / 25.4) : 1.0;
+    qreal kPxToMm = 1.0 / ppm;
+    m_xSpin->setSuffix(QStringLiteral(" mm"));
+    m_ySpin->setSuffix(QStringLiteral(" mm"));
+    m_wSpin->setSuffix(QStringLiteral(" mm"));
+    m_hSpin->setSuffix(QStringLiteral(" mm"));
 
-    m_xSpin->setValue(isMm ? minX * kPxToMm : minX);
-    m_ySpin->setValue(isMm ? minY * kPxToMm : minY);
+    m_xSpin->setValue(minX * kPxToMm);
+    m_ySpin->setValue(minY * kPxToMm);
 
     // 判断 W/H 是否可编辑：支持 setGeometryRect 的图元
     bool canResizeRect = gi->supportsSetGeometryRect();
     m_wSpin->setReadOnly(!canResizeRect);
     m_hSpin->setReadOnly(!canResizeRect);
 
-    m_wSpin->setValue(isMm ? (maxX - minX) * kPxToMm : (maxX - minX));
-    m_hSpin->setValue(isMm ? (maxY - minY) * kPxToMm : (maxY - minY));
+    m_wSpin->setValue((maxX - minX) * kPxToMm);
+    m_hSpin->setValue((maxY - minY) * kPxToMm);
 
     m_zValueSpin->setValue(m_currentItem->zValue());
 
@@ -887,14 +885,12 @@ void PropertyPanel::onGeometryChanged()
     qreal w = m_wSpin->value();
     qreal h = m_hSpin->value();
 
-    // 若为 mm 模式，转换回 px
-    if (m_displayUnit == RulerBar::Millimeter) {
-        qreal kMmToPx = m_ppi / 25.4;
-        x *= kMmToPx;
-        y *= kMmToPx;
-        w *= kMmToPx;
-        h *= kMmToPx;
-    }
+    // 始终从 mm 转回 scene px（无 DPI 时 pixelsPerMm=1.0）
+    qreal ppm = (m_ppi > 0.0) ? (m_ppi / 25.4) : 1.0;
+    x *= ppm;
+    y *= ppm;
+    w *= ppm;
+    h *= ppm;
 
     // 位置变更：X/Y 显示的是视觉包围盒的 minX/minY，需要转为 item 的 pos
     QRectF currentGeom = (gi->supportsGeometryRect()) ? gi->geometryRect() : m_currentItem->boundingRect();

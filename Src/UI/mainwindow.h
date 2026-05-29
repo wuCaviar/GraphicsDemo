@@ -117,6 +117,7 @@ private:
 
     void importSingleImage(const QStringList &paths);
     void importMultipleImages(const QStringList &paths);
+    void _applyImageDpi(int dpi); // 应用图片 DPI 到画布（首次设置时缩放所有图元）
 
     void copyItemsToClipboard(const QList<QGraphicsItem *> &items);
     QList<QGraphicsItem *> pasteItemsFromClipboard();
@@ -163,10 +164,6 @@ private:
 
     // 网格显示切换
     QAction *m_gridAction = nullptr;
-
-    // 刻度尺单位切换
-    QAction *m_rulerUnitPxAction = nullptr;
-    QAction *m_rulerUnitMmAction = nullptr;
 
     // 主题切换
     QAction *m_lightThemeAction = nullptr;

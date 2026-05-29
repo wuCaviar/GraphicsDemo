@@ -43,14 +43,6 @@ void NewFileDialog::setupUI()
     m_heightSpin->setSuffix(QStringLiteral(" mm"));
     formLayout->addRow(tr("Height:"), m_heightSpin);
 
-    // DPI 设置
-    m_ppiCombo = new QComboBox;
-    for (int dpi : kDpiValues)
-        m_ppiCombo->addItem(QString::number(dpi) + tr(" dpi"), dpi);
-    m_ppiCombo->setCurrentIndex(2); // 默认 300 dpi
-    m_ppiCombo->setToolTip(tr("Pixels Per Inch — affects mm↔px conversion"));
-    formLayout->addRow(tr("Resolution:"), m_ppiCombo);
-
     mainLayout->addWidget(group);
 
     // 按钮
@@ -89,14 +81,8 @@ void NewFileDialog::onPresetChanged(int index)
 
 QSizeF NewFileDialog::selectedSize() const
 {
-    // 将 mm 转为 px（基于用户设定的 PPI）
-    qreal mmToPx = m_ppiCombo->currentData().toInt() / 25.4;
-    return QSizeF(m_widthSpin->value() * mmToPx, m_heightSpin->value() * mmToPx);
-}
-
-qreal NewFileDialog::selectedPpi() const
-{
-    return m_ppiCombo->currentData().toInt();
+    // 直接返回 mm 尺寸（不再转换为 px）
+    return QSizeF(m_widthSpin->value(), m_heightSpin->value());
 }
 
 QString NewFileDialog::selectedPresetName() const
