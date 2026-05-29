@@ -512,14 +512,16 @@ void GroupItemsCommand::redo()
     // 设置组的位置
     grp->setPos(m_groupPos);
 
+    // 先将组添加到场景，确保 addToGroup 时场景坐标变换链正确
+    if (!grp->scene())
+        m_scene->addItem(grp);
+
     // 将子图元从场景中移除并加入组
     for (auto *child : m_children) {
         if (child)
             grp->addChildFromScene(child);
     }
 
-    // 将组添加到场景
-    m_scene->addItem(grp);
     m_owned = false; // 组和子图元都在场景中
 }
 
@@ -570,6 +572,10 @@ void UngroupItemsCommand::undo()
     grp->setPos(m_groupPos);
     grp->setRotation(m_groupRotation);
 
+    // 先将组添加回场景，确保 addToGroup 时场景坐标变换链正确
+    if (!grp->scene())
+        m_scene->addItem(grp);
+
     // 将子图元从场景中移除，重新加入组
     for (auto *child : m_children) {
         if (child && child->scene())
@@ -577,8 +583,6 @@ void UngroupItemsCommand::undo()
         grp->addToGroup(child);
     }
 
-    // 将组添加回场景
-    m_scene->addItem(grp);
     m_owned = false; // 组和子图元都在场景中
 }
 

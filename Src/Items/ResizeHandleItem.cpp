@@ -6,6 +6,7 @@
 
 #include <QBrush>
 #include <QCursor>
+#include <QGraphicsItemGroup>
 #include <QGraphicsScene>
 #include <QGraphicsSceneHoverEvent>
 #include <QGraphicsSceneMouseEvent>
@@ -17,6 +18,20 @@
 const int ResizeHandleItem::kHandleSize;
 
 // ---- helpers using IGraphicsItem interface ----
+
+// 递归检查图元列表中是否包含图片图元（含成组内的图片）
+static bool containsImageItem(const QList<QGraphicsItem *> &items)
+{
+    for (auto *item : items) {
+        auto *igi = dynamic_cast<IGraphicsItem *>(item);
+        if (igi && !igi->isResizable())
+            return true;
+        auto *group = dynamic_cast<QGraphicsItemGroup *>(item);
+        if (group && containsImageItem(group->childItems()))
+            return true;
+    }
+    return false;
+}
 
 static QRectF getItemGeometry(QGraphicsItem *item)
 {
@@ -194,13 +209,21 @@ void ResizeHandleItem::updateHandlePositions()
     if (m_selectionPolygon.size() < 4)
         return;
 
-    // 单目标且不可缩放时，只显示选中框，不绘制缩放手柄
+    // 不可缩放时（含图片图元），只显示选中框，不绘制缩放手柄
+    bool shouldSuppressHandles = false;
     if (!isGroupMode() && m_target) {
         auto *igi = dynamic_cast<IGraphicsItem *>(m_target);
-        if (igi && !igi->isResizable()) {
-            update();
-            return;
-        }
+        if (igi && !igi->isResizable())
+            shouldSuppressHandles = true;
+        else if (containsImageItem({m_target}))
+            shouldSuppressHandles = true;
+    } else if (isGroupMode()) {
+        if (containsImageItem(m_targetItems))
+            shouldSuppressHandles = true;
+    }
+    if (shouldSuppressHandles) {
+        update();
+        return;
     }
 
     const QPointF &tl = m_selectionPolygon[0];
@@ -514,6 +537,10 @@ void ResizeHandleItem::applyResize(HandleRole role, const QPointF &scenePos)
 
 void ResizeHandleItem::applyGroupResize(HandleRole role, const QPointF &scenePos)
 {
+    // 包含图片图元时禁止组缩放
+    if (containsImageItem(m_targetItems))
+        return;
+
     QPointF delta = scenePos - m_pressPos;
 
     qreal left = m_originalGroupRect.left();
