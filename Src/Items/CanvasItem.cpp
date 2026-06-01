@@ -2,7 +2,7 @@
 #include <QPainter>
 
 CanvasItem::CanvasItem(QGraphicsItem *parent)
-    : QGraphicsRectItem(QRectF(0, 0, 210, 297), parent) // A4 默认 210x297mm（无 DPI 时 1mm = 1 scene unit）
+    : QGraphicsRectItem(QRectF(0, 0, 2480.0, 3508.0), parent) // A4 默认 210x297mm @300ppi
 {
     setFlag(ItemIsSelectable, false);
     setFlag(ItemIsMovable, false);
@@ -30,20 +30,40 @@ void CanvasItem::setCanvasSize(const QSizeF &size)
 
 void CanvasItem::setPpi(qreal ppi)
 {
-    m_ppi = (ppi <= 0.0) ? 0.0 : qBound(1.0, ppi, 9999.0);
+    m_ppi = qBound(1.0, ppi, 9999.0);
 }
 
-void CanvasItem::setCanvasSizeMm(const QSizeF &sizeMm)
+void CanvasItem::setCanvasDpi(int dpiX, int dpiY)
 {
-    qreal k = pixelsPerMm();
-    setRect(QRectF(0, 0, sizeMm.width() * k, sizeMm.height() * k));
+    m_canvasDpiX = dpiX;
+    m_canvasDpiY = dpiY;
+    updateEffectivePpi();
 }
 
-QSizeF CanvasItem::canvasSizeMm() const
+void CanvasItem::lockDpi()
 {
-    qreal k = pixelsPerMm();
-    QSizeF sz = rect().size();
-    return QSizeF(sz.width() / k, sz.height() / k);
+    m_dpiLocked = true;
+}
+
+void CanvasItem::unlockDpi()
+{
+    m_dpiLocked = false;
+    m_canvasDpiX = 0;
+    m_canvasDpiY = 0;
+}
+
+void CanvasItem::updateEffectivePpi()
+{
+    if (m_canvasDpiX > 0) {
+        m_ppi = static_cast<qreal>(m_canvasDpiX);
+    }
+    // m_canvasDpiX = 0 时保持 m_ppi 不变（使用默认 300 或已设置的值）
+}
+
+qreal CanvasItem::pixelsPerMm() const
+{
+    // 始终基于有效 PPI 返回换算因子
+    return m_ppi / 25.4;
 }
 
 QSizeF CanvasItem::canvasSize() const

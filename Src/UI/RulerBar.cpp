@@ -49,7 +49,7 @@ void RulerBar::setGraphicsView(QGraphicsView *view)
 
 void RulerBar::setPpi(qreal ppi)
 {
-    m_ppi = (ppi <= 0.0) ? 0.0 : qBound(1.0, ppi, 9999.0);
+    m_ppi = qBound(1.0, ppi, 9999.0);
     update();
 }
 
@@ -96,7 +96,8 @@ void RulerBar::setMousePosition(const QPointF &scenePos)
 
 qreal RulerBar::toDisplayValue(qreal scenePixels) const
 {
-    return scenePixels / pixelsPerMm();
+    // 始终返回 mm
+    return scenePixels / (m_ppi / 25.4);
 }
 
 qreal RulerBar::sceneToScreen(qreal scenePos) const
@@ -109,13 +110,16 @@ qreal RulerBar::sceneToScreen(qreal scenePos) const
 
 void RulerBar::calcInterval(qreal &interval, qreal &subInterval) const
 {
+    // 目标主刻度屏幕间距：80px，保证标签不重叠
     static constexpr qreal kTargetSpacing = 80.0;
 
-    const qreal ppm = pixelsPerMm();
-    const qreal mmScreenPx = ppm * m_scale;
+    // mm 模式：先计算 mm 单位的间隔，再转换为场景像素
+    const qreal pixelsPerMm = m_ppi / 25.4;
+    const qreal mmScreenPx = pixelsPerMm * m_scale;
     const qreal idealMm = kTargetSpacing / mmScreenPx;
     const qreal intervalMm = roundToNiceNumber(idealMm);
 
+    // 次刻度间隔（mm 单位）
     qreal subMm;
     qreal intPart;
     qreal frac = std::modf(intervalMm, &intPart);
@@ -131,12 +135,13 @@ void RulerBar::calcInterval(qreal &interval, qreal &subInterval) const
         subMm = intervalMm / 5.0;
     }
 
-    interval = intervalMm * ppm;
-    subInterval = subMm * ppm;
+    interval = intervalMm * pixelsPerMm;
+    subInterval = subMm * pixelsPerMm;
 }
 
 QString RulerBar::formatLabel(qreal value) const
 {
+    // mm 模式：智能格式化
     if (qFuzzyCompare(value, qRound(value)))
         return QString::number(qRound(value));
     if (qAbs(value) >= 1.0)

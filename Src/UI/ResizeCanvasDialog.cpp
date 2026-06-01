@@ -46,19 +46,17 @@ void ResizeCanvasDialog::setupUI()
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 }
 
-void ResizeCanvasDialog::setCurrentSize(const QSizeF &sizeMm, qreal currentDpi)
+void ResizeCanvasDialog::setCurrentSizeMM(const QSizeF &pixelSize, qreal ppi)
 {
-    m_widthSpin->setValue(sizeMm.width());
-    m_heightSpin->setValue(sizeMm.height());
-
-    if (currentDpi > 0) {
-        m_infoLabel->setText(tr("Current DPI: %1").arg(qRound(currentDpi)));
-    } else {
-        m_infoLabel->setText(tr("No DPI set (will be determined by imported images)"));
-    }
+    qreal factor = 25.4 / ppi;
+    m_widthSpin->setValue(pixelSize.width() * factor);
+    m_heightSpin->setValue(pixelSize.height() * factor);
+    m_infoLabel->setText(tr("PPI: %1")
+                             .arg(ppi, 0, 'f', 0));
 }
 
-QSizeF ResizeCanvasDialog::newSizeMm() const
+QSizeF ResizeCanvasDialog::newPixelSize(qreal ppi) const
 {
-    return QSizeF(m_widthSpin->value(), m_heightSpin->value());
+    qreal factor = ppi / 25.4;
+    return QSizeF(m_widthSpin->value() * factor, m_heightSpin->value() * factor);
 }

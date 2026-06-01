@@ -53,6 +53,19 @@ static QPair<int, int> getTiffDpi(TIFF *tif)
     return qMakePair(72, 72);
 }
 
+// 轻量级读取 TIFF DPI 标签（不解码图像数据）
+QPair<int, int> readTiffDpi(const QString &path)
+{
+    QByteArray array = path.toLocal8Bit();
+    TIFF *tif = TIFFOpen(array.data(), "r");
+    if (!tif)
+        return { 0, 0 };
+
+    QPair<int, int> dpi = getTiffDpi(tif);
+    TIFFClose(tif);
+    return dpi;
+}
+
 // 使用 libtiff 解码 TIFF 为显示用 QImage（线程安全）
 // 支持 CMYK（LCMS2 批量转换 → RGB）、RGB/RGBA/灰度/16-bit/压缩/tiled 等
 QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)
@@ -60,7 +73,7 @@ QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)
     QByteArray array = path.toLocal8Bit();
     TIFF *tif = TIFFOpen(array.data(), "r");
     if (!tif)
-        return {};
+        return { };
 
     uint32_t width = 0, height = 0;
     TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
@@ -69,7 +82,7 @@ QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)
     if (width == 0 || height == 0 || width > 50000 || height > 50000) {
         qWarning("TIFF invalid/large dimensions: %u x %u", width, height);
         TIFFClose(tif);
-        return {};
+        return { };
     }
 
     if (dpi)
@@ -95,7 +108,7 @@ QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)
         if (bitsPerSample != 8) {
             qWarning("Unsupported CMYK TIFF bit depth: %u", bitsPerSample);
             TIFFClose(tif);
-            return {};
+            return { };
         }
 
         // 先读取全部 CMYK 数据到内存
@@ -106,7 +119,7 @@ QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)
         tdata_t scanBuf = _TIFFmalloc(scanlineSize);
         if (!scanBuf) {
             TIFFClose(tif);
-            return {};
+            return { };
         }
 
         if (planarConfig == PLANARCONFIG_CONTIG) {
@@ -172,13 +185,13 @@ QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)
             _TIFFmalloc(width * height * sizeof(uint32_t)));
         if (!raster) {
             TIFFClose(tif);
-            return {};
+            return { };
         }
 
         if (!TIFFReadRGBAImage(tif, width, height, raster, 0)) {
             _TIFFfree(raster);
             TIFFClose(tif);
-            return {};
+            return { };
         }
 
         result = QImage(width, height, QImage::Format_ARGB32);

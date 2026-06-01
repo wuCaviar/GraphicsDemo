@@ -37,6 +37,15 @@ QGraphicsItem *TextItem::cloneItem() const
     item->setTransformOriginPoint(transformOriginPoint());
     if (m_rect.isValid())
         item->setRect(m_rect);
+    // 复制 CMYK 颜色存储
+    if (m_penCmyk.valid)
+        item->setItemPenCmyk(m_penCmyk.c, m_penCmyk.m, m_penCmyk.y,
+                             m_penCmyk.k);
+    if (m_brushCmyk.valid)
+        item->setItemBrushCmyk(m_brushCmyk.c, m_brushCmyk.m, m_brushCmyk.y,
+                               m_brushCmyk.k);
+    if (!m_gradientCmyk.isEmpty())
+        item->setGradientStopCmykMap(m_gradientCmyk);
     return item;
 }
 
@@ -50,7 +59,10 @@ void TextItem::setItemPen(const QPen &pen)
     setDefaultTextColor(pen.color());
 }
 
-QBrush TextItem::itemBrush() const { return m_bgBrush; }
+QBrush TextItem::itemBrush() const
+{
+    return m_bgBrush;
+}
 
 void TextItem::setItemBrush(const QBrush &brush)
 {
@@ -58,7 +70,10 @@ void TextItem::setItemBrush(const QBrush &brush)
     update();
 }
 
-QString TextItem::text() const { return toPlainText(); }
+QString TextItem::text() const
+{
+    return toPlainText();
+}
 
 void TextItem::setText(const QString &t)
 {
@@ -74,7 +89,10 @@ void TextItem::setText(const QString &t)
     }
 }
 
-QFont TextItem::itemFont() const { return font(); }
+QFont TextItem::itemFont() const
+{
+    return font();
+}
 
 void TextItem::setItemFont(const QFont &f)
 {
@@ -136,13 +154,15 @@ void TextItem::enableEditing(bool on)
     }
 }
 
-void TextItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+void TextItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
+                     QWidget *widget)
 {
     // 先绘制背景
     if (m_bgBrush != Qt::NoBrush) {
         painter->setPen(Qt::NoPen);
         QRectF bgRect = boundingRect();
-        painter->setBrush(ColorUtils::mapGradientBrushToRect(m_bgBrush, bgRect));
+        painter->setBrush(
+            ColorUtils::mapGradientBrushToRect(m_bgBrush, bgRect));
         painter->drawRect(bgRect);
     }
 
@@ -167,8 +187,8 @@ void TextItem::focusOutEvent(QFocusEvent *event)
 
 void TextItem::serialize(QDataStream &out) const
 {
-    out << toPlainText() << defaultTextColor() << font() << m_bgBrush << pos() << rotation()
-        << m_rect;
+    out << toPlainText() << defaultTextColor() << font() << m_bgBrush << pos()
+        << rotation() << m_rect;
     writeCmykIfValid(out, m_penCmyk);
     writeCmykIfValid(out, m_brushCmyk);
     writeGradientCmykIfValid(out, m_gradientCmyk);

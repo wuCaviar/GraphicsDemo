@@ -24,6 +24,8 @@ class QToolBar;
 class QToolButton;
 class AlignLayoutDialog;
 
+class TiffExportEngine;
+
 namespace Ui {
 class MainWindow;
 }
@@ -117,7 +119,11 @@ private:
 
     void importSingleImage(const QStringList &paths);
     void importMultipleImages(const QStringList &paths);
-    void _applyImageDpi(int dpi); // 应用图片 DPI 到画布（首次设置时缩放所有图元）
+
+    // DPI 管理
+    bool _tryLockCanvasDpi(int dpiX,
+                           int dpiY); // 尝试锁定画布 DPI，返回是否允许导入
+    void _unlockCanvasDpiIfNoImages(); // 画布无图片时解除 DPI 锁定
 
     void copyItemsToClipboard(const QList<QGraphicsItem *> &items);
     QList<QGraphicsItem *> pasteItemsFromClipboard();
@@ -140,13 +146,14 @@ private:
 
     NetWorkUtils *m_pNetWorkUtils = nullptr;
 
-    bool m_exporting = false; // 防止重复导出
+    TiffExportEngine *m_tiffEngine = nullptr; // TIFF 导出模块
+    QString m_exportTaskId; // 当前导出进度任务 ID
 
     QString m_currentProjectPath; // 当前工程文件路径，空表示未保存
     bool m_projectModified = false; // 工程文件是否已修改（未保存）
 
     ImageUtils::ImageImportPipeline m_importSinglePipeline; // 单图导入处理管线
-    ImageUtils::ImageImportPipeline m_importMultiPipeline;  // 批量导入处理管线
+    ImageUtils::ImageImportPipeline m_importMultiPipeline; // 批量导入处理管线
 
     QAction *m_undoAction = nullptr;
     QAction *m_redoAction = nullptr;

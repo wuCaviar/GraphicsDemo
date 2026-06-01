@@ -76,10 +76,8 @@ public:
     ~ImageArrangementDialog();
 
     void setFilePaths(const QStringList &paths);
-    void setCanvasDpi(int dpi); // 设置当前画布 DPI，用于过滤不匹配的图片组
     ImageArrangement arrangement() const;
     QStringList orderedPaths() const;
-    int selectedGroupDpi() const; // 返回选中组的 DPI
 
 private:
     void onDpiFinished();
@@ -89,8 +87,6 @@ private:
     QButtonGroup *m_radioGroup;
     QList<FileInfoWidget *> m_lstFileInfoWidget;
     QLabel *m_loadingLabel = nullptr;
-    int m_canvasDpi = 0; // 当前画布 DPI（0 表示无）
-    QList<FileDpiInfo> m_dpiGroups; // 缓存 DPI 分组结果
 };
 
 #endif // IMAGEARRANGEMENTDIALOG_H

@@ -60,8 +60,8 @@ struct ImportWorkerResult
 {
     QPixmap pixmap;
     QString path;
-    int dpiX = 0; // TIFF 图片的 X DPI（非 TIFF 或无 DPI 信息时为 0）
-    int dpiY = 0; // TIFF 图片的 Y DPI
+    int dpiX = 0; // 图片 X 方向 DPI（仅 TIFF 有效，非 TIFF 为 0）
+    int dpiY = 0; // 图片 Y 方向 DPI
 
     bool isValid() const { return !pixmap.isNull(); }
 
@@ -89,7 +89,7 @@ struct TiffExportSettings
 {
     int dpi = 300;
     uint16_t compression = COMPRESSION_LZW; // libtiff compression constant
-    QString iccProfilePath;                   // empty = use built-in default
+    QString iccProfilePath; // empty = use built-in default
 };
 
 // ========== 源 TIFF 输入描述 ==========
@@ -112,14 +112,21 @@ struct CmykOverlay
     int zOrder = 0;
 };
 
-// ========== 统一 TIFF 导出 ==========
+// ========== RGB → CMYK fallback 转换 ==========
 
-// 并行读取所有源 TIFF 的像素数据（自动处理不同色域和压缩方式，统一转换为 CMYK），
-// 按 z-order 合成为一张输出 TIFF。所有 tag 值来自 TiffExportSettings，不从源 TIFF 复制。
-// overlays: 预先渲染好的 CMYK 图层（如矢量图元），与 TIFF 源一起按 z-order 合成。
+// 不使用 LCMS2 时的简单数学转换，用于 fallback 路径。
+// 输入: bgra[4*pixelCount] (B,G,R,A)，输出: cmyk[4*pixelCount] (C,M,Y,K)
+// 透明像素应先由调用方处理（A=0 的像素应跳过或清零输出）。
+// 注意：此函数不涉及 LCMS2，可在任意线程安全调用。
+void bgraToCmykFallback(const uint8_t *bgra, uint8_t *cmyk, int pixelCount);
+
+// ========== 统一 TIFF 导出 (Legacy — 全缓冲模式) ==========
+
+// [DEPRECATED] 全缓冲实现，保留作为 StripPipeline 的验证参考路径。
+// 新代码应使用 StripPipeline::execute()。
 ExportWorkerResult exportTiff(const QString &outputPath,
                               const QList<SourceTiffInput> &sources,
-                              const QList<CmykOverlay> &overlays,
+                              QList<CmykOverlay> &&overlays,
                               const QSize &outputSize,
                               const TiffExportSettings &settings,
                               ProgressCallback progress = nullptr);

@@ -13,6 +13,9 @@ bool isTiffFile(const QString &path);
 QImage loadTiffImage(const QString &path, QPair<int, int> *dpi = nullptr,
                      bool *isCmyk = nullptr);
 
+// 轻量级读取 TIFF DPI 标签（不解码图像数据）
+QPair<int, int> readTiffDpi(const QString &path);
+
 } // namespace ImageUtils
 
 #endif // IMAGEUTILS_H

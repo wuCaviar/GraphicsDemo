@@ -18,23 +18,32 @@ public:
     void setCanvasSize(const QSizeF &size);
     QSizeF canvasSize() const;
 
+    // 画布 DPI（由导入图片确定）
+    void setCanvasDpi(int dpiX, int dpiY);
+    int canvasDpiX() const { return m_canvasDpiX; }
+    int canvasDpiY() const { return m_canvasDpiY; }
+    bool isDpiLocked() const { return m_dpiLocked; }
+    void lockDpi();
+    void unlockDpi();
+
+    // 兼容旧接口：设置显示用 PPI（内部用于标尺/状态栏换算）
     void setPpi(qreal ppi);
     qreal ppi() const { return m_ppi; }
-    bool hasDpi() const { return m_ppi > 0.0; }
 
-    // 1mm 对应的场景像素数（无 DPI 时返回 1.0，即 1mm = 1 scene unit）
-    qreal pixelsPerMm() const { return hasDpi() ? (m_ppi / 25.4) : 1.0; }
-
-    // mm 辅助方法
-    void setCanvasSizeMm(const QSizeF &sizeMm);
-    QSizeF canvasSizeMm() const;
+    // 1mm 对应的场景像素数（基于当前有效 PPI）
+    qreal pixelsPerMm() const;
 
 protected:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget) override;
 
 private:
-    qreal m_ppi = 0.0; // 0 表示尚未由图片确定 DPI
+    void updateEffectivePpi();
+
+    qreal m_ppi = 300.0;      // 有效显示 PPI（用于 mm↔px 换算）
+    int m_canvasDpiX = 0;      // 画布 X 方向 DPI，0 = 未确定
+    int m_canvasDpiY = 0;      // 画布 Y 方向 DPI，0 = 未确定
+    bool m_dpiLocked = false;  // DPI 是否锁定
 };
 
 #endif // CANVASITEM_H

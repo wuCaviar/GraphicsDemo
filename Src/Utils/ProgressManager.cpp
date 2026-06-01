@@ -3,11 +3,11 @@
 #include <QUuid>
 #include <QApplication>
 
-ProgressManager::ProgressManager(QObject *parent)
-    : QObject(parent)
+ProgressManager::ProgressManager(QObject *parent) : QObject(parent)
 {
     m_label = new QLabel(tr("Ready"));
     m_label->setMinimumWidth(80);
+    m_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
     m_bar = new QProgressBar();
     m_bar->setRange(0, 100);
@@ -130,7 +130,7 @@ bool ProgressManager::isActive() const
 QString ProgressManager::activeTaskName() const
 {
     if (m_taskStack.isEmpty())
-        return {};
+        return { };
     return m_tasks.value(m_taskStack.last()).name;
 }
 

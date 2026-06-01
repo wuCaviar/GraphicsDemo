@@ -116,7 +116,7 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     m_hSpacingSpin->setRange(0.0, 10000.0);
     m_hSpacingSpin->setSingleStep(1.0);
     m_hSpacingSpin->setDecimals(1);
-    m_hSpacingSpin->setSuffix(tr(" px"));
+    m_hSpacingSpin->setSuffix(QString());
     m_hSpacingSpin->setValue(s_hSpacing);
     m_hSpacingSpin->setToolTip(tr("Gap value for Custom Gap distribution"));
     hSpRow->addWidget(new QLabel(tr("Gap:"), container));
@@ -178,7 +178,7 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     m_vSpacingSpin->setRange(0.0, 10000.0);
     m_vSpacingSpin->setSingleStep(1.0);
     m_vSpacingSpin->setDecimals(1);
-    m_vSpacingSpin->setSuffix(tr(" px"));
+    m_vSpacingSpin->setSuffix(QString());
     m_vSpacingSpin->setValue(s_vSpacing);
     m_vSpacingSpin->setMaximumWidth(90);
     m_vSpacingSpin->setToolTip(tr("Gap value for Custom Gap distribution"));

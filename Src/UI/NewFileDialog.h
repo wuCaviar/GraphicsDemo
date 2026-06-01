@@ -15,7 +15,7 @@ class NewFileDialog : public QDialog
 public:
     explicit NewFileDialog(QWidget *parent = nullptr);
 
-    QSizeF selectedSize() const; // 返回 mm 尺寸
+    QSizeF selectedSizeMM() const;
     QString selectedPresetName() const;
 
 private slots:

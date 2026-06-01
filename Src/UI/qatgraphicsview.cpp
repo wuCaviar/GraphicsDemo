@@ -47,7 +47,7 @@ QAtGraphicsView::QAtGraphicsView(QWidget *parent) : QGraphicsView(parent)
     setResizeAnchor(AnchorUnderMouse);
 
     m_defaultPen = QPen(Qt::black, 1.0);
-    m_defaultBrush = QBrush(Qt::white);
+    m_defaultBrush = QBrush(Qt::black);
     m_defaultFont = QFont("Arial", 14);
 
     // 将 scene 的 selectionChanged 转发为 view 的 selectionChanged，

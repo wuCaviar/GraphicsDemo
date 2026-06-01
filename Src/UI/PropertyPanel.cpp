@@ -30,9 +30,9 @@ PropertyPanel::PropertyPanel(QWidget *parent) : QDockWidget(tr("Properties"), pa
     setupUI();
 }
 
-void PropertyPanel::setPpi(qreal ppi)
+void PropertyPanel::setDisplayPpi(qreal ppi)
 {
-    m_ppi = (ppi <= 0.0) ? 0.0 : ppi;
+    m_ppi = ppi;
     if (m_currentItem)
         updatePanel();
 }
@@ -516,13 +516,13 @@ void PropertyPanel::updatePanel()
         if (corners[i].y() > maxY) maxY = corners[i].y();
     }
 
-    // 始终以 mm 显示（无 DPI 时 pixelsPerMm=1.0）
-    qreal ppm = (m_ppi > 0.0) ? (m_ppi / 25.4) : 1.0;
-    qreal kPxToMm = 1.0 / ppm;
-    m_xSpin->setSuffix(QStringLiteral(" mm"));
-    m_ySpin->setSuffix(QStringLiteral(" mm"));
-    m_wSpin->setSuffix(QStringLiteral(" mm"));
-    m_hSpin->setSuffix(QStringLiteral(" mm"));
+    // 始终以 mm 显示
+    qreal kPxToMm = 25.4 / m_ppi;
+    QString suffix = QStringLiteral(" mm");
+    m_xSpin->setSuffix(suffix);
+    m_ySpin->setSuffix(suffix);
+    m_wSpin->setSuffix(suffix);
+    m_hSpin->setSuffix(suffix);
 
     m_xSpin->setValue(minX * kPxToMm);
     m_ySpin->setValue(minY * kPxToMm);
@@ -671,11 +671,12 @@ void PropertyPanel::updatePanel()
         QFileInfo fi(imgItem->filePath());
         m_imgFormatLabel->setText(fi.suffix().toUpper());
 
-        // 显示尺寸（画布上的当前尺寸）
+        // 显示尺寸（画布上的当前尺寸，mm）
         QSizeF displaySz = imgItem->geometryRect().size();
-        m_imgDisplaySizeLabel->setText(tr("%1 x %2 px")
-            .arg(qRound(displaySz.width()))
-            .arg(qRound(displaySz.height())));
+        qreal kPxToMm = 25.4 / m_ppi;
+        m_imgDisplaySizeLabel->setText(tr("%1 x %2 mm")
+            .arg(displaySz.width() * kPxToMm, 0, 'f', 1)
+            .arg(displaySz.height() * kPxToMm, 0, 'f', 1));
 
         // 原始尺寸
         // QSize origSz = imgItem->originalSize();
@@ -879,18 +880,18 @@ void PropertyPanel::onGeometryChanged()
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
     if (!gi) return;
 
-    // 读取用户输入值（可能是 mm 或 px）
+    // 读取用户输入值（始终 mm），转换回 px
     qreal x = m_xSpin->value();
     qreal y = m_ySpin->value();
     qreal w = m_wSpin->value();
     qreal h = m_hSpin->value();
 
-    // 始终从 mm 转回 scene px（无 DPI 时 pixelsPerMm=1.0）
-    qreal ppm = (m_ppi > 0.0) ? (m_ppi / 25.4) : 1.0;
-    x *= ppm;
-    y *= ppm;
-    w *= ppm;
-    h *= ppm;
+    // 始终 mm → px 转换
+    qreal kMmToPx = m_ppi / 25.4;
+    x *= kMmToPx;
+    y *= kMmToPx;
+    w *= kMmToPx;
+    h *= kMmToPx;
 
     // 位置变更：X/Y 显示的是视觉包围盒的 minX/minY，需要转为 item 的 pos
     QRectF currentGeom = (gi->supportsGeometryRect()) ? gi->geometryRect() : m_currentItem->boundingRect();

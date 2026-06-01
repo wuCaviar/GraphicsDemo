@@ -18,50 +18,50 @@ ColumnLimit: 80
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never
-ContinuationIndentWidth: 4          
-AccessModifierOffset: -4            # public:/private: 与 class 对齐
+ContinuationIndentWidth: 4
+AccessModifierOffset: -4 # public:/private: 与 class 对齐
 NamespaceIndentation: None
-IndentPPDirectives: AfterHash       
+IndentPPDirectives: AfterHash
 
 # ── 大括号 ────────────────────────────────────────────
 BreakBeforeBraces: Custom
 BraceWrapping:
   AfterClass: true
   AfterStruct: true
-  AfterEnum: true                   
+  AfterEnum: true
   AfterFunction: true
   AfterNamespace: false
-  AfterControlStatement: false      
+  AfterControlStatement: false
   BeforeCatch: false
   BeforeElse: false
   IndentBraces: false
-  SplitEmptyFunction: true          
-  SplitEmptyRecord: false           
-  SplitEmptyNamespace: true         
+  SplitEmptyFunction: true
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: true
 
 # ── 指针 & 引用 ───────────────────────────────────────
-PointerBindsToType: false           
-DerivePointerAlignment: false       
+PointerBindsToType: false
+DerivePointerAlignment: false
 
 # ── 模板 ──────────────────────────────────────────────
-SpaceAfterTemplateKeyword: false    
+SpaceAfterTemplateKeyword: false
 AlwaysBreakTemplateDeclarations: Yes
 
 # ── 构造 / 继承初始化列表 ─────────────────────────────
-BreakConstructorInitializers: BeforeComma       
-BreakInheritanceList: BeforeComma               
+BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: BeforeComma
 ConstructorInitializerIndentWidth: 4
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 
 # ── 操作符换行 ────────────────────────────────────────
-BreakBeforeBinaryOperators: NonAssignment       
-BreakBeforeTernaryOperators: true               
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeTernaryOperators: true
 
 # ── 空格 ──────────────────────────────────────────────
-SpaceBeforeParens: ControlStatements            
+SpaceBeforeParens: ControlStatements
 SpaceAfterCStyleCast: false
 SpaceBeforeAssignmentOperators: true
-SpaceBeforeCpp11BracedList: false               
+SpaceBeforeCpp11BracedList: false
 SpaceInEmptyParentheses: false
 SpacesInAngles: false
 SpacesInParentheses: false
@@ -70,20 +70,20 @@ SpacesInContainerLiterals: false
 SpacesInSquareBrackets: false
 
 # ── 对齐 ──────────────────────────────────────────────
-AlignAfterOpenBracket: Align        
-AlignOperands: true                 
-AlignTrailingComments: false        
-AlignConsecutiveAssignments: false  
-AlignConsecutiveDeclarations: false 
-AlignEscapedNewlines: Left          
+AlignAfterOpenBracket: Align
+AlignOperands: true
+AlignTrailingComments: false
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Left
 
 # ── 短语句 ────────────────────────────────────────────
-AllowShortFunctionsOnASingleLine: Inline        
-AllowShortIfStatementsOnASingleLine: false      
-AllowShortLoopsOnASingleLine: false             
-AllowShortBlocksOnASingleLine: false            
-AllowShortCaseLabelsOnASingleLine: false        
-AllowAllParametersOfDeclarationOnNextLine: true 
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowAllParametersOfDeclarationOnNextLine: true
 
 # ── 宏 ────────────────────────────────────────────────
 ForEachMacros:
@@ -96,26 +96,26 @@ ForEachMacros:
   - QBENCHMARK_ONCE
 
 # ── 注释 & 空行 ───────────────────────────────────────
-CommentPragmas: "^!|^:|^ SPDX-License-Identifier:"  
-ReflowComments: false                
+CommentPragmas: "^!|^:|^ SPDX-License-Identifier:"
+ReflowComments: false
 FixNamespaceComments: true
-MaxEmptyLinesToKeep: 1               
+MaxEmptyLinesToKeep: 1
 KeepEmptyLinesAtTheStartOfBlocks: false
 
 # ── #include 排序 ─────────────────────────────────────
-SortIncludes: false                  
-SortUsingDeclarations: true          
-IncludeBlocks: Preserve              
-IncludeCategories:                   # 即使 SortIncludes=false，仍保留分类供将来启用
+SortIncludes: false
+SortUsingDeclarations: true
+IncludeBlocks: Preserve
+IncludeCategories: # 即使 SortIncludes=false，仍保留分类供将来启用
   - Regex: '^"'
     Priority: 1
-  - Regex: '^<Q.*>'
+  - Regex: "^<Q.*>"
     Priority: 2
-  - Regex: '^<.*>'
+  - Regex: "^<.*>"
     Priority: 3
 
 # ── 其他 ──────────────────────────────────────────────
-CompactNamespaces: false             
+CompactNamespaces: false
 
 ---
 # Proto 文件使用 Google 风格

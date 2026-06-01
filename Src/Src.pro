@@ -26,6 +26,7 @@ HEADERS += \
     UI/FitCanvasDlg.h \
     UI/ImageArrangementDialog.h \
     UI/MergeTiffProcessor.h \
+    UI/TiffExportEngine.h \
     UI/mainwindow.h \
     UI/qatgraphicsview.h \
     UI/GraphicsScene.h \
@@ -53,6 +54,9 @@ HEADERS += \
     Commands/Commands.h \
     Utils/ImageUtils.h \
     Utils/ImageWorker.h \
+    Utils/ScopedTiffHandle.h \
+    Utils/SourceReader.h \
+    Utils/TiffExportPipeline.h \
     Utils/ProcessGuard.h \
     Utils/ProgressManager.h \
     Utils/ColorUtils.h \
@@ -76,6 +80,7 @@ SOURCES += \
     UI/FitCanvasDlg.cpp \
     UI/ImageArrangementDialog.cpp \
     UI/MergeTiffProcessor.cpp \
+    UI/TiffExportEngine.cpp \
     UI/mainwindow.cpp \
     UI/qatgraphicsview.cpp \
     UI/GraphicsScene.cpp \
@@ -102,6 +107,8 @@ SOURCES += \
     Commands/Commands.cpp \
     Utils/ImageUtils.cpp \
     Utils/ImageWorker.cpp \
+    Utils/SourceReader.cpp \
+    Utils/TiffExportPipeline.cpp \
     Utils/ProcessGuard.cpp \
     Utils/ProgressManager.cpp \
     Utils/ColorUtils.cpp \

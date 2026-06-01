@@ -48,7 +48,7 @@ void NetWorkUtils::doRipStatus()
 
 void NetWorkUtils::doWhileRipStatus()
 {
-    int id = QObject::startTimer(1000);
+    int id = QObject::startTimer(3000);
     m_timeoutFuncs.insert(id, [this]() { doRipStatus(); });
 }
 

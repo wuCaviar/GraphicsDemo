@@ -79,9 +79,9 @@ void NewFileDialog::onPresetChanged(int index)
     }
 }
 
-QSizeF NewFileDialog::selectedSize() const
+QSizeF NewFileDialog::selectedSizeMM() const
 {
-    // 直接返回 mm 尺寸（不再转换为 px）
+    // 直接返回 mm 尺寸
     return QSizeF(m_widthSpin->value(), m_heightSpin->value());
 }
 

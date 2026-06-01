@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QSizeF>
 
+class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
 
@@ -14,8 +15,8 @@ class ResizeCanvasDialog : public QDialog
 public:
     explicit ResizeCanvasDialog(QWidget *parent = nullptr);
 
-    void setCurrentSize(const QSizeF &sizeMm, qreal currentDpi);
-    QSizeF newSizeMm() const;
+    void setCurrentSizeMM(const QSizeF &pixelSize, qreal ppi);
+    QSizeF newPixelSize(qreal ppi) const;
 
 private:
     void setupUI();
