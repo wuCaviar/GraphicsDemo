@@ -1428,7 +1428,7 @@ void MainWindow::importSingleImage(const QStringList &paths)
                     }
                 }
 
-                auto *item = new ImageItem(result.pixmap);
+                auto *item = new ImageItem(result.pixmap, result.size);
                 item->setItemPen(QPen(Qt::NoPen));
                 item->setFilePath(result.path);
                 item->setOriginalSize(result.size);
@@ -1438,7 +1438,7 @@ void MainWindow::importSingleImage(const QStringList &paths)
                     item->setDpi(result.dpiX, result.dpiY);
 
                 item->setPos(0, *runningY);
-                *runningY += result.pixmap.height() + 10;
+                *runningY += result.size.height() + 10;
 
                 m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
                 importedItems->append(item);
@@ -1592,7 +1592,7 @@ void MainWindow::importMultipleImages(const QStringList &paths)
                     }
                 }
 
-                auto *item = new ImageItem(result.pixmap);
+                auto *item = new ImageItem(result.pixmap, result.size);
                 item->setItemPen(QPen(Qt::NoPen));
                 item->setFilePath(result.path);
                 item->setOriginalSize(result.size);
@@ -1603,10 +1603,10 @@ void MainWindow::importMultipleImages(const QStringList &paths)
 
                 if (arr == ArrangeHorizontal) {
                     item->setPos(*runningCoord, 0);
-                    *runningCoord += result.pixmap.width();
+                    *runningCoord += result.size.width();
                 } else {
                     item->setPos(0, *runningCoord);
-                    *runningCoord += result.pixmap.height();
+                    *runningCoord += result.size.height();
                 }
 
                 m_undoStack->push(new AddItemCommand(m_pView->scene(), item));

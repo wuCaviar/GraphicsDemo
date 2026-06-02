@@ -75,7 +75,6 @@ ImportWorkerResult runImportWorker(const QString &filePath)
     QImageReader reader(filePath);
     reader.setAutoTransform(true);
     reader.setAllocationLimit(0);
-    // reader.setScaledSize(reader.size() / 10);
     QImage image = reader.read();
 
     if (image.isNull()) {
@@ -91,6 +90,17 @@ ImportWorkerResult runImportWorker(const QString &filePath)
 
         QSize size = ImageUtils::readTiffSize(filePath);
         result.size = size;
+    }
+
+    // 生成缩略图：固定 1/4 缩放，减少内存占用
+    // 缩略图仅用于屏幕显示，物理尺寸通过 m_rect 保持与原图一致
+    // 导出时从磁盘重新读取原图，不受缩略图影响
+    constexpr int kThumbScaleDiv = 4;
+    if (image.width() > kThumbScaleDiv || image.height() > kThumbScaleDiv) {
+        QSize thumbSize(qMax(1, image.width() / kThumbScaleDiv),
+                        qMax(1, image.height() / kThumbScaleDiv));
+        image = image.scaled(thumbSize, Qt::IgnoreAspectRatio,
+                             Qt::SmoothTransformation);
     }
 
     result.pixmap = QPixmap::fromImage(image);

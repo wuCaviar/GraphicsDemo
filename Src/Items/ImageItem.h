@@ -12,6 +12,8 @@ public:
 
     explicit ImageItem(QGraphicsItem *parent = nullptr);
     ImageItem(const QPixmap &pixmap, QGraphicsItem *parent = nullptr);
+    ImageItem(const QPixmap &pixmap, const QSize &sourcePixelSize,
+              QGraphicsItem *parent = nullptr);
 
     int type() const override { return Type; }
 
@@ -40,6 +42,9 @@ public:
 
     // 重写 boundingRect 以返回 m_rect（若有）或原始图片尺寸
     QRectF boundingRect() const override;
+
+    // 重写 shape 使命中区域匹配 m_rect（缩略图模式下 pixmap 尺寸 < m_rect）
+    QPainterPath shape() const override;
 
     // 精确几何矩形 — 返回 m_rect 或原始图片包围
     QRectF geometryRect() const override;

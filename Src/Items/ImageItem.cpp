@@ -16,6 +16,15 @@ ImageItem::ImageItem(const QPixmap &pixmap, QGraphicsItem *parent)
         m_rect = QRectF(QPointF(0, 0), pixmap.size());
 }
 
+ImageItem::ImageItem(const QPixmap &pixmap, const QSize &sourcePixelSize,
+                     QGraphicsItem *parent)
+    : QGraphicsPixmapItem(pixmap, parent)
+{
+    setFlag(ItemIsSelectable, true);
+    setFlag(ItemIsMovable, true);
+    m_rect = QRectF(QPointF(0, 0), sourcePixelSize);
+}
+
 QGraphicsItem *ImageItem::cloneItem() const
 {
     auto *item = new ImageItem(pixmap());
@@ -57,10 +66,21 @@ QRectF ImageItem::geometryRect() const
     return boundingRect();
 }
 
+QPainterPath ImageItem::shape() const
+{
+    QPainterPath path;
+    path.addRect(boundingRect());
+    return path;
+}
+
 void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                       QWidget *widget)
 {
-    QGraphicsPixmapItem::paint(painter, option, widget);
+    Q_UNUSED(option);
+    Q_UNUSED(widget);
+    if (pixmap().isNull() || !m_rect.isValid())
+        return;
+    painter->drawPixmap(m_rect, pixmap(), pixmap().rect());
 }
 
 void ImageItem::serialize(QDataStream &out) const
