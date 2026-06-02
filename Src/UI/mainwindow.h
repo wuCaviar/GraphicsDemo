@@ -23,6 +23,7 @@ class QSlider;
 class QToolBar;
 class QToolButton;
 class AlignLayoutDialog;
+class TaskHistoryPopup;
 
 class TiffExportEngine;
 
@@ -181,6 +182,11 @@ private:
 
     // 通用进度管理器
     ProgressManager *m_pProgressMgr = nullptr;
+
+    // 任务历史按钮与弹窗
+    QToolButton *m_taskHistoryBtn = nullptr;
+    TaskHistoryPopup *m_taskHistoryPopup = nullptr;
+    void _toggleHistoryPopup();
 
     // 进程管理器
     ProcessGuard *m_pProcessGuard = nullptr;

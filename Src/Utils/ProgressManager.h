@@ -6,6 +6,8 @@
 #include <QLabel>
 #include <QMap>
 #include <QStringList>
+#include <QTimer>
+#include <QList>
 
 // 进度任务生命周期观察者接口 — 后续功能通过实现此接口监听进度事件
 class IProgressObserver
@@ -18,7 +20,7 @@ public:
     virtual void onAllTasksFinished() = 0;
 };
 
-// 通用进度条管理器 — 管理状态栏标签和进度条，支持多任务栈
+// 通用进度条管理器 — 管理状态栏标签和进度条，支持多任务栈与历史查询
 class ProgressManager : public QObject
 {
     Q_OBJECT
@@ -41,6 +43,25 @@ public:
     // 查询
     bool isActive() const;
     QString activeTaskName() const;
+    bool hasActiveTasks() const;
+    bool hasFinishedTasks() const;
+
+    // 焦点任务：允许状态栏显示非栈顶任务
+    void setFocusTask(const QString &taskId);
+    QString focusTaskId() const;
+    void clearFocus();
+
+    // 供弹窗查询的数据结构
+    struct TaskInfo
+    {
+        QString id;
+        QString name;
+        int value = 0;
+        int max = 100;
+        bool finished = false;
+    };
+    QList<TaskInfo> activeTaskList() const;
+    QList<TaskInfo> finishedTaskList() const;
 
     // 观察者扩展接口
     void addObserver(IProgressObserver *observer);
@@ -48,21 +69,34 @@ public:
 
 signals:
     void allTasksFinished();
+    void taskHistoryChanged(); // 弹窗刷新信号
+    void focusTaskChanged(); // 焦点切换信号
 
 private:
-    struct Task {
+    struct Task
+    {
         QString id;
         QString name;
         int max = 100;
         int value = 0;
     };
 
+    struct FinishedEntry
+    {
+        QString id;
+        QString name;
+        QTimer *expiryTimer = nullptr;
+    };
+
     void _updateDisplay();
+    void _removeFinishedEntry(const QString &taskId);
 
     QLabel *m_label = nullptr;
     QProgressBar *m_bar = nullptr;
     QMap<QString, Task> m_tasks;
-    QStringList m_taskStack; // first → most recent
+    QStringList m_taskStack;
+    QList<FinishedEntry> m_finishedHistory;
+    QString m_focusTaskId;
     QList<IProgressObserver *> m_observers;
 };
 

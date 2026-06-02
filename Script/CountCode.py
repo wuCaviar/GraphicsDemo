@@ -7,6 +7,7 @@ Qt/C++ 代码量统计工具
 
 import os
 import sys
+import unicodedata
 from collections import defaultdict
 
 # 需要统计的文件扩展名（Qt 常见类型）
@@ -14,6 +15,28 @@ CPP_EXTS = {'.cpp', '.cxx', '.cc', '.c', '.h', '.hpp', '.hxx', '.qml', '.ui', '.
 
 # 默认忽略的目录名
 IGNORE_DIRS = {'.git', 'build', 'debug', 'release', '__pycache__', 'node_modules', '3rdparty', 'third_party'}
+
+
+def str_display_width(s):
+    """计算字符串的终端显示宽度（中文/全角字符占 2 列）"""
+    w = 0
+    for ch in s:
+        if unicodedata.east_asian_width(ch) in ('F', 'W'):
+            w += 2
+        else:
+            w += 1
+    return w
+
+
+def ljust(s, width):
+    """左对齐，按显示宽度补齐空格"""
+    return s + ' ' * max(0, width - str_display_width(s))
+
+
+def rjust(s, width):
+    """右对齐，按显示宽度补齐空格"""
+    return ' ' * max(0, width - str_display_width(s)) + s
+
 
 def count_lines_in_file(filepath):
     """
@@ -31,33 +54,25 @@ def count_lines_in_file(filepath):
                 total += 1
                 stripped = line.strip()
 
-                # 空行
                 if not stripped:
                     blank += 1
                     continue
 
-                # 处理块注释
                 if in_block_comment:
                     comment += 1
                     if '*/' in stripped:
                         in_block_comment = False
                     continue
 
-                # 检查是否开始块注释
                 if '/*' in stripped:
                     comment += 1
                     if '*/' not in stripped:
                         in_block_comment = True
                     continue
 
-                # 单行注释 //
                 if stripped.startswith('//'):
                     comment += 1
                     continue
-
-                # 如果包含 // 但不是开头，算作代码（可能行尾注释，这里保守算代码）
-                # 我们只统计整行注释，不拆分混合行，以避免复杂化
-                # 剩下的都是代码行
     except Exception:
         return 0, 0, 0, 0
 
@@ -66,7 +81,6 @@ def count_lines_in_file(filepath):
 
 
 def main():
-    # 确定扫描根目录
     if len(sys.argv) > 1:
         root = sys.argv[1]
     else:
@@ -76,7 +90,6 @@ def main():
         print(f"错误：目录不存在 - {root}")
         sys.exit(1)
 
-    # 存储统计结果：扩展名 -> [文件数, 总行, 空行, 注释行, 代码行]
     stats = defaultdict(lambda: [0, 0, 0, 0, 0])
 
     total_files = 0
@@ -86,10 +99,26 @@ def main():
     total_code = 0
 
     print(f"正在扫描目录: {os.path.abspath(root)}")
-    print("-" * 70)
+
+    # 列宽定义
+    W_EXT = 10
+    W_NUM = 10
+
+    separator = '-' * (W_EXT + W_NUM * 5)
+    print(separator)
+
+    # 表头
+    print(
+        ljust('扩展名', W_EXT)
+        + rjust('文件数', W_NUM)
+        + rjust('总行数', W_NUM)
+        + rjust('空行数', W_NUM)
+        + rjust('注释行', W_NUM)
+        + rjust('代码行', W_NUM)
+    )
+    print(separator)
 
     for dirpath, dirnames, filenames in os.walk(root):
-        # 过滤忽略目录
         dirnames[:] = [d for d in dirnames if d not in IGNORE_DIRS]
 
         for filename in filenames:
@@ -100,7 +129,6 @@ def main():
             filepath = os.path.join(dirpath, filename)
             total, blank, comment, code = count_lines_in_file(filepath)
 
-            # 更新按扩展名的统计
             ext_stats = stats[ext]
             ext_stats[0] += 1
             ext_stats[1] += total
@@ -115,14 +143,26 @@ def main():
             total_code += code
 
     # 输出分类统计
-    print(f"{'扩展名':<10}{'文件数':>8}{'总行数':>10}{'空行数':>10}{'注释行':>10}{'代码行':>10}")
-    print("-" * 70)
     for ext in sorted(stats.keys()):
         files, t, b, c, code = stats[ext]
-        print(f"{ext:<10}{files:>8}{t:>10}{b:>10}{c:>10}{code:>10}")
+        print(
+            ljust(ext, W_EXT)
+            + rjust(str(files), W_NUM)
+            + rjust(str(t), W_NUM)
+            + rjust(str(b), W_NUM)
+            + rjust(str(c), W_NUM)
+            + rjust(str(code), W_NUM)
+        )
 
-    print("-" * 70)
-    print(f"{'合计':<10}{total_files:>8}{total_all:>10}{total_blank:>10}{total_comment:>10}{total_code:>10}")
+    print(separator)
+    print(
+        ljust('合计', W_EXT)
+        + rjust(str(total_files), W_NUM)
+        + rjust(str(total_all), W_NUM)
+        + rjust(str(total_blank), W_NUM)
+        + rjust(str(total_comment), W_NUM)
+        + rjust(str(total_code), W_NUM)
+    )
     print()
     if total_all > 0:
         code_percent = total_code / total_all * 100

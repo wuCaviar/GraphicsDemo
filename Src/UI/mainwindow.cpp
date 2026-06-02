@@ -25,6 +25,7 @@
 #include "RulerBar.h"
 #include "TextItem.h"
 #include "TiffExportEngine.h"
+#include "TaskHistoryPopup.h"
 #include "GraphicsItemGroup.h"
 #include "FitCanvasDlg.h"
 
@@ -64,6 +65,7 @@
 #include <QStatusBar>
 #include <QToolBar>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QThreadPool>
 
 static const char *kMimeFormat = "application/x-graphicsdemo-items";
@@ -501,7 +503,7 @@ void MainWindow::_initToolBar()
     actionGroup->setExclusive(true);
 
     auto addToolAction = [&](const QString &iconPath, const QString &text,
-                             Tool tool, const QString &shortcut = {}) {
+                             Tool tool, const QString &shortcut = { }) {
         QAction *act = drawBar->addAction(QIcon(iconPath), text);
         act->setCheckable(true);
         act->setToolTip(text);
@@ -753,7 +755,46 @@ void MainWindow::_initStatusBar()
 
     bar->addWidget(m_posLabel);
     bar->addPermanentWidget(createStatusSeparator(bar));
-    bar->addPermanentWidget(m_pProgressMgr->label());
+
+    // 任务历史按钮
+    m_taskHistoryBtn = new QToolButton;
+    m_taskHistoryBtn->setIcon(QIcon(":/icons/icons/task-history.svg"));
+    m_taskHistoryBtn->setIconSize(QSize(14, 14));
+    m_taskHistoryBtn->setAutoRaise(true);
+    m_taskHistoryBtn->setToolTip(tr("Task history"));
+    m_taskHistoryBtn->setEnabled(false);
+    connect(m_taskHistoryBtn, &QToolButton::clicked, this,
+            &MainWindow::_toggleHistoryPopup);
+
+    // 任务历史弹窗
+    m_taskHistoryPopup = new TaskHistoryPopup(this);
+    connect(m_taskHistoryPopup, &TaskHistoryPopup::taskClicked, this,
+            [this](const QString &taskId) {
+                m_pProgressMgr->setFocusTask(taskId);
+            });
+    connect(m_taskHistoryPopup, &TaskHistoryPopup::popupHidden, this,
+            [this]() { m_taskHistoryBtn->setChecked(false); });
+
+    // 弹窗数据刷新
+    connect(
+        m_pProgressMgr, &ProgressManager::taskHistoryChanged, this, [this]() {
+            m_taskHistoryBtn->setEnabled(m_pProgressMgr->hasActiveTasks()
+                                         || m_pProgressMgr->hasFinishedTasks());
+            if (m_taskHistoryPopup && m_taskHistoryPopup->isVisible())
+                m_taskHistoryPopup->refresh(m_pProgressMgr->activeTaskList(),
+                                            m_pProgressMgr->finishedTaskList());
+        });
+
+    // 按钮 + 标签紧凑布局
+    auto *taskContainer = new QWidget;
+    auto *taskLayout = new QHBoxLayout(taskContainer);
+    taskLayout->setContentsMargins(0, 0, 0, 0);
+    taskLayout->setSpacing(2);
+    taskLayout->addWidget(m_taskHistoryBtn);
+    taskLayout->addWidget(m_pProgressMgr->label());
+    taskContainer->setAttribute(Qt::WA_TranslucentBackground);
+
+    bar->addPermanentWidget(taskContainer);
     bar->addPermanentWidget(m_pProgressMgr->bar());
     bar->addPermanentWidget(createStatusSeparator(bar));
     bar->addPermanentWidget(m_zoomLabel);
@@ -956,13 +997,15 @@ void MainWindow::onNew()
     if (dlg.exec() != QDialog::Accepted)
         return;
 
+    QApplication::setOverrideCursor(Qt::WaitCursor);
     setEnabled(false); // 阻止用户在重置过程中操作界面
 
     // 获取 mm 尺寸，使用默认 PPI 300 转换为场景像素
     QSizeF sizeMM = dlg.selectedSizeMM();
     static constexpr qreal kDefaultPpi = 300.0;
     qreal mmToPx = kDefaultPpi / 25.4;
-    QSizeF canvasSize(sizeMM.width() * mmToPx, sizeMM.height() * mmToPx);
+    QSizeF canvasSize(std::ceil(sizeMM.width() * mmToPx),
+                      std::ceil(sizeMM.height() * mmToPx));
 
     // 先清空 undo 栈，避免命令引用即将被删除的图元
     m_undoStack->clear();
@@ -998,6 +1041,7 @@ void MainWindow::onNew()
     _updateCanvasLabel();
     _updatePosLabel(m_lastScenePos);
 
+    QApplication::restoreOverrideCursor();
     setEnabled(true);
 }
 
@@ -1248,9 +1292,35 @@ bool MainWindow::_tryLockCanvasDpi(int dpiX, int dpiY)
 
     if (!canvas->isDpiLocked()) {
         // DPI 未锁定：由当前图片确定并锁定
+        // 先算出当前物理 mm（在修改 DPI 前）
+        QSizeF oldSize = canvas->canvasSize();
+        qreal oldPpi = canvas->ppi();
+        qreal mmW = oldSize.width() / oldPpi * 25.4;
+        qreal mmH = oldSize.height() / oldPpi * 25.4;
+
         canvas->setCanvasDpi(dpiX, dpiY);
         canvas->setPpi(static_cast<qreal>(dpiX));
         canvas->lockDpi();
+
+        // 从物理 mm 反算新像素尺寸，保持物理毫米尺寸不变（ceil 保证整数边界）
+        qreal mmToPx = static_cast<qreal>(dpiX) / 25.4;
+        QSizeF newSize(std::ceil(mmW * mmToPx), std::ceil(mmH * mmToPx));
+        m_pView->setCanvasSize(newSize);
+
+        // 同步缩放非图片图元的像素尺寸和位置（factor = newPpi/oldPpi）
+        qreal factor = static_cast<qreal>(dpiX) / oldPpi;
+        if (!qFuzzyCompare(factor, 1.0)) {
+            const auto selectable =
+                ::filterSelectableItems(m_pView->scene()->items());
+            for (auto *item : selectable) {
+                if (dynamic_cast<ImageItem *>(item) || item->parentItem())
+                    continue;
+                item->setPos(item->pos() * factor);
+                item->setTransform(QTransform::fromScale(factor, factor)
+                                   * item->transform());
+            }
+        }
+
         m_hRuler->setPpi(static_cast<qreal>(dpiX));
         m_vRuler->setPpi(static_cast<qreal>(dpiX));
         m_pPropertyPanel->setDisplayPpi(static_cast<qreal>(dpiX));
@@ -1361,6 +1431,7 @@ void MainWindow::importSingleImage(const QStringList &paths)
                 auto *item = new ImageItem(result.pixmap);
                 item->setItemPen(QPen(Qt::NoPen));
                 item->setFilePath(result.path);
+                item->setOriginalSize(result.size);
 
                 // 设置图片 DPI 到 ImageItem
                 if (result.dpiX > 0 && result.dpiY > 0)
@@ -1524,6 +1595,7 @@ void MainWindow::importMultipleImages(const QStringList &paths)
                 auto *item = new ImageItem(result.pixmap);
                 item->setItemPen(QPen(Qt::NoPen));
                 item->setFilePath(result.path);
+                item->setOriginalSize(result.size);
 
                 // 设置图片 DPI
                 if (result.dpiX > 0 && result.dpiY > 0)
@@ -1659,6 +1731,48 @@ void MainWindow::onExportImage()
             if (!ok)
                 return; // 用户取消导出
             dpiOverride = chosen.toInt();
+        }
+    }
+
+    // 应用用户自定义 DPI 到画布（保持物理尺寸，但不锁定 DPI）
+    if (dpiOverride > 0) {
+        auto *canvas = m_pView->canvasItem();
+        if (canvas) {
+            // 先算出当前物理 mm（在修改 DPI 前）
+            QSizeF oldSize = canvas->canvasSize();
+            qreal oldPpi = canvas->ppi();
+            qreal mmW = oldSize.width() / oldPpi * 25.4;
+            qreal mmH = oldSize.height() / oldPpi * 25.4;
+
+            // 更新画布 DPI（不锁定）
+            canvas->setCanvasDpi(dpiOverride, dpiOverride);
+            canvas->setPpi(static_cast<qreal>(dpiOverride));
+
+            // 从物理 mm 反算新像素尺寸（ceil 保证整数边界，消除取整不一致）
+            qreal mmToPx = static_cast<qreal>(dpiOverride) / 25.4;
+            QSizeF newSize(std::ceil(mmW * mmToPx), std::ceil(mmH * mmToPx));
+            m_pView->setCanvasSize(newSize);
+
+            // 同步缩放非图片图元的像素尺寸和位置（factor = newPpi/oldPpi）
+            qreal factor = static_cast<qreal>(dpiOverride) / oldPpi;
+            if (!qFuzzyCompare(factor, 1.0)) {
+                const auto selectable =
+                    ::filterSelectableItems(m_pView->scene()->items());
+                for (auto *item : selectable) {
+                    if (dynamic_cast<ImageItem *>(item) || item->parentItem())
+                        continue;
+                    item->setPos(item->pos() * factor);
+                    item->setTransform(QTransform::fromScale(factor, factor)
+                                       * item->transform());
+                }
+            }
+
+            m_hRuler->setPpi(static_cast<qreal>(dpiOverride));
+            m_vRuler->setPpi(static_cast<qreal>(dpiOverride));
+            m_pPropertyPanel->setDisplayPpi(static_cast<qreal>(dpiOverride));
+            m_hRuler->updateRuler();
+            m_vRuler->updateRuler();
+            _updateCanvasLabel();
         }
     }
 
@@ -2592,4 +2706,18 @@ void MainWindow::closeEvent(QCloseEvent *event)
         m_undoStack->clear();
 
     QMainWindow::closeEvent(event);
+}
+
+void MainWindow::_toggleHistoryPopup()
+{
+    if (!m_taskHistoryPopup)
+        return;
+    if (m_taskHistoryPopup->isVisible()) {
+        m_taskHistoryPopup->hide();
+        return;
+    }
+    m_taskHistoryPopup->showAbove(m_taskHistoryBtn,
+                                  m_pProgressMgr->activeTaskList(),
+                                  m_pProgressMgr->finishedTaskList());
+    m_taskHistoryBtn->setChecked(true);
 }

@@ -25,7 +25,8 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-PropertyPanel::PropertyPanel(QWidget *parent) : QDockWidget(tr("Properties"), parent)
+PropertyPanel::PropertyPanel(QWidget *parent)
+    : QDockWidget(tr("Properties"), parent)
 {
     setupUI();
 }
@@ -48,7 +49,7 @@ void PropertyPanel::setupUI()
     m_noSelectionLabel = new QLabel(tr("No item selected"));
     m_noSelectionLabel->setAlignment(Qt::AlignCenter);
     m_noSelectionLabel->setStyleSheet(
-            QStringLiteral("color: gray; font-style: italic; padding: 40px 0;"));
+        QStringLiteral("color: gray; font-style: italic; padding: 40px 0;"));
     mainLayout->addWidget(m_noSelectionLabel);
 
     // ---- 位置/尺寸 ----
@@ -85,7 +86,8 @@ void PropertyPanel::setupUI()
     m_penWidthSpin = new QSpinBox;
     m_penWidthSpin->setRange(0, 100);
     m_penStyleCombo = new QComboBox;
-    m_penStyleCombo->addItems({tr("Solid"), tr("Dash"), tr("Dot"), tr("DashDot"), tr("DashDotDot"), tr("None")});
+    m_penStyleCombo->addItems({ tr("Solid"), tr("Dash"), tr("Dot"),
+                                tr("DashDot"), tr("DashDotDot"), tr("None") });
     penLayout->addRow(tr("Color:"), m_penColorSelector);
     penLayout->addRow(tr("Width:"), m_penWidthSpin);
     penLayout->addRow(tr("Style:"), m_penStyleCombo);
@@ -97,7 +99,8 @@ void PropertyPanel::setupUI()
     auto *brushLayout = new QFormLayout(m_brushGroup);
 
     m_fillModeCombo = new QComboBox;
-    m_fillModeCombo->addItems({tr("No Fill"), tr("Solid Color"), tr("Gradient")});
+    m_fillModeCombo->addItems(
+        { tr("No Fill"), tr("Solid Color"), tr("Gradient") });
 
     m_brushSolid = new ColorSelector(this);
     m_brushSolid->setFixedSize(60, 24);
@@ -176,17 +179,11 @@ void PropertyPanel::setupUI()
     m_imgPathLabel = new QLabel;
     m_imgPathLabel->setWordWrap(true);
     m_imgPathLabel->setTextFormat(Qt::PlainText);
-    m_imgFormatLabel = new QLabel;
-    m_imgDisplaySizeLabel = new QLabel;
     m_imgOriginalSizeLabel = new QLabel;
-    m_imgColorSpaceLabel = new QLabel;
     m_imgDpiLabel = new QLabel;
 
     imgInfoLayout->addRow(tr("Path:"), m_imgPathLabel);
-    imgInfoLayout->addRow(tr("Format:"), m_imgFormatLabel);
-    imgInfoLayout->addRow(tr("Display Size:"), m_imgDisplaySizeLabel);
-    imgInfoLayout->addRow(tr("Original Size:"), m_imgOriginalSizeLabel);
-    imgInfoLayout->addRow(tr("Color Space:"), m_imgColorSpaceLabel);
+    imgInfoLayout->addRow(tr("Physical Size:"), m_imgOriginalSizeLabel);
     imgInfoLayout->addRow(tr("DPI:"), m_imgDpiLabel);
     mainLayout->addWidget(m_imageInfoGroup);
 
@@ -206,43 +203,65 @@ void PropertyPanel::setupUI()
 
     // ---- 信号连接 ----
     connect(m_penColorSelector, &ColorSelector::colorEditingStarted, this,
-            [this](const QColor &) { beginColorPreview(ColorPreviewTarget::Border); });
+            [this](const QColor &) {
+                beginColorPreview(ColorPreviewTarget::Border);
+            });
     connect(m_penColorSelector, &ColorSelector::colorChanged, this,
-            [this](const QColor &color) { previewColorChange(ColorPreviewTarget::Border, color); });
-    connect(m_penColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onPenColorSelected);
+            [this](const QColor &color) {
+                previewColorChange(ColorPreviewTarget::Border, color);
+            });
+    connect(m_penColorSelector, &ColorSelector::colorSelected, this,
+            &PropertyPanel::onPenColorSelected);
     connect(m_penColorSelector, &ColorSelector::colorSelectionCanceled, this,
-            [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::Border); });
+            [this](const QColor &) {
+                cancelColorPreview(ColorPreviewTarget::Border);
+            });
     connect(m_penColorSelector, &ColorSelector::colorSelectedCmyk, this,
             [this](const QColor &, double c, double m, double y, double k) {
                 if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem)) {
-                    if (c >= 0) gi->setItemPenCmyk(c, m, y, k);
-                    else gi->clearPenCmyk();
+                    if (c >= 0)
+                        gi->setItemPenCmyk(c, m, y, k);
+                    else
+                        gi->clearPenCmyk();
                 }
             });
 
     connect(m_penWidthSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
             &PropertyPanel::onPenWidthChanged);
-    connect(m_penStyleCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+    connect(m_penStyleCombo,
+            QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &PropertyPanel::onPenStyleChanged);
     connect(m_brushSolid, &ColorSelector::colorEditingStarted, this,
-            [this](const QColor &) { beginColorPreview(ColorPreviewTarget::Fill); });
+            [this](const QColor &) {
+                beginColorPreview(ColorPreviewTarget::Fill);
+            });
     connect(m_brushSolid, &ColorSelector::colorChanged, this,
-            [this](const QColor &color) { previewColorChange(ColorPreviewTarget::Fill, color); });
-    connect(m_brushSolid, &ColorSelector::colorSelected, this, &PropertyPanel::onBrushColorClicked);
+            [this](const QColor &color) {
+                previewColorChange(ColorPreviewTarget::Fill, color);
+            });
+    connect(m_brushSolid, &ColorSelector::colorSelected, this,
+            &PropertyPanel::onBrushColorClicked);
     connect(m_brushSolid, &ColorSelector::colorSelectionCanceled, this,
-            [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::Fill); });
+            [this](const QColor &) {
+                cancelColorPreview(ColorPreviewTarget::Fill);
+            });
     connect(m_brushSolid, &ColorSelector::colorSelectedCmyk, this,
             [this](const QColor &, double c, double m, double y, double k) {
                 if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem)) {
-                    if (c >= 0) gi->setItemBrushCmyk(c, m, y, k);
-                    else gi->clearBrushCmyk();
+                    if (c >= 0)
+                        gi->setItemBrushCmyk(c, m, y, k);
+                    else
+                        gi->clearBrushCmyk();
                 }
             });
 
-    connect(m_fillModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+    connect(m_fillModeCombo,
+            QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &PropertyPanel::onFillModeChanged);
     connect(m_brushGradient, &GradientPreview::brushEditingStarted, this,
-            [this](const QBrush &) { beginBrushPreview(ColorPreviewTarget::FillGradient); });
+            [this](const QBrush &) {
+                beginBrushPreview(ColorPreviewTarget::FillGradient);
+            });
     connect(m_brushGradient, &GradientPreview::brushPreviewed, this,
             &PropertyPanel::onBrushGradientPreviewed);
     connect(m_brushGradient, &GradientPreview::brushSelected, this,
@@ -260,39 +279,60 @@ void PropertyPanel::setupUI()
             &PropertyPanel::onFontFamilyChanged);
     connect(m_fontSizeSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
             &PropertyPanel::onFontSizeChanged);
-    connect(m_boldBtn, &QPushButton::toggled, this, &PropertyPanel::onBoldToggled);
-    connect(m_italicBtn, &QPushButton::toggled, this, &PropertyPanel::onItalicToggled);
+    connect(m_boldBtn, &QPushButton::toggled, this,
+            &PropertyPanel::onBoldToggled);
+    connect(m_italicBtn, &QPushButton::toggled, this,
+            &PropertyPanel::onItalicToggled);
     connect(m_textColorSelector, &ColorSelector::colorEditingStarted, this,
-            [this](const QColor &) { beginColorPreview(ColorPreviewTarget::Text); });
+            [this](const QColor &) {
+                beginColorPreview(ColorPreviewTarget::Text);
+            });
     connect(m_textColorSelector, &ColorSelector::colorChanged, this,
-            [this](const QColor &color) { previewColorChange(ColorPreviewTarget::Text, color); });
-    connect(m_textColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onTextColorClicked);
+            [this](const QColor &color) {
+                previewColorChange(ColorPreviewTarget::Text, color);
+            });
+    connect(m_textColorSelector, &ColorSelector::colorSelected, this,
+            &PropertyPanel::onTextColorClicked);
     connect(m_textColorSelector, &ColorSelector::colorSelectionCanceled, this,
-            [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::Text); });
+            [this](const QColor &) {
+                cancelColorPreview(ColorPreviewTarget::Text);
+            });
     connect(m_textColorSelector, &ColorSelector::colorSelectedCmyk, this,
             [this](const QColor &, double c, double m, double y, double k) {
                 if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem)) {
-                    if (c >= 0) gi->setItemPenCmyk(c, m, y, k);
-                    else gi->clearPenCmyk();
+                    if (c >= 0)
+                        gi->setItemPenCmyk(c, m, y, k);
+                    else
+                        gi->clearPenCmyk();
                 }
             });
 
     connect(m_textBgColorSelector, &ColorSelector::colorEditingStarted, this,
-            [this](const QColor &) { beginColorPreview(ColorPreviewTarget::TextBackground); });
+            [this](const QColor &) {
+                beginColorPreview(ColorPreviewTarget::TextBackground);
+            });
     connect(m_textBgColorSelector, &ColorSelector::colorChanged, this,
-            [this](const QColor &color) { previewColorChange(ColorPreviewTarget::TextBackground, color); });
-    connect(m_textBgColorSelector, &ColorSelector::colorSelected, this, &PropertyPanel::onTextBgColorClicked);
+            [this](const QColor &color) {
+                previewColorChange(ColorPreviewTarget::TextBackground, color);
+            });
+    connect(m_textBgColorSelector, &ColorSelector::colorSelected, this,
+            &PropertyPanel::onTextBgColorClicked);
     connect(m_textBgColorSelector, &ColorSelector::colorSelectionCanceled, this,
-            [this](const QColor &) { cancelColorPreview(ColorPreviewTarget::TextBackground); });
+            [this](const QColor &) {
+                cancelColorPreview(ColorPreviewTarget::TextBackground);
+            });
     connect(m_textBgColorSelector, &ColorSelector::colorSelectedCmyk, this,
             [this](const QColor &, double c, double m, double y, double k) {
                 if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem)) {
-                    if (c >= 0) gi->setItemBrushCmyk(c, m, y, k);
-                    else gi->clearBrushCmyk();
+                    if (c >= 0)
+                        gi->setItemBrushCmyk(c, m, y, k);
+                    else
+                        gi->clearBrushCmyk();
                 }
             });
 
-    connect(m_textEdit, &QLineEdit::editingFinished, this, &PropertyPanel::onTextChanged);
+    connect(m_textEdit, &QLineEdit::editingFinished, this,
+            &PropertyPanel::onTextChanged);
     connect(m_xSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &PropertyPanel::onGeometryChanged);
     connect(m_ySpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
@@ -301,9 +341,10 @@ void PropertyPanel::setupUI()
             &PropertyPanel::onGeometryChanged);
     connect(m_hSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &PropertyPanel::onGeometryChanged);
-    connect(m_cornerSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
-            &PropertyPanel::onCornerRadiusChanged);
-    connect(m_rotationSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+    connect(m_cornerSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &PropertyPanel::onCornerRadiusChanged);
+    connect(m_rotationSpin,
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &PropertyPanel::onRotationChanged);
 }
 
@@ -323,21 +364,25 @@ void PropertyPanel::beginColorPreview(ColorPreviewTarget target)
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
     if (!gi)
         return;
-    if (target == ColorPreviewTarget::Text && !qgraphicsitem_cast<TextItem *>(m_currentItem))
+    if (target == ColorPreviewTarget::Text
+        && !qgraphicsitem_cast<TextItem *>(m_currentItem))
         return;
 
     m_previewTarget = target;
     m_previewItem = m_currentItem;
 
-    if (target == ColorPreviewTarget::Border || target == ColorPreviewTarget::Text)
+    if (target == ColorPreviewTarget::Border
+        || target == ColorPreviewTarget::Text)
         m_previewOldPen = gi->itemPen();
     else
         m_previewOldBrush = gi->itemBrush();
 }
 
-void PropertyPanel::previewColorChange(ColorPreviewTarget target, const QColor &color)
+void PropertyPanel::previewColorChange(ColorPreviewTarget target,
+                                       const QColor &color)
 {
-    if (m_updating || !color.isValid() || m_previewTarget != target || !m_previewItem)
+    if (m_updating || !color.isValid() || m_previewTarget != target
+        || !m_previewItem)
         return;
 
     auto *gi = dynamic_cast<IGraphicsItem *>(m_previewItem);
@@ -364,7 +409,8 @@ void PropertyPanel::previewColorChange(ColorPreviewTarget target, const QColor &
     }
 }
 
-void PropertyPanel::commitColorChange(ColorPreviewTarget target, const QColor &color)
+void PropertyPanel::commitColorChange(ColorPreviewTarget target,
+                                      const QColor &color)
 {
     if (m_updating || !color.isValid())
         return;
@@ -383,7 +429,8 @@ void PropertyPanel::commitColorChange(ColorPreviewTarget target, const QColor &c
         return;
     }
 
-    if (target == ColorPreviewTarget::Border || target == ColorPreviewTarget::Text) {
+    if (target == ColorPreviewTarget::Border
+        || target == ColorPreviewTarget::Text) {
         QPen newPen = gi->itemPen();
         QPen oldPen = m_previewOldPen;
         clearColorPreview();
@@ -407,7 +454,8 @@ void PropertyPanel::cancelColorPreview(ColorPreviewTarget target)
 
     auto *gi = dynamic_cast<IGraphicsItem *>(m_previewItem);
     if (gi) {
-        if (target == ColorPreviewTarget::Border || target == ColorPreviewTarget::Text)
+        if (target == ColorPreviewTarget::Border
+            || target == ColorPreviewTarget::Text)
             gi->setItemPen(m_previewOldPen);
         else
             gi->setItemBrush(m_previewOldBrush);
@@ -430,7 +478,8 @@ void PropertyPanel::beginBrushPreview(ColorPreviewTarget target)
     m_previewOldBrush = gi->itemBrush();
 }
 
-void PropertyPanel::previewBrushChange(ColorPreviewTarget target, const QBrush &brush)
+void PropertyPanel::previewBrushChange(ColorPreviewTarget target,
+                                       const QBrush &brush)
 {
     if (m_updating || m_previewTarget != target || !m_previewItem)
         return;
@@ -440,7 +489,8 @@ void PropertyPanel::previewBrushChange(ColorPreviewTarget target, const QBrush &
         gi->setItemBrush(brush);
 }
 
-void PropertyPanel::commitBrushChange(ColorPreviewTarget target, const QBrush &brush)
+void PropertyPanel::commitBrushChange(ColorPreviewTarget target,
+                                      const QBrush &brush)
 {
     if (m_updating)
         return;
@@ -499,21 +549,25 @@ void PropertyPanel::updatePanel()
     m_geomGroup->setVisible(true);
 
     // 显示图元在画板上的视觉坐标（mapToScene 处理旋转和父级偏移）
-    QRectF geomRect = (gi->supportsGeometryRect()) ? gi->geometryRect() : m_currentItem->boundingRect();
+    QRectF geomRect = (gi->supportsGeometryRect())
+                          ? gi->geometryRect()
+                          : m_currentItem->boundingRect();
     // 映射四个角到场景空间，计算轴对齐包围盒得到视觉 W/H
-    QPointF corners[4] = {
-        m_currentItem->mapToScene(geomRect.topLeft()),
-        m_currentItem->mapToScene(geomRect.topRight()),
-        m_currentItem->mapToScene(geomRect.bottomRight()),
-        m_currentItem->mapToScene(geomRect.bottomLeft())
-    };
+    QPointF corners[4] = { m_currentItem->mapToScene(geomRect.topLeft()),
+                           m_currentItem->mapToScene(geomRect.topRight()),
+                           m_currentItem->mapToScene(geomRect.bottomRight()),
+                           m_currentItem->mapToScene(geomRect.bottomLeft()) };
     qreal minX = corners[0].x(), minY = corners[0].y();
     qreal maxX = minX, maxY = minY;
     for (int i = 1; i < 4; ++i) {
-        if (corners[i].x() < minX) minX = corners[i].x();
-        if (corners[i].y() < minY) minY = corners[i].y();
-        if (corners[i].x() > maxX) maxX = corners[i].x();
-        if (corners[i].y() > maxY) maxY = corners[i].y();
+        if (corners[i].x() < minX)
+            minX = corners[i].x();
+        if (corners[i].y() < minY)
+            minY = corners[i].y();
+        if (corners[i].x() > maxX)
+            maxX = corners[i].x();
+        if (corners[i].y() > maxY)
+            maxY = corners[i].y();
     }
 
     // 始终以 mm 显示
@@ -552,13 +606,26 @@ void PropertyPanel::updatePanel()
         m_penWidthSpin->setValue(p.width());
         int styleIdx = 0;
         switch (p.style()) {
-        case Qt::SolidLine:      styleIdx = 0; break;
-        case Qt::DashLine:       styleIdx = 1; break;
-        case Qt::DotLine:        styleIdx = 2; break;
-        case Qt::DashDotLine:    styleIdx = 3; break;
-        case Qt::DashDotDotLine: styleIdx = 4; break;
-        case Qt::NoPen:          styleIdx = 5; break;
-        default: break;
+        case Qt::SolidLine:
+            styleIdx = 0;
+            break;
+        case Qt::DashLine:
+            styleIdx = 1;
+            break;
+        case Qt::DotLine:
+            styleIdx = 2;
+            break;
+        case Qt::DashDotLine:
+            styleIdx = 3;
+            break;
+        case Qt::DashDotDotLine:
+            styleIdx = 4;
+            break;
+        case Qt::NoPen:
+            styleIdx = 5;
+            break;
+        default:
+            break;
         }
         m_penStyleCombo->setCurrentIndex(styleIdx);
     }
@@ -571,9 +638,9 @@ void PropertyPanel::updatePanel()
 
         Qt::BrushStyle style = b.style();
         int nIndex = static_cast<int>(FillMode::NoFill);
-        if (style == Qt::LinearGradientPattern ||
-            style == Qt::RadialGradientPattern ||
-            style == Qt::ConicalGradientPattern) {
+        if (style == Qt::LinearGradientPattern
+            || style == Qt::RadialGradientPattern
+            || style == Qt::ConicalGradientPattern) {
             // 渐变
             nIndex = static_cast<int>(FillMode::Gradient);
             m_brushGradient->setBrush(b);
@@ -592,9 +659,7 @@ void PropertyPanel::updatePanel()
             } else {
                 m_brushSolid->setColor(b.color());
             }
-        }
-        else
-        {
+        } else {
             // 隐藏控件
             m_brushGradient->setVisible(false);
             m_brushSolid->setVisible(false);
@@ -617,27 +682,26 @@ void PropertyPanel::updatePanel()
         m_textEdit->setText(m_oldText);
 
         // 文字颜色（仅 TextItem 有此概念）
-        if (qgraphicsitem_cast<TextItem *>(m_currentItem))
-        {
+        if (qgraphicsitem_cast<TextItem *>(m_currentItem)) {
             m_textColorSelector->setVisible(true);
             m_textBgColorSelector->setVisible(true);
 
             double c, m, y, k;
             if (gi->hasPenCmyk()) {
                 gi->penCmyk(c, m, y, k);
-                m_textColorSelector->setCmykColor(gi->itemPen().color(), c, m, y, k);
+                m_textColorSelector->setCmykColor(gi->itemPen().color(), c, m,
+                                                  y, k);
             } else {
                 m_textColorSelector->setColor(gi->itemPen().color());
             }
             if (gi->hasBrushCmyk()) {
                 gi->brushCmyk(c, m, y, k);
-                m_textBgColorSelector->setCmykColor(gi->itemBrush().color(), c, m, y, k);
+                m_textBgColorSelector->setCmykColor(gi->itemBrush().color(), c,
+                                                    m, y, k);
             } else {
                 m_textBgColorSelector->setColor(gi->itemBrush().color());
             }
-        }
-        else
-        {
+        } else {
             m_textColorSelector->setVisible(false);
             m_textBgColorSelector->setVisible(false);
         }
@@ -667,54 +731,44 @@ void PropertyPanel::updatePanel()
         // 文件路径
         m_imgPathLabel->setText(imgItem->filePath());
 
-        // 文件格式
-        QFileInfo fi(imgItem->filePath());
-        m_imgFormatLabel->setText(fi.suffix().toUpper());
+        // 物理尺寸（mm = 像素 / DPI * 25.4）
+        QSize origSz = imgItem->originalSize();
+        if (origSz.isValid() && imgItem->dpiX() > 0 && imgItem->dpiY() > 0) {
+            qreal mmW =
+                origSz.width() / static_cast<qreal>(imgItem->dpiX()) * 25.4;
+            qreal mmH =
+                origSz.height() / static_cast<qreal>(imgItem->dpiY()) * 25.4;
+            m_imgOriginalSizeLabel->setText(
+                tr("%1 x %2 mm").arg(mmW, 0, 'f', 4).arg(mmH, 0, 'f', 4));
+        } else {
+            m_imgOriginalSizeLabel->setText(tr("Unknown"));
+        }
 
-        // 显示尺寸（画布上的当前尺寸，mm）
-        QSizeF displaySz = imgItem->geometryRect().size();
-        qreal kPxToMm = 25.4 / m_ppi;
-        m_imgDisplaySizeLabel->setText(tr("%1 x %2 mm")
-            .arg(displaySz.width() * kPxToMm, 0, 'f', 1)
-            .arg(displaySz.height() * kPxToMm, 0, 'f', 1));
+        // DPI
+        m_imgDpiLabel->setText(
+            tr("%1 x %2").arg(imgItem->dpiX()).arg(imgItem->dpiY()));
 
-        // 原始尺寸
-        // QSize origSz = imgItem->originalSize();
-        // if (origSz.isValid()) {
-        //     m_imgOriginalSizeLabel->setText(tr("%1 x %2 px")
-        //         .arg(origSz.width())
-        //         .arg(origSz.height()));
-        // } else {
-        //     m_imgOriginalSizeLabel->setText(tr("Unknown"));
-        // }
-
-        // // 色彩空间
-        // if (imgItem->isCmykSource())
-        //     m_imgColorSpaceLabel->setText(tr("CMYK"));
-        // else
-        //     m_imgColorSpaceLabel->setText(tr("RGB"));
-
-        // // DPI
-        // m_imgDpiLabel->setText(tr("%1 x %2").arg(imgItem->dpiX()).arg(imgItem->dpiY()));
-
-        m_imageInfoGroup->setVisible(false); // 暂时隐藏图像信息，后续完善 ImageItem 后再显示
+        m_imageInfoGroup->setVisible(true);
     } else {
         m_imageInfoGroup->setVisible(false);
     }
 }
 
 // ---- 边框颜色 ----
-void PropertyPanel::onPenColorSelected(const QColor& color)
+void PropertyPanel::onPenColorSelected(const QColor &color)
 {
-    if (!color.isValid()) return;
+    if (!color.isValid())
+        return;
     commitColorChange(ColorPreviewTarget::Border, color);
 }
 
 void PropertyPanel::onPenWidthChanged(int w)
 {
-    if (m_updating || !m_currentItem) return;
+    if (m_updating || !m_currentItem)
+        return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
+    if (!gi)
+        return;
 
     QPen oldPen = gi->itemPen();
     QPen newPen = oldPen;
@@ -724,14 +778,15 @@ void PropertyPanel::onPenWidthChanged(int w)
 
 void PropertyPanel::onPenStyleChanged(int idx)
 {
-    if (m_updating || !m_currentItem) return;
+    if (m_updating || !m_currentItem)
+        return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
+    if (!gi)
+        return;
 
-    static const Qt::PenStyle styles[] = {
-        Qt::SolidLine, Qt::DashLine, Qt::DotLine,
-        Qt::DashDotLine, Qt::DashDotDotLine, Qt::NoPen
-    };
+    static const Qt::PenStyle styles[] = { Qt::SolidLine,      Qt::DashLine,
+                                           Qt::DotLine,        Qt::DashDotLine,
+                                           Qt::DashDotDotLine, Qt::NoPen };
     QPen oldPen = gi->itemPen();
     QPen newPen = oldPen;
     newPen.setStyle(styles[idx]);
@@ -739,17 +794,20 @@ void PropertyPanel::onPenStyleChanged(int idx)
 }
 
 // ---- 填充颜色 ----
-void PropertyPanel::onBrushColorClicked(const QColor& color)
+void PropertyPanel::onBrushColorClicked(const QColor &color)
 {
-    if (!color.isValid()) return;
+    if (!color.isValid())
+        return;
     commitColorChange(ColorPreviewTarget::Fill, color);
 }
 
 void PropertyPanel::onFillModeChanged(int idx)
 {
-    if (!m_currentItem) return;
+    if (!m_currentItem)
+        return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
+    if (!gi)
+        return;
 
     FillMode mode = static_cast<FillMode>(idx);
     QBrush newBrush;
@@ -779,21 +837,21 @@ void PropertyPanel::onFillModeChanged(int idx)
         return;
 
     QBrush oldBrush = gi->itemBrush();
-    if(newBrush != oldBrush)
+    if (newBrush != oldBrush)
         Q_EMIT brushChanged(m_currentItem, oldBrush, newBrush);
 }
 
-void PropertyPanel::onBrushGradientPreviewed(const QBrush& brush)
+void PropertyPanel::onBrushGradientPreviewed(const QBrush &brush)
 {
     previewBrushChange(ColorPreviewTarget::FillGradient, brush);
 }
 
-void PropertyPanel::onBrushGradientSelected(const QBrush& brush)
+void PropertyPanel::onBrushGradientSelected(const QBrush &brush)
 {
     commitBrushChange(ColorPreviewTarget::FillGradient, brush);
 }
 
-void PropertyPanel::onBrushGradientCanceled(const QBrush&)
+void PropertyPanel::onBrushGradientCanceled(const QBrush &)
 {
     cancelColorPreview(ColorPreviewTarget::FillGradient);
 }
@@ -801,9 +859,11 @@ void PropertyPanel::onBrushGradientCanceled(const QBrush&)
 // ---- 文字属性 ----
 void PropertyPanel::onFontFamilyChanged(const QFont &f)
 {
-    if (m_updating || !m_currentItem) return;
+    if (m_updating || !m_currentItem)
+        return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
+    if (!gi)
+        return;
 
     QFont oldFont = gi->itemFont();
     QFont newFont = f;
@@ -815,9 +875,11 @@ void PropertyPanel::onFontFamilyChanged(const QFont &f)
 
 void PropertyPanel::onFontSizeChanged(int s)
 {
-    if (m_updating || !m_currentItem) return;
+    if (m_updating || !m_currentItem)
+        return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
+    if (!gi)
+        return;
 
     QFont oldFont = gi->itemFont();
     QFont newFont = oldFont;
@@ -827,9 +889,11 @@ void PropertyPanel::onFontSizeChanged(int s)
 
 void PropertyPanel::onBoldToggled(bool b)
 {
-    if (m_updating || !m_currentItem) return;
+    if (m_updating || !m_currentItem)
+        return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
+    if (!gi)
+        return;
 
     QFont oldFont = gi->itemFont();
     QFont newFont = oldFont;
@@ -839,9 +903,11 @@ void PropertyPanel::onBoldToggled(bool b)
 
 void PropertyPanel::onItalicToggled(bool b)
 {
-    if (m_updating || !m_currentItem) return;
+    if (m_updating || !m_currentItem)
+        return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
+    if (!gi)
+        return;
 
     QFont oldFont = gi->itemFont();
     QFont newFont = oldFont;
@@ -849,23 +915,27 @@ void PropertyPanel::onItalicToggled(bool b)
     emit fontChanged(m_currentItem, oldFont, newFont);
 }
 
-void PropertyPanel::onTextColorClicked(const QColor& color)
+void PropertyPanel::onTextColorClicked(const QColor &color)
 {
-    if (!color.isValid()) return;
+    if (!color.isValid())
+        return;
     commitColorChange(ColorPreviewTarget::Text, color);
 }
 
-void PropertyPanel::onTextBgColorClicked(const QColor& color)
+void PropertyPanel::onTextBgColorClicked(const QColor &color)
 {
-    if (!color.isValid()) return;
+    if (!color.isValid())
+        return;
     commitColorChange(ColorPreviewTarget::TextBackground, color);
 }
 
 void PropertyPanel::onTextChanged()
 {
-    if (m_updating || !m_currentItem) return;
+    if (m_updating || !m_currentItem)
+        return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
+    if (!gi)
+        return;
 
     QString oldText = gi->text();
     QString newText = m_textEdit->text();
@@ -876,9 +946,11 @@ void PropertyPanel::onTextChanged()
 // ---- 几何属性 ----
 void PropertyPanel::onGeometryChanged()
 {
-    if (m_updating || !m_currentItem) return;
+    if (m_updating || !m_currentItem)
+        return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem);
-    if (!gi) return;
+    if (!gi)
+        return;
 
     // 读取用户输入值（始终 mm），转换回 px
     qreal x = m_xSpin->value();
@@ -894,17 +966,20 @@ void PropertyPanel::onGeometryChanged()
     h *= kMmToPx;
 
     // 位置变更：X/Y 显示的是视觉包围盒的 minX/minY，需要转为 item 的 pos
-    QRectF currentGeom = (gi->supportsGeometryRect()) ? gi->geometryRect() : m_currentItem->boundingRect();
-    QPointF corners[4] = {
-        m_currentItem->mapToScene(currentGeom.topLeft()),
-        m_currentItem->mapToScene(currentGeom.topRight()),
-        m_currentItem->mapToScene(currentGeom.bottomRight()),
-        m_currentItem->mapToScene(currentGeom.bottomLeft())
-    };
+    QRectF currentGeom = (gi->supportsGeometryRect())
+                             ? gi->geometryRect()
+                             : m_currentItem->boundingRect();
+    QPointF corners[4] = { m_currentItem->mapToScene(currentGeom.topLeft()),
+                           m_currentItem->mapToScene(currentGeom.topRight()),
+                           m_currentItem->mapToScene(currentGeom.bottomRight()),
+                           m_currentItem->mapToScene(
+                               currentGeom.bottomLeft()) };
     qreal currentMinX = corners[0].x(), currentMinY = corners[0].y();
     for (int i = 1; i < 4; ++i) {
-        if (corners[i].x() < currentMinX) currentMinX = corners[i].x();
-        if (corners[i].y() < currentMinY) currentMinY = corners[i].y();
+        if (corners[i].x() < currentMinX)
+            currentMinX = corners[i].x();
+        if (corners[i].y() < currentMinY)
+            currentMinY = corners[i].y();
     }
     QPointF currentCanvasPos(currentMinX, currentMinY);
     QPointF newCanvasPos(x, y);
@@ -930,9 +1005,11 @@ void PropertyPanel::onGeometryChanged()
 // ---- 圆角 ----
 void PropertyPanel::onCornerRadiusChanged(double r)
 {
-    if (m_updating || !m_currentItem) return;
+    if (m_updating || !m_currentItem)
+        return;
     auto *ri = qgraphicsitem_cast<RectItem *>(m_currentItem);
-    if (!ri) return;
+    if (!ri)
+        return;
 
     qreal oldR = ri->cornerRadius();
     if (!qFuzzyCompare(oldR, r))
@@ -942,7 +1019,8 @@ void PropertyPanel::onCornerRadiusChanged(double r)
 // ---- 旋转 ----
 void PropertyPanel::onRotationChanged(double r)
 {
-    if (m_updating || !m_currentItem) return;
+    if (m_updating || !m_currentItem)
+        return;
 
     qreal oldR = m_currentItem->rotation();
     if (!qFuzzyCompare(oldR, r))

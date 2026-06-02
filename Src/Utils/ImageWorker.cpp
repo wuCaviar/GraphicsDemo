@@ -88,6 +88,9 @@ ImportWorkerResult runImportWorker(const QString &filePath)
         QPair<int, int> dpi = ImageUtils::readTiffDpi(filePath);
         result.dpiX = dpi.first;
         result.dpiY = dpi.second;
+
+        QSize size = ImageUtils::readTiffSize(filePath);
+        result.size = size;
     }
 
     result.pixmap = QPixmap::fromImage(image);

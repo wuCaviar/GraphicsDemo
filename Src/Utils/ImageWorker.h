@@ -59,6 +59,7 @@ private:
 struct ImportWorkerResult
 {
     QPixmap pixmap;
+    QSize size;
     QString path;
     int dpiX = 0; // 图片 X 方向 DPI（仅 TIFF 有效，非 TIFF 为 0）
     int dpiY = 0; // 图片 Y 方向 DPI

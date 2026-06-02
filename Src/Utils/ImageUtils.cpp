@@ -66,6 +66,19 @@ QPair<int, int> readTiffDpi(const QString &path)
     return dpi;
 }
 
+QSize readTiffSize(const QString &path)
+{
+    QByteArray array = path.toLocal8Bit();
+    TIFF *tif = TIFFOpen(array.data(), "r");
+    if (!tif)
+        return { 0, 0 };
+    uint32_t width = 0, height = 0;
+    TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
+    TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
+    TIFFClose(tif);
+    return QSize(width, height);
+}
+
 // 使用 libtiff 解码 TIFF 为显示用 QImage（线程安全）
 // 支持 CMYK（LCMS2 批量转换 → RGB）、RGB/RGBA/灰度/16-bit/压缩/tiled 等
 QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)

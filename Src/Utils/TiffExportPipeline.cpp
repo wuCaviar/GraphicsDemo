@@ -375,9 +375,10 @@ void StripPipeline::producerStage(StripSlot &slot,
             const auto &src = sources[si];
 
             // 检查该源是否覆盖本 strip
-            int srcRectY0 = std::max(0, static_cast<int>(src.outputRect.top()));
-            int srcRectY1 =
-                std::min(outH, static_cast<int>(src.outputRect.bottom()));
+            int srcRectY0 =
+                std::max(0, static_cast<int>(std::floor(src.outputRect.top())));
+            int srcRectY1 = std::min(
+                outH, static_cast<int>(std::ceil(src.outputRect.bottom())));
             if (srcRectY1 <= stripY0 || srcRectY0 >= stripY1) {
                 sd.hasData = false;
                 sd.zOrder = src.zOrder;
@@ -487,9 +488,10 @@ void StripPipeline::organizerStage(StripSlot &slot,
     // 收集覆盖本 strip 的 overlays
     std::vector<const CmykOverlay *> activeOverlays;
     for (const auto &ov : overlays) {
-        int ovY0 = std::max(0, static_cast<int>(ov.outputRect.top()));
-        int ovY1 =
-            std::min(outHeight, static_cast<int>(ov.outputRect.bottom()));
+        int ovY0 =
+            std::max(0, static_cast<int>(std::floor(ov.outputRect.top())));
+        int ovY1 = std::min(
+            outHeight, static_cast<int>(std::ceil(ov.outputRect.bottom())));
         if (ovY1 <= stripY0 || ovY0 >= stripY0 + numRows)
             continue;
         activeOverlays.push_back(&ov);
@@ -546,23 +548,28 @@ void StripPipeline::organizerStage(StripSlot &slot,
                 if (!sd || !sd->hasData)
                     continue;
 
-                int sdRectY0 =
-                    std::max(0, static_cast<int>(sd->outputRect.top()));
+                int sdRectY0 = std::max(
+                    0, static_cast<int>(std::floor(sd->outputRect.top())));
                 int sdRectY1 = std::min(
-                    outHeight, static_cast<int>(sd->outputRect.bottom()));
+                    outHeight,
+                    static_cast<int>(std::ceil(sd->outputRect.bottom())));
                 if (globalY < sdRectY0 || globalY >= sdRectY1)
                     continue;
 
                 // 1:1 映射：输出行 → 源行 = globalY - outputRect.top()
-                int srcRow = globalY - static_cast<int>(sd->outputRect.top());
+                int srcRow =
+                    globalY
+                    - static_cast<int>(std::floor(sd->outputRect.top()));
                 int localRow = srcRow - sd->startSourceRow;
                 if (localRow < 0 || localRow >= sd->numSourceRows)
                     continue;
 
-                int srcWidth = static_cast<int>(sd->outputRect.width());
-                int bx0 = std::max(0, static_cast<int>(sd->outputRect.left()));
-                int bx1 = std::min(outWidth,
-                                   static_cast<int>(sd->outputRect.right()));
+                int srcWidth =
+                    static_cast<int>(std::ceil(sd->outputRect.width()));
+                int bx0 = std::max(
+                    0, static_cast<int>(std::floor(sd->outputRect.left())));
+                int bx1 = std::min(outWidth, static_cast<int>(std::ceil(
+                                                 sd->outputRect.right())));
 
                 const uint8_t *srcRowData =
                     sd->cmykRows.data()
@@ -582,12 +589,15 @@ void StripPipeline::organizerStage(StripSlot &slot,
                     || globalY >= ov->outputRect.bottom())
                     continue;
 
-                int bx0 = std::max(0, static_cast<int>(ov->outputRect.left()));
-                int bx1 = std::min(outWidth,
-                                   static_cast<int>(ov->outputRect.right()));
+                int bx0 = std::max(
+                    0, static_cast<int>(std::floor(ov->outputRect.left())));
+                int bx1 = std::min(outWidth, static_cast<int>(std::ceil(
+                                                 ov->outputRect.right())));
 
                 // 1:1 映射：overlay 渲染尺寸 == outputRect 尺寸
-                int srcRow = globalY - static_cast<int>(ov->outputRect.top());
+                int srcRow =
+                    globalY
+                    - static_cast<int>(std::floor(ov->outputRect.top()));
                 const uint8_t *srcRowData =
                     ov->data.data()
                     + static_cast<size_t>(srcRow) * ov->width * 4;

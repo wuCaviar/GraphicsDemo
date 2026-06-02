@@ -46,13 +46,16 @@ void NewFileDialog::setupUI()
     mainLayout->addWidget(group);
 
     // 按钮
-    auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-    buttonBox->button(QDialogButtonBox::Ok)->setToolTip(tr("Create a new canvas"));
-    buttonBox->button(QDialogButtonBox::Cancel)->setToolTip(tr("Cancel and close the dialog"));
+    auto *buttonBox =
+        new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    buttonBox->button(QDialogButtonBox::Ok)
+        ->setToolTip(tr("Create a new canvas"));
+    buttonBox->button(QDialogButtonBox::Cancel)
+        ->setToolTip(tr("Cancel and close the dialog"));
     mainLayout->addWidget(buttonBox);
 
-    connect(m_presetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
-            &NewFileDialog::onPresetChanged);
+    connect(m_presetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &NewFileDialog::onPresetChanged);
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
@@ -63,7 +66,8 @@ void NewFileDialog::setupUI()
 
 void NewFileDialog::onPresetChanged(int index)
 {
-    if (index < 0 || index >= int(sizeof(kCanvasPresets) / sizeof(kCanvasPresets[0])))
+    if (index < 0
+        || index >= int(sizeof(kCanvasPresets) / sizeof(kCanvasPresets[0])))
         return;
 
     const auto &preset = kCanvasPresets[index];

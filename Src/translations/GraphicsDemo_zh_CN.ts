@@ -1447,6 +1447,11 @@ Please use images with matching DPI.</source>
         <source>GraphicsDemo</source>
         <translation>GraphicsDemo</translation>
     </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="719"/>
+        <source>Task history</source>
+        <translation>任务历史</translation>
+    </message>
 </context>
 <context>
     <name>NewFileDialog</name>

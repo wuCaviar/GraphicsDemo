@@ -52,5 +52,6 @@
         <file>icons/dist-vcustom.svg</file>
         <file>icons/page-hcenter.svg</file>
         <file>icons/page-vcenter.svg</file>
+        <file>icons/task-history.svg</file>
     </qresource>
 </RCC>
