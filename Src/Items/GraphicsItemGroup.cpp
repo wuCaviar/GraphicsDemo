@@ -1,5 +1,6 @@
 #include "GraphicsItemGroup.h"
 
+#include <QStyleOptionGraphicsItem>
 #include <QGraphicsScene>
 #include <QPainter>
 
@@ -8,6 +9,15 @@ GraphicsItemGroup::GraphicsItemGroup(QGraphicsItem *parent)
 {
     setFlag(ItemIsSelectable, true);
     setFlag(ItemIsMovable, true);
+}
+
+void GraphicsItemGroup::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+{
+    // 去掉 State_Selected 以禁用 Qt 内置的选中虚线框
+    // 选中框由 ResizeHandleItem 统一绘制，避免两层叠加及残影
+    QStyleOptionGraphicsItem opt = *option;
+    opt.state &= ~QStyle::State_Selected;
+    QGraphicsItemGroup::paint(painter, &opt, widget);
 }
 
 QGraphicsItem *GraphicsItemGroup::cloneItem() const
@@ -25,13 +35,70 @@ QGraphicsItem *GraphicsItemGroup::cloneItem() const
             continue;
         QGraphicsItem *clone = gi->cloneItem();
         if (clone) {
-            // cloneItem 返回的是场景坐标下的独立图元
-            // 需要转为 group 的本地坐标
-            clone->setPos(mapFromScene(clone->pos()));
+            // cloneItem 拷贝了子图元的 pos()（组本地坐标）
+            // 先转为场景坐标，addToGroup 会自动转换回新组的本地坐标
+            clone->setPos(mapToScene(child->pos()));
             group->addToGroup(clone);
         }
     }
     return group;
+}
+
+bool GraphicsItemGroup::containsImageItem() const
+{
+    for (auto *child : childItems()) {
+        auto *igi = dynamic_cast<IGraphicsItem *>(child);
+        if (igi && !igi->isResizable())
+            return true;
+        // 递归检查嵌套组
+        auto *nestedGroup = dynamic_cast<GraphicsItemGroup *>(child);
+        if (nestedGroup && nestedGroup->containsImageItem())
+            return true;
+    }
+    return false;
+}
+
+void GraphicsItemGroup::setGeometryRect(const QRectF &newRect)
+{
+    QRectF oldRect = geometryRect();
+    if (oldRect.isEmpty() || newRect.isEmpty())
+        return;
+
+    prepareGeometryChange();
+
+    qreal sx = newRect.width() / oldRect.width();
+    qreal sy = newRect.height() / oldRect.height();
+
+    for (auto *child : childItems()) {
+        auto *igi = dynamic_cast<IGraphicsItem *>(child);
+        QPointF childPos = child->pos();
+        QRectF childRect = (igi && igi->supportsGeometryRect())
+                               ? igi->geometryRect()
+                               : child->boundingRect();
+
+        // 相对于 oldRect 左上角的位置，按比例缩放
+        qreal relX = childPos.x() + childRect.left() - oldRect.left();
+        qreal relY = childPos.y() + childRect.top() - oldRect.top();
+        qreal newLeft = newRect.left() + relX * sx;
+        qreal newTop = newRect.top() + relY * sy;
+
+        if (igi && igi->supportsSetGeometryRect()) {
+            QSizeF newSize(childRect.width() * sx, childRect.height() * sy);
+            QRectF scaledRect(childRect.topLeft(), newSize);
+            igi->setGeometryRect(scaledRect);
+            child->setPos(QPointF(newLeft - childRect.left(),
+                                  newTop - childRect.top()));
+        } else {
+            QSizeF newSize(childRect.width() * sx, childRect.height() * sy);
+            QSizeF origSize = childRect.size();
+            if (origSize.width() > 0 && origSize.height() > 0) {
+                qreal itemSx = newSize.width() / origSize.width();
+                qreal itemSy = newSize.height() / origSize.height();
+                child->setTransform(QTransform().scale(itemSx, itemSy));
+            }
+            child->setPos(QPointF(newLeft, newTop));
+        }
+    }
 }
 
 QRectF GraphicsItemGroup::geometryRect() const

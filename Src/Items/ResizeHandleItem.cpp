@@ -199,6 +199,11 @@ void ResizeHandleItem::updateHandlePositions()
     if (!isTargetValid())
         return;
 
+    // 保存旧多边形区域用于显式失效（处理选中框缩小时残影问题）
+    QRectF oldBounds;
+    if (m_selectionPolygon.size() >= 4)
+        oldBounds = m_selectionPolygon.boundingRect().adjusted(-kHandleSize, -kHandleSize, kHandleSize, kHandleSize);
+
     prepareGeometryChange();
 
     // 始终位于场景原点
@@ -208,6 +213,13 @@ void ResizeHandleItem::updateHandlePositions()
     m_selectionPolygon = computeSelectionPolygon();
     if (m_selectionPolygon.size() < 4)
         return;
+
+    // 显式失效旧区域，防止多边形缩小时残留旧选中框
+    if (!oldBounds.isNull() && scene()) {
+        QRectF newBounds = m_selectionPolygon.boundingRect().adjusted(-kHandleSize, -kHandleSize, kHandleSize, kHandleSize);
+        if (oldBounds != newBounds)
+            scene()->update(oldBounds);
+    }
 
     // 不可缩放时（含图片图元），只显示选中框，不绘制缩放手柄
     bool shouldSuppressHandles = false;

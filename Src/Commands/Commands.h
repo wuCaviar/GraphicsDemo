@@ -236,6 +236,8 @@ public:
     void undo() override;
     void redo() override;
 
+    QGraphicsItem *groupItem() const { return m_group; }
+
 private:
     QPointer<QGraphicsScene> m_scene;
     QList<QGraphicsItem *> m_children;   // 子图元列表

@@ -378,10 +378,16 @@ void StretchAlignItemsCommand::undo()
     for (int i = 0; i < m_items.size(); ++i) {
         if (!m_items[i])
             continue;
-        m_items[i]->setPos(m_oldPos[i]);
         auto *gi = dynamic_cast<IGraphicsItem *>(m_items[i]);
-        if (gi && gi->supportsSetGeometryRect())
-            gi->setGeometryRect(m_oldGeom[i]);
+        bool isGroup = gi && gi->itemType() == IGraphicsItem::GroupItemType;
+        if (isGroup) {
+            // 组不参与拉伸，仅还原位置（几何未变）
+            m_items[i]->setPos(m_oldPos[i]);
+        } else {
+            m_items[i]->setPos(m_oldPos[i]);
+            if (gi && gi->supportsSetGeometryRect())
+                gi->setGeometryRect(m_oldGeom[i]);
+        }
     }
 }
 
@@ -392,10 +398,17 @@ void StretchAlignItemsCommand::redo()
     for (int i = 0; i < m_items.size(); ++i) {
         if (!m_items[i])
             continue;
-        m_items[i]->setPos(m_newPos[i]);
         auto *gi = dynamic_cast<IGraphicsItem *>(m_items[i]);
-        if (gi && gi->supportsSetGeometryRect())
-            gi->setGeometryRect(m_newGeom[i]);
+        bool isGroup = gi && gi->itemType() == IGraphicsItem::GroupItemType;
+        if (isGroup) {
+            // 组不拉伸几何，位置需补偿 newGeom 与 oldGeom 的原点偏移
+            QPointF offset = m_newGeom[i].topLeft() - m_oldGeom[i].topLeft();
+            m_items[i]->setPos(m_newPos[i] + offset);
+        } else {
+            m_items[i]->setPos(m_newPos[i]);
+            if (gi && gi->supportsSetGeometryRect())
+                gi->setGeometryRect(m_newGeom[i]);
+        }
     }
 }
 

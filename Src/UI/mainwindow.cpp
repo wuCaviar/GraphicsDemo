@@ -1952,18 +1952,13 @@ void MainWindow::onGroup()
     if (topLevel.size() < 2)
         return;
 
-    m_undoStack->push(new GroupItemsCommand(m_pView->scene(), topLevel));
+    auto *cmd = new GroupItemsCommand(m_pView->scene(), topLevel);
+    m_undoStack->push(cmd);
 
     // 选中新组
     m_pView->scene()->clearSelection();
-    for (auto *item : m_pView->scene()->items()) {
-        if (auto *grp = qgraphicsitem_cast<GraphicsItemGroup *>(item)) {
-            if (!grp->childGraphicsItems().isEmpty()) {
-                grp->setSelected(true);
-                break;
-            }
-        }
-    }
+    if (cmd->groupItem())
+        cmd->groupItem()->setSelected(true);
 }
 
 void MainWindow::onUngroup()
@@ -2199,6 +2194,8 @@ void MainWindow::onGeometryChanged(QGraphicsItem *item, const QRectF &oldRect,
     m_undoStack->push(new PropertyChangeCommand(
         item, PropertyChangeCommand::Geometry, QVariant(oldRect),
         QVariant(newRect), m_pView->scene()));
+    // 尺寸变更后需要更新 ResizeHandleItem 以正确显示选中框
+    m_pView->scheduleResizeHandleUpdate();
 }
 
 void MainWindow::onCornerRadiusChanged(QGraphicsItem *item, qreal oldR,
@@ -2214,6 +2211,8 @@ void MainWindow::onPositionChanged(QGraphicsItem *item, const QPointF &oldPos,
 {
     m_undoStack->push(
         new PositionChangeCommand(item, oldPos, newPos, m_pView->scene()));
+    // 位置变更后需要更新 ResizeHandleItem 以正确显示选中框
+    m_pView->scheduleResizeHandleUpdate();
 }
 
 void MainWindow::onRotationChanged(QGraphicsItem *item, qreal oldRotation,

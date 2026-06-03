@@ -42,10 +42,10 @@ QAtGraphicsView::QAtGraphicsView(QWidget *parent) : QGraphicsView(parent)
     setScene(m_scene);
     setDragMode(RubberBandDrag);
     setRenderHint(QPainter::Antialiasing);
-    setViewportUpdateMode(SmartViewportUpdate);
+    setViewportUpdateMode(FullViewportUpdate);
     setTransformationAnchor(AnchorUnderMouse);
     setResizeAnchor(AnchorUnderMouse);
-    setOptimizationFlags(DontAdjustForAntialiasing | DontSavePainterState);
+    // setOptimizationFlags(DontAdjustForAntialiasing | DontSavePainterState);
 
     m_defaultPen = QPen(Qt::black, 1.0);
     m_defaultBrush = QBrush(Qt::black);
@@ -158,20 +158,20 @@ void QAtGraphicsView::setTool(Tool tool)
     switch (tool) {
     case Tool::Select:
         setDragMode(RubberBandDrag);
-        setCursor(Qt::ArrowCursor);
+        viewport()->setCursor(Qt::ArrowCursor);
         break;
     case Tool::Hand:
         setDragMode(NoDrag);
-        setCursor(Qt::OpenHandCursor);
+        viewport()->setCursor(Qt::OpenHandCursor);
         break;
     case Tool::Text:
     case Tool::Image:
         setDragMode(NoDrag);
-        setCursor(Qt::ArrowCursor);
+        viewport()->setCursor(Qt::ArrowCursor);
         break;
     default:
         setDragMode(NoDrag);
-        setCursor(Qt::CrossCursor);
+        viewport()->setCursor(Qt::CrossCursor);
         break;
     }
 
@@ -224,7 +224,7 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
     if (m_tool == Tool::Hand) {
         m_handPanning = true;
         m_handLastPos = event->pos();
-        setCursor(Qt::ClosedHandCursor);
+        viewport()->setCursor(Qt::ClosedHandCursor);
         event->accept();
         return;
     }
@@ -390,7 +390,7 @@ void QAtGraphicsView::mouseReleaseEvent(QMouseEvent *event)
 
     if (m_handPanning) {
         m_handPanning = false;
-        setCursor(m_tool == Tool::Hand ? Qt::OpenHandCursor : Qt::ArrowCursor);
+        viewport()->setCursor(m_tool == Tool::Hand ? Qt::OpenHandCursor : Qt::ArrowCursor);
         event->accept();
         return;
     }

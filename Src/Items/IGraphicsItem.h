@@ -186,7 +186,8 @@ inline QList<QGraphicsItem *> filterSelectableItems(const QList<QGraphicsItem *>
     result.reserve(items.size());
     for (auto *item : items) {
         int t = item->type();
-        if (t != QGraphicsItem::UserType + 100 && t != QGraphicsItem::UserType + 200)
+        if (t != QGraphicsItem::UserType + 100 && t != QGraphicsItem::UserType + 200
+            && !item->parentItem())
             result << item;
     }
     return result;
