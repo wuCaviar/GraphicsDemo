@@ -22,6 +22,7 @@ ImportImageDialog::ImportImageDialog(QWidget *parent,
 
     // DPI 策略
     m_dpiCombo = new QComboBox(this);
+    m_dpiCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_dpiCombo->addItem(
         tr("Use Image DPI"),
         static_cast<int>(ImportParameters::DpiPolicy::UseImageDpi));
@@ -44,6 +45,7 @@ ImportImageDialog::ImportImageDialog(QWidget *parent,
 
     // 颜色空间
     m_colorCombo = new QComboBox(this);
+    m_colorCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_colorCombo->addItem(
         tr("Keep Original"),
         static_cast<int>(ImportParameters::ColorSpace::KeepOriginal));
@@ -57,6 +59,7 @@ ImportImageDialog::ImportImageDialog(QWidget *parent,
 
     // Alpha 通道处理
     m_alphaCombo = new QComboBox(this);
+    m_alphaCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_alphaCombo->addItem(
         tr("Keep Alpha"),
         static_cast<int>(ImportParameters::AlphaHandling::Keep));

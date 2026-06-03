@@ -29,7 +29,9 @@ QGraphicsItem *ImageItem::cloneItem() const
 {
     auto *item = new ImageItem(pixmap());
     item->setItemPen(m_pen);
-    item->setItemPenCmyk(m_penCmyk.c, m_penCmyk.m, m_penCmyk.y, m_penCmyk.k);
+    if (m_penCmyk.valid)
+        item->setItemPenCmyk(m_penCmyk.c, m_penCmyk.m, m_penCmyk.y,
+                             m_penCmyk.k);
     item->setPos(pos());
     item->setRotation(rotation());
     item->setTransform(transform());

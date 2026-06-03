@@ -1,7 +1,7 @@
 
 TEMPLATE = app
 
-QT += core gui widgets network xml concurrent
+QT += core gui widgets network xml concurrent openglwidgets
 
 TARGET = ATGraphics
 

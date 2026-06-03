@@ -2020,8 +2020,8 @@ void MainWindow::onSettings()
     SettingsDialog dlg(this);
     if (dlg.exec() != QDialog::Accepted)
         return;
-    // TODO: 使用 dlg.resolutionX(), dlg.resolutionY(),
-    //       dlg.dotCurvePath(), dlg.colorCurvePath(), dlg.outputPath()
+
+    getToolInfo();
 }
 
 void MainWindow::onPreferences()
@@ -2035,7 +2035,7 @@ void MainWindow::onAbout()
     QString strText = QString(tr("<h3>AT Drawing Tools</h3>"
                                  "<p>Current Version: %1</p>"
                                  "<p>    Rip Version: %2</p>"))
-                          .arg(ATHC_VERSION_STR_MAJ_MIN_MIC)
+                          .arg(qApp->applicationVersion())
                           .arg(RipVersion);
 
     QMessageBox::about(this, tr("About AT Drawing Tools"), strText);

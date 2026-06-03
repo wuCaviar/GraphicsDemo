@@ -13,23 +13,11 @@
 #include "colortransform.h"
 #include "QtColorWidgets/color_dialog.hpp"
 
-class ComboBoxAdjuster : public QObject {
-public:
-    using QObject::QObject;
-protected:
-    bool eventFilter(QObject *obj, QEvent *event) override {
-        if (event->type() == QEvent::Show) {
-            if (auto *combo = qobject_cast<QComboBox *>(obj))
-                combo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-        }
-        return QObject::eventFilter(obj, event);
-    }
-};
-
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    a.setApplicationVersion(ATHC_VERSION_STR_MAJ_MIN_MIC);
+    a.setApplicationName("ATGraphics");
+    a.setApplicationVersion(appVersion());
 
     // 加载中文翻译
     const QStringList uiLanguages = QLocale::system().uiLanguages();
@@ -38,8 +26,9 @@ int main(int argc, char *argv[])
 
         // Qt 基础翻译（标准按钮等）
         auto *qtTranslator = new QTranslator(&a);
-        if (qtTranslator->load("qtbase_" + localeName,
-                               QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+        if (qtTranslator->load(
+                "qtbase_" + localeName,
+                QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
             a.installTranslator(qtTranslator);
         }
 
@@ -50,9 +39,6 @@ int main(int argc, char *argv[])
             break;
         }
     }
-
-    // 全局 QComboBox 弹出框自适应内容宽度
-    a.installEventFilter(new ComboBoxAdjuster(&a));
 
     // 加载qss
     QFile f(":/qdarkstyle/light/lightstyle.qss");
@@ -70,7 +56,7 @@ int main(int argc, char *argv[])
                   AppConfig::instance().cmykIccPath());
     color_widgets::ColorDialog::setColorTransform(&cm);
 
-    QString name = "com.athc.darwingtools";
+    QString name = "com.athc.atgraphics";
     SingleInstance instance;
     if (SingleInstance::hasPrevious(name))
         return EXIT_SUCCESS;

@@ -8,7 +8,8 @@
 // ============================================================
 // AddItemCommand
 // ============================================================
-AddItemCommand::AddItemCommand(QGraphicsScene *scene, QGraphicsItem *item, QUndoCommand *parent)
+AddItemCommand::AddItemCommand(QGraphicsScene *scene, QGraphicsItem *item,
+                               QUndoCommand *parent)
     : QUndoCommand(parent), m_scene(scene), m_item(item)
 {
     setText(QObject::tr("Add Item"));
@@ -93,8 +94,7 @@ void RemoveItemsCommand::redo()
 MoveItemsCommand::MoveItemsCommand(const QList<QGraphicsItem *> &items,
                                    const QList<QPointF> &oldPositions,
                                    const QList<QPointF> &newPositions,
-                                   QGraphicsScene *scene,
-                                   QUndoCommand *parent)
+                                   QGraphicsScene *scene, QUndoCommand *parent)
     : QUndoCommand(parent)
     , m_items(items)
     , m_oldPos(oldPositions)
@@ -129,10 +129,9 @@ void MoveItemsCommand::redo()
 // ============================================================
 // PropertyChangeCommand
 // ============================================================
-PropertyChangeCommand::PropertyChangeCommand(QGraphicsItem *item, PropType propType,
-                                             const QVariant &oldValue, const QVariant &newValue,
-                                             QGraphicsScene *scene,
-                                             QUndoCommand *parent)
+PropertyChangeCommand::PropertyChangeCommand(
+    QGraphicsItem *item, PropType propType, const QVariant &oldValue,
+    const QVariant &newValue, QGraphicsScene *scene, QUndoCommand *parent)
     : QUndoCommand(parent)
     , m_item(item)
     , m_propType(propType)
@@ -141,12 +140,24 @@ PropertyChangeCommand::PropertyChangeCommand(QGraphicsItem *item, PropType propT
     , m_scene(scene)
 {
     switch (propType) {
-    case Pen:          setText(QObject::tr("Change Pen")); break;
-    case Brush:        setText(QObject::tr("Change Brush")); break;
-    case Font:         setText(QObject::tr("Change Font")); break;
-    case Text:         setText(QObject::tr("Change Text")); break;
-    case Geometry:     setText(QObject::tr("Resize")); break;
-    case CornerRadius: setText(QObject::tr("Change Corner Radius")); break;
+    case Pen:
+        setText(QObject::tr("Change Pen"));
+        break;
+    case Brush:
+        setText(QObject::tr("Change Brush"));
+        break;
+    case Font:
+        setText(QObject::tr("Change Font"));
+        break;
+    case Text:
+        setText(QObject::tr("Change Text"));
+        break;
+    case Geometry:
+        setText(QObject::tr("Resize"));
+        break;
+    case CornerRadius:
+        setText(QObject::tr("Change Corner Radius"));
+        break;
     }
 }
 
@@ -155,15 +166,25 @@ void PropertyChangeCommand::undo()
     // 场景已销毁，图元必然已无效
     if (!m_scene)
         return;
-    if (!m_item) return;
+    if (!m_item)
+        return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_item);
-    if (!gi) return;
+    if (!gi)
+        return;
 
     switch (m_propType) {
-    case Pen:          gi->setItemPen(m_oldValue.value<QPen>()); break;
-    case Brush:        gi->setItemBrush(m_oldValue.value<QBrush>()); break;
-    case Font:         gi->setItemFont(m_oldValue.value<QFont>()); break;
-    case Text:         gi->setText(m_oldValue.toString()); break;
+    case Pen:
+        gi->setItemPen(m_oldValue.value<QPen>());
+        break;
+    case Brush:
+        gi->setItemBrush(m_oldValue.value<QBrush>());
+        break;
+    case Font:
+        gi->setItemFont(m_oldValue.value<QFont>());
+        break;
+    case Text:
+        gi->setText(m_oldValue.toString());
+        break;
     case Geometry:
         gi->setGeometryRect(m_oldValue.toRectF());
         break;
@@ -179,15 +200,25 @@ void PropertyChangeCommand::redo()
     // 场景已销毁，图元必然已无效
     if (!m_scene)
         return;
-    if (!m_item) return;
+    if (!m_item)
+        return;
     auto *gi = dynamic_cast<IGraphicsItem *>(m_item);
-    if (!gi) return;
+    if (!gi)
+        return;
 
     switch (m_propType) {
-    case Pen:          gi->setItemPen(m_newValue.value<QPen>()); break;
-    case Brush:        gi->setItemBrush(m_newValue.value<QBrush>()); break;
-    case Font:         gi->setItemFont(m_newValue.value<QFont>()); break;
-    case Text:         gi->setText(m_newValue.toString()); break;
+    case Pen:
+        gi->setItemPen(m_newValue.value<QPen>());
+        break;
+    case Brush:
+        gi->setItemBrush(m_newValue.value<QBrush>());
+        break;
+    case Font:
+        gi->setItemFont(m_newValue.value<QFont>());
+        break;
+    case Text:
+        gi->setText(m_newValue.toString());
+        break;
     case Geometry:
         gi->setGeometryRect(m_newValue.toRectF());
         break;
@@ -253,7 +284,11 @@ ZValueChangeCommand::ZValueChangeCommand(const QList<QGraphicsItem *> &items,
                                          const QList<qreal> &newZ,
                                          QGraphicsScene *scene,
                                          QUndoCommand *parent)
-    : QUndoCommand(parent), m_items(items), m_oldZ(oldZ), m_newZ(newZ), m_scene(scene)
+    : QUndoCommand(parent)
+    , m_items(items)
+    , m_oldZ(oldZ)
+    , m_newZ(newZ)
+    , m_scene(scene)
 {
     setText(QObject::tr("Change Z-Order"));
 }
@@ -319,14 +354,11 @@ void AlignItemsCommand::redo()
 // ============================================================
 // StretchAlignItemsCommand（拉伸对齐：位置 + 几何同时变更）
 // ============================================================
-StretchAlignItemsCommand::StretchAlignItemsCommand(const QList<QGraphicsItem *> &items,
-                                                   const QList<QPointF> &oldPositions,
-                                                   const QList<QPointF> &newPositions,
-                                                   const QList<QRectF> &oldGeometries,
-                                                   const QList<QRectF> &newGeometries,
-                                                   const QString &description,
-                                                   QGraphicsScene *scene,
-                                                   QUndoCommand *parent)
+StretchAlignItemsCommand::StretchAlignItemsCommand(
+    const QList<QGraphicsItem *> &items, const QList<QPointF> &oldPositions,
+    const QList<QPointF> &newPositions, const QList<QRectF> &oldGeometries,
+    const QList<QRectF> &newGeometries, const QString &description,
+    QGraphicsScene *scene, QUndoCommand *parent)
     : QUndoCommand(parent)
     , m_items(items)
     , m_oldPos(oldPositions)
@@ -335,7 +367,8 @@ StretchAlignItemsCommand::StretchAlignItemsCommand(const QList<QGraphicsItem *> 
     , m_newGeom(newGeometries)
     , m_scene(scene)
 {
-    setText(description.isEmpty() ? QObject::tr("Stretch Align Items") : description);
+    setText(description.isEmpty() ? QObject::tr("Stretch Align Items")
+                                  : description);
 }
 
 void StretchAlignItemsCommand::undo()
@@ -343,7 +376,8 @@ void StretchAlignItemsCommand::undo()
     if (!m_scene)
         return;
     for (int i = 0; i < m_items.size(); ++i) {
-        if (!m_items[i]) continue;
+        if (!m_items[i])
+            continue;
         m_items[i]->setPos(m_oldPos[i]);
         auto *gi = dynamic_cast<IGraphicsItem *>(m_items[i]);
         if (gi && gi->supportsSetGeometryRect())
@@ -356,7 +390,8 @@ void StretchAlignItemsCommand::redo()
     if (!m_scene)
         return;
     for (int i = 0; i < m_items.size(); ++i) {
-        if (!m_items[i]) continue;
+        if (!m_items[i])
+            continue;
         m_items[i]->setPos(m_newPos[i]);
         auto *gi = dynamic_cast<IGraphicsItem *>(m_items[i]);
         if (gi && gi->supportsSetGeometryRect())
@@ -367,10 +402,16 @@ void StretchAlignItemsCommand::redo()
 // ============================================================
 // PositionChangeCommand（单图元位置变更，由属性面板触发）
 // ============================================================
-PositionChangeCommand::PositionChangeCommand(QGraphicsItem *item, const QPointF &oldPos,
-                                             const QPointF &newPos, QGraphicsScene *scene,
+PositionChangeCommand::PositionChangeCommand(QGraphicsItem *item,
+                                             const QPointF &oldPos,
+                                             const QPointF &newPos,
+                                             QGraphicsScene *scene,
                                              QUndoCommand *parent)
-    : QUndoCommand(parent), m_item(item), m_oldPos(oldPos), m_newPos(newPos), m_scene(scene)
+    : QUndoCommand(parent)
+    , m_item(item)
+    , m_oldPos(oldPos)
+    , m_newPos(newPos)
+    , m_scene(scene)
 {
     setText(QObject::tr("Change Position"));
 }
@@ -392,8 +433,10 @@ void PositionChangeCommand::redo()
 // ============================================================
 // RotationChangeCommand（单图元绕中心旋转变更）
 // ============================================================
-RotationChangeCommand::RotationChangeCommand(QGraphicsItem *item, qreal oldRotation,
-                                             qreal newRotation, QGraphicsScene *scene,
+RotationChangeCommand::RotationChangeCommand(QGraphicsItem *item,
+                                             qreal oldRotation,
+                                             qreal newRotation,
+                                             QGraphicsScene *scene,
                                              QUndoCommand *parent)
     : QUndoCommand(parent)
     , m_item(item)
@@ -462,40 +505,20 @@ GroupItemsCommand::GroupItemsCommand(QGraphicsScene *scene,
     m_group = new GraphicsItemGroup;
 }
 
-GroupItemsCommand::~GroupItemsCommand()
-{
-    if (!m_scene)
-        return;
-    // 如果 command 持有组且组不在场景中，删除组
-    if (m_owned && m_group && !m_group->scene())
-        delete m_group;
-    // 如果 command 持有子图元且不在场景/组中，删除
-    if (m_owned) {
-        for (auto *child : m_children) {
-            if (child && !child->scene() && !child->parentItem())
-                delete child;
-        }
-    }
-}
+GroupItemsCommand::~GroupItemsCommand() { }
 
 void GroupItemsCommand::undo()
 {
     if (!m_scene || !m_group)
         return;
 
-    // 从组中提取子图元到场景
+    // 从组中提取子图元到场景（内部 removeFromGroup 已自动加到场景）
     auto *grp = qgraphicsitem_cast<GraphicsItemGroup *>(m_group);
     if (grp)
         grp->extractChildren();
 
-    // 移除组
+    // 移除组（子图元已在场景中）
     m_scene->removeItem(m_group);
-
-    // 子图元回到场景
-    for (auto *child : m_children) {
-        if (child)
-            m_scene->addItem(child);
-    }
 
     m_owned = true; // command 持有组和子图元
 }
@@ -528,7 +551,8 @@ void GroupItemsCommand::redo()
 // ============================================================
 // UngroupItemsCommand
 // ============================================================
-UngroupItemsCommand::UngroupItemsCommand(QGraphicsScene *scene, QGraphicsItem *groupItem,
+UngroupItemsCommand::UngroupItemsCommand(QGraphicsScene *scene,
+                                         QGraphicsItem *groupItem,
                                          QUndoCommand *parent)
     : QUndoCommand(parent), m_scene(scene), m_group(groupItem)
 {
@@ -543,21 +567,7 @@ UngroupItemsCommand::UngroupItemsCommand(QGraphicsScene *scene, QGraphicsItem *g
     }
 }
 
-UngroupItemsCommand::~UngroupItemsCommand()
-{
-    if (!m_scene)
-        return;
-    // command 持有组时（undo 状态）删除组
-    if (m_owned && m_group && !m_group->scene())
-        delete m_group;
-    // command 持有子图元时（redo 状态，已从场景移除）删除
-    if (m_owned) {
-        for (auto *child : m_children) {
-            if (child && !child->scene() && !child->parentItem())
-                delete child;
-        }
-    }
-}
+UngroupItemsCommand::~UngroupItemsCommand() { }
 
 void UngroupItemsCommand::undo()
 {
@@ -608,10 +618,16 @@ void UngroupItemsCommand::redo()
 // ============================================================
 // CanvasResizeCommand
 // ============================================================
-CanvasResizeCommand::CanvasResizeCommand(CanvasItem *canvas, const QSizeF &oldSize,
-                                         const QSizeF &newSize, QGraphicsScene *scene,
+CanvasResizeCommand::CanvasResizeCommand(CanvasItem *canvas,
+                                         const QSizeF &oldSize,
+                                         const QSizeF &newSize,
+                                         QGraphicsScene *scene,
                                          QUndoCommand *parent)
-    : QUndoCommand(parent), m_canvas(canvas), m_oldSize(oldSize), m_newSize(newSize), m_scene(scene)
+    : QUndoCommand(parent)
+    , m_canvas(canvas)
+    , m_oldSize(oldSize)
+    , m_newSize(newSize)
+    , m_scene(scene)
 {
     setText(QObject::tr("Fit Canvas"));
 }

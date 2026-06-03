@@ -86,6 +86,7 @@ void PropertyPanel::setupUI()
     m_penWidthSpin = new QSpinBox;
     m_penWidthSpin->setRange(0, 100);
     m_penStyleCombo = new QComboBox;
+    m_penStyleCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_penStyleCombo->addItems({ tr("Solid"), tr("Dash"), tr("Dot"),
                                 tr("DashDot"), tr("DashDotDot"), tr("None") });
     penLayout->addRow(tr("Color:"), m_penColorSelector);
@@ -99,6 +100,7 @@ void PropertyPanel::setupUI()
     auto *brushLayout = new QFormLayout(m_brushGroup);
 
     m_fillModeCombo = new QComboBox;
+    m_fillModeCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     m_fillModeCombo->addItems(
         { tr("No Fill"), tr("Solid Color"), tr("Gradient") });
 

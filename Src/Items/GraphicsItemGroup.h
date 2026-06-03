@@ -4,10 +4,15 @@
 #include "IGraphicsItem.h"
 #include <QGraphicsItemGroup>
 
-class GraphicsItemGroup : public QGraphicsItemGroup, public IGraphicsItem
+class GraphicsItemGroup
+    : public QGraphicsItemGroup
+    , public IGraphicsItem
 {
 public:
-    enum { Type = UserType + GroupItemType };
+    enum
+    {
+        Type = UserType + GroupItemType
+    };
 
     explicit GraphicsItemGroup(QGraphicsItem *parent = nullptr);
 
@@ -15,13 +20,13 @@ public:
 
     // IGraphicsItem
     ItemType itemType() const override { return GroupItemType; }
-    PropertyFlags propertyFlags() const override { return HasRotation; }
+    PropertyFlags propertyFlags() const override { return { }; }
     QGraphicsItem *cloneItem() const override;
 
-    QPen itemPen() const override { return {}; }
-    void setItemPen(const QPen &) override {}
-    QBrush itemBrush() const override { return {}; }
-    void setItemBrush(const QBrush &) override {}
+    QPen itemPen() const override { return { }; }
+    void setItemPen(const QPen &) override { }
+    QBrush itemBrush() const override { return { }; }
+    void setItemBrush(const QBrush &) override { }
 
     QRectF geometryRect() const override;
     bool supportsGeometryRect() const override { return true; }

@@ -27,6 +27,7 @@ void NewFileDialog::setupUI()
     auto *formLayout = new QFormLayout(group);
 
     m_presetCombo = new QComboBox;
+    m_presetCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     for (const auto &p : kCanvasPresets)
         m_presetCombo->addItem(p.name);
     formLayout->addRow(tr("Preset:"), m_presetCombo);

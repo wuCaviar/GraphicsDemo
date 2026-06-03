@@ -73,7 +73,8 @@ void AppConfig::saveConfig() const
 
     QDomDocument doc;
     doc.appendChild(doc.createProcessingInstruction(
-        QStringLiteral("xml"), QStringLiteral("version=\"1.0\" encoding=\"UTF-8\"")));
+        QStringLiteral("xml"),
+        QStringLiteral("version=\"1.0\" encoding=\"UTF-8\"")));
 
     QDomElement root = doc.createElement(QStringLiteral("Config"));
     doc.appendChild(root);
@@ -126,8 +127,7 @@ QString AppConfig::iccProfileBasePath() const
 
 QString AppConfig::srgbIccPath() const
 {
-    return iccProfileBasePath()
-           + QStringLiteral("/RGB/SRGB IEC61966-2.1.icc");
+    return iccProfileBasePath() + QStringLiteral("/RGB/SRGB IEC61966-2.1.icc");
 }
 
 QString AppConfig::cmykIccPath() const

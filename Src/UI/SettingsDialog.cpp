@@ -39,6 +39,7 @@ void SettingsDialog::setupUI()
 
     resLayout->addWidget(new QLabel(tr("X:")));
     m_resolutionXCombo = new QComboBox;
+    m_resolutionXCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     for (int dpi : X_DPIValues)
         m_resolutionXCombo->addItem(QString::number(dpi) + tr(" dpi"), dpi);
     m_resolutionXCombo->setCurrentIndex(1); // 默认 360 dpi
@@ -46,6 +47,7 @@ void SettingsDialog::setupUI()
 
     resLayout->addWidget(new QLabel(tr("Y:")));
     m_resolutionYCombo = new QComboBox;
+    m_resolutionYCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     for (int dpi : Y_DPIValues)
         m_resolutionYCombo->addItem(QString::number(dpi) + tr(" dpi"), dpi);
     m_resolutionYCombo->setCurrentIndex(0); // 默认 600 dpi
@@ -100,13 +102,13 @@ void SettingsDialog::setupUI()
 
     connect(dotCurveBtn, &QPushButton::clicked, this, [this]() {
         QString path = QFileDialog::getOpenFileName(
-            this, tr("选择网点曲线文件"), {}, tr("曲线文件 (*.p)"));
+            this, tr("选择网点曲线文件"), { }, tr("曲线文件 (*.p)"));
         if (!path.isEmpty())
             m_dotCurveEdit->setText(path);
     });
     connect(colorCurveBtn, &QPushButton::clicked, this, [this]() {
         QString path = QFileDialog::getOpenFileName(
-            this, tr("选择色彩曲线文件"), {}, tr("色彩曲线文件 (*.icm)"));
+            this, tr("选择色彩曲线文件"), { }, tr("色彩曲线文件 (*.icm)"));
         if (!path.isEmpty())
             m_colorCurveEdit->setText(path);
     });
@@ -217,8 +219,10 @@ void SettingsDialog::saveConfig()
 
     // <DPI X="..." Y="..."/>
     QDomElement dpiEl = doc.createElement(QStringLiteral("DPI"));
-    dpiEl.setAttribute(QStringLiteral("X"), m_resolutionXCombo->currentData().toInt());
-    dpiEl.setAttribute(QStringLiteral("Y"), m_resolutionYCombo->currentData().toInt());
+    dpiEl.setAttribute(QStringLiteral("X"),
+                       m_resolutionXCombo->currentData().toInt());
+    dpiEl.setAttribute(QStringLiteral("Y"),
+                       m_resolutionYCombo->currentData().toInt());
     root.appendChild(dpiEl);
 
     // <ICC ProofFile="..." ICCFile="..."/>
