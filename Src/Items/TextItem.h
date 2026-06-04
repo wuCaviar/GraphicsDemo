@@ -84,6 +84,11 @@ private:
     CmykColor m_penCmyk;
     CmykColor m_brushCmyk;
     QMap<double, CmykColor> m_gradientCmyk;
+
+    // 缩放相关
+    QRectF m_originalRect;        // 初始矩形（用于计算缩放比例）
+    qreal m_originalFontSize = 0; // 初始字体大小
+    void updateFontScale();       // 根据矩形变化更新字体缩放
 };
 
 #endif // TEXTITEM_H

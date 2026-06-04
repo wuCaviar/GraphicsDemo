@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
         // Qt 基础翻译（标准按钮等）
         auto *qtTranslator = new QTranslator(&a);
         if (qtTranslator->load(
-                "qtbase_" + localeName,
+                "qt_" + localeName,
                 QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
             a.installTranslator(qtTranslator);
         }

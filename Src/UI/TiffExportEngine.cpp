@@ -2,6 +2,7 @@
 #include "TiffExportPipeline.h"
 
 #include "CanvasItem.h"
+#include "GraphicsItemGroup.h"
 #include "IGraphicsItem.h"
 #include "ImageItem.h"
 #include "colortransform.h"
@@ -73,6 +74,12 @@ void TiffExportEngine::separateItems(const QList<QGraphicsItem *> &allItems,
                                      QList<QGraphicsItem *> &nonImageItems)
 {
     for (auto *gi : allItems) {
+        auto *group = dynamic_cast<GraphicsItemGroup *>(gi);
+        if (group) {
+            // 展开组，遍历组内包含的图元
+            separateItems(group->childItems(), imageItems, nonImageItems);
+            continue;
+        }
         auto *imgItem = dynamic_cast<ImageItem *>(gi);
         if (imgItem)
             imageItems.append(imgItem);
@@ -457,11 +464,11 @@ void TiffExportEngine::launchExport(
             Qt::QueuedConnection);
     };
 
-    auto *thread = QThread::create(
-        [guard, outputPath, sources = std::move(sources),
-         overlays = std::move(overlays), outputSize, settings, progress,
-         ripEnabled, ripXRes, ripYRes, netUtils,
-         cancelFlag = m_cancelFlag]() mutable {
+    auto *thread =
+        QThread::create([guard, outputPath, sources = std::move(sources),
+                         overlays = std::move(overlays), outputSize, settings,
+                         progress, ripEnabled, ripXRes, ripYRes, netUtils,
+                         cancelFlag = m_cancelFlag]() mutable {
             try {
                 // ---- 使用 StripPipeline 执行流水线导出 ----
                 ImageUtils::StripPipeline::Config pipelineCfg;

@@ -1697,6 +1697,19 @@ void MainWindow::importMultipleImages(const QStringList &paths)
     qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz");
 }
 
+// 递归检查图元列表中是否包含 ImageItem（会遍历组内的子图元）
+static bool containsImageItemRecursive(const QList<QGraphicsItem *> &items)
+{
+    for (auto *item : items) {
+        if (dynamic_cast<ImageItem *>(item))
+            return true;
+        auto *group = dynamic_cast<GraphicsItemGroup *>(item);
+        if (group && containsImageItemRecursive(group->childItems()))
+            return true;
+    }
+    return false;
+}
+
 void MainWindow::onExportImage()
 {
     if (m_tiffEngine->isRunning()) {
@@ -1709,15 +1722,9 @@ void MainWindow::onExportImage()
     int dpiOverride = 0;
     {
         auto *canvas = m_pView->canvasItem();
-        bool hasImages = false;
         const auto allItems =
             ::filterSelectableItems(m_pView->scene()->items());
-        for (auto *item : allItems) {
-            if (dynamic_cast<ImageItem *>(item)) {
-                hasImages = true;
-                break;
-            }
-        }
+        bool hasImages = containsImageItemRecursive(allItems);
         if (!hasImages && (!canvas || !canvas->isDpiLocked())) {
             QStringList dpiItems;
             for (int dpi : kDpiValues)
