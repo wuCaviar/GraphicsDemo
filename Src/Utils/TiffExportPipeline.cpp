@@ -400,12 +400,11 @@ void StripPipeline::producerStage(StripSlot &slot,
             }
 
             // 1:1 映射：outputRect 尺寸 == 源图像像素尺寸
+            int srcTop = static_cast<int>(std::floor(src.outputRect.top()));
             int stripSrcY0 = std::max(stripY0, srcRectY0);
             int stripSrcY1 = std::min(stripY1, srcRectY1);
-            int sourceRow0 =
-                stripSrcY0 - static_cast<int>(src.outputRect.top());
-            int sourceRow1 =
-                stripSrcY1 - static_cast<int>(src.outputRect.top()) - 1;
+            int sourceRow0 = stripSrcY0 - srcTop;
+            int sourceRow1 = stripSrcY1 - srcTop - 1;
             sourceRow0 = std::clamp(sourceRow0, 0,
                                     static_cast<int>(reader.height()) - 1);
             sourceRow1 = std::clamp(sourceRow1, 0,
@@ -438,6 +437,7 @@ void StripPipeline::producerStage(StripSlot &slot,
             sd.numSourceRows = numRows;
             sd.hasData = true;
             sd.outputRect = src.outputRect;
+            sd.sourcePixelWidth = static_cast<int>(reader.width());
             sd.zOrder = src.zOrder;
 
             // 逐行读取并转换为 CMYK（预分配行缓冲区，避免每行 malloc）
@@ -564,12 +564,17 @@ void StripPipeline::organizerStage(StripSlot &slot,
                 if (localRow < 0 || localRow >= sd->numSourceRows)
                     continue;
 
-                int srcWidth =
-                    static_cast<int>(std::ceil(sd->outputRect.width()));
+                // 使用 sourcePixelWidth（= reader.width()）作为行步长，
+                // 与 Producer 分配 cmykRows 时的步长一致。
+                // 不能使用 ceil(outputRect.width())，因为浮点精度误差可能导致
+                // ceil(width) = width + 1，造成步长错位。
+                int srcWidth = sd->sourcePixelWidth;
                 int bx0 = std::max(
                     0, static_cast<int>(std::floor(sd->outputRect.left())));
                 int bx1 = std::min(outWidth, static_cast<int>(std::ceil(
                                                  sd->outputRect.right())));
+                // 钳制拷贝范围，防止浮点精度导致 ceil(right) - floor(left) > srcWidth
+                bx1 = std::min(bx1, bx0 + srcWidth);
 
                 const uint8_t *srcRowData =
                     sd->cmykRows.data()
@@ -593,6 +598,8 @@ void StripPipeline::organizerStage(StripSlot &slot,
                     0, static_cast<int>(std::floor(ov->outputRect.left())));
                 int bx1 = std::min(outWidth, static_cast<int>(std::ceil(
                                                  ov->outputRect.right())));
+                // 钳制拷贝范围，防止浮点精度导致 ceil(right) - floor(left) > ov->width
+                bx1 = std::min(bx1, bx0 + static_cast<int>(ov->width));
 
                 // 1:1 映射：overlay 渲染尺寸 == outputRect 尺寸
                 int srcRow =
@@ -601,11 +608,22 @@ void StripPipeline::organizerStage(StripSlot &slot,
                 const uint8_t *srcRowData =
                     ov->data.data()
                     + static_cast<size_t>(srcRow) * ov->width * 4;
-                std::memcpy(
-                    outRow + bx0 * 4,
-                    srcRowData
-                        + (bx0 - static_cast<int>(ov->outputRect.left())) * 4,
-                    static_cast<size_t>(bx1 - bx0) * 4);
+                // 逐像素合成：跳过透明像素 (CMYK 0,0,0,0)，防止高 z-order
+                // overlay 的透明区域擦除低 z-order overlay 的实际像素。
+                // 仅当 overlay 与其他 overlay 的外接矩形重叠时才需要此检查，
+                // 但为简化逻辑和保证正确性，统一使用逐像素路径。
+                {
+                    const int srcOffset =
+                        bx0 - static_cast<int>(ov->outputRect.left());
+                    const uint8_t *src = srcRowData + srcOffset * 4;
+                    uint8_t *dst = outRow + bx0 * 4;
+                    for (int x = 0; x < bx1 - bx0; ++x) {
+                        const uint8_t *s = src + x * 4;
+                        // CMYK 0,0,0,0 = 透明（无墨水），跳过
+                        if (s[0] | s[1] | s[2] | s[3])
+                            std::memcpy(dst + x * 4, s, 4);
+                    }
+                }
             }
         }
     }

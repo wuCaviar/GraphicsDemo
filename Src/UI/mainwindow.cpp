@@ -2303,12 +2303,21 @@ void MainWindow::onFitCanvasToItems()
         || unitedRect.height() < 1)
         return;
 
-    // 将图元整体平移到 (0,0) 起始，消除边缘留白
-    qreal offsetX = -unitedRect.left();
-    qreal offsetY = -unitedRect.top();
+    // 留白（从首选项读取，单位 mm → 像素）
+    const AppConfig &cfg = AppConfig::instance();
+    qreal ppm = canvas->pixelsPerMm();
+    qreal marginLeft = cfg.canvasMarginLeft() * ppm;
+    qreal marginRight = cfg.canvasMarginRight() * ppm;
+    qreal marginTop = cfg.canvasMarginTop() * ppm;
+    qreal marginBottom = cfg.canvasMarginBottom() * ppm;
 
-    // 画布从 (0,0) 开始，尺寸覆盖所有图元
-    QSizeF newSize(unitedRect.width(), unitedRect.height());
+    // 将图元整体平移到 (marginLeft, marginTop) 起始
+    qreal offsetX = -unitedRect.left() + marginLeft;
+    qreal offsetY = -unitedRect.top() + marginTop;
+
+    // 画布尺寸 = 图元包围盒 + 四周留白
+    QSizeF newSize(unitedRect.width() + marginLeft + marginRight,
+                   unitedRect.height() + marginTop + marginBottom);
     QSizeF oldSize = canvas->canvasSize();
 
     if (newSize.width() <= 0 || newSize.height() <= 0)

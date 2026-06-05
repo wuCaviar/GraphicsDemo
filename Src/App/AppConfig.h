@@ -48,6 +48,16 @@ public:
     QString networkRoot() const { return m_networkRoot; }
     void setNetworkRoot(const QString &url) { m_networkRoot = url; }
 
+    // -- 画布留白 (单位 mm，config.xml: /Config/Canvas/Margin) --
+    double canvasMarginLeft() const { return m_canvasMarginLeft; }
+    double canvasMarginRight() const { return m_canvasMarginRight; }
+    double canvasMarginTop() const { return m_canvasMarginTop; }
+    double canvasMarginBottom() const { return m_canvasMarginBottom; }
+    void setCanvasMarginLeft(double v) { m_canvasMarginLeft = v; }
+    void setCanvasMarginRight(double v) { m_canvasMarginRight = v; }
+    void setCanvasMarginTop(double v) { m_canvasMarginTop = v; }
+    void setCanvasMarginBottom(double v) { m_canvasMarginBottom = v; }
+
 private:
     AppConfig() = default;
     ~AppConfig() = default;
@@ -61,6 +71,10 @@ private:
     int m_ripResolutionX = 300;
     int m_ripResolutionY = 300;
     QString m_networkRoot = QStringLiteral("http://127.0.0.1:9201");
+    double m_canvasMarginLeft = 6.35;
+    double m_canvasMarginRight = 6.35;
+    double m_canvasMarginTop = 5.08;
+    double m_canvasMarginBottom = 5.08;
 };
 
 #endif // APPCONFIG_H

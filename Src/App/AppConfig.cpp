@@ -60,6 +60,22 @@ void AppConfig::loadConfig()
             m_iccProfileBasePath = pathEl.text().trimmed();
     }
 
+    // <Canvas> 子元素
+    QDomElement canvasEl = root.firstChildElement(QStringLiteral("Canvas"));
+    if (!canvasEl.isNull()) {
+        QDomElement marginEl = canvasEl.firstChildElement(QStringLiteral("Margin"));
+        if (!marginEl.isNull()) {
+            auto readAttr = [&](const QString &name, double &target) {
+                if (marginEl.hasAttribute(name))
+                    target = marginEl.attribute(name).toDouble();
+            };
+            readAttr(QStringLiteral("Left"), m_canvasMarginLeft);
+            readAttr(QStringLiteral("Right"), m_canvasMarginRight);
+            readAttr(QStringLiteral("Top"), m_canvasMarginTop);
+            readAttr(QStringLiteral("Bottom"), m_canvasMarginBottom);
+        }
+    }
+
     qInfo() << "[AppConfig] Loaded from config.xml"
             << "\n  ripExe:" << m_ripExePath
             << "\n  ripConfig:" << m_ripConfigPath
@@ -98,6 +114,17 @@ void AppConfig::saveConfig() const
     QDomElement pathEl = doc.createElement(QStringLiteral("Path"));
     pathEl.appendChild(doc.createTextNode(m_iccProfileBasePath));
     iccEl.appendChild(pathEl);
+
+    // <Canvas>
+    QDomElement canvasEl = doc.createElement(QStringLiteral("Canvas"));
+    root.appendChild(canvasEl);
+
+    QDomElement marginEl = doc.createElement(QStringLiteral("Margin"));
+    marginEl.setAttribute(QStringLiteral("Left"), m_canvasMarginLeft);
+    marginEl.setAttribute(QStringLiteral("Right"), m_canvasMarginRight);
+    marginEl.setAttribute(QStringLiteral("Top"), m_canvasMarginTop);
+    marginEl.setAttribute(QStringLiteral("Bottom"), m_canvasMarginBottom);
+    canvasEl.appendChild(marginEl);
 
     QFile file(cfgPath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {

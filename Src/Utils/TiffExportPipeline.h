@@ -40,13 +40,16 @@ struct StripSlot
     // ---- Producer 产出：每个源的 strip 级数据 ----
     struct SourceStripData
     {
-        std::vector<uint8_t> cmykRows; // width × numSourceRows × 4 bytes
+        std::vector<uint8_t>
+            cmykRows; // sourcePixelWidth × numSourceRows × 4 bytes
         int startSourceRow = 0; // 该数据在源图像中的起始行
         int numSourceRows = 0; // 行数
         bool hasData = false; // 该源是否覆盖本 strip
         QString error;
         QRectF
             outputRect; // 该源在输出图像中的 pixel rect（宽高 = 源像素尺寸，1:1 映射）
+        int sourcePixelWidth =
+            0; // 源 TIFF 的实际像素宽度（= reader.width()），用于行步长
         int zOrder = 0; // z-order 排序键
     };
     std::vector<SourceStripData> sourcesData;

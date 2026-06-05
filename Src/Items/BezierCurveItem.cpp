@@ -16,6 +16,8 @@ QGraphicsItem *BezierCurveItem::cloneItem() const
     item->setRotation(rotation());
     item->setTransform(transform());
     item->setTransformOriginPoint(transformOriginPoint());
+    if (m_penCmyk.valid)
+        item->setItemPenCmyk(m_penCmyk.c, m_penCmyk.m, m_penCmyk.y, m_penCmyk.k);
     return item;
 }
 

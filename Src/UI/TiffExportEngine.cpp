@@ -194,8 +194,12 @@ ImageUtils::CmykOverlay TiffExportEngine::renderCmykOverlay(
     scope.enter(scene, dynamic_cast<QGraphicsItem *>(gi), allSceneItems,
                 oldSceneBg);
 
+    // 用 sceneRect 计算渲染区域，保留亚像素偏移使内容在 overlay 中精确定位
     QRectF renderSrcRect = sceneRect.intersected(exportRect);
-    QRectF renderDstRect(0, 0, w, h);
+    double offX = renderSrcRect.left() - (outRect.left() + exportRect.left());
+    double offY = renderSrcRect.top() - (outRect.top() + exportRect.top());
+    QRectF renderDstRect(offX, offY, renderSrcRect.width(),
+                         renderSrcRect.height());
 
     if (hasBrush && hasPen) {
         // 两者都有 CMYK：分别渲染填充蒙版和边框蒙版，各自使用精确 CMYK 值
@@ -322,15 +326,19 @@ ImageUtils::CmykOverlay TiffExportEngine::renderBgraOverlay(
     VisibilityScope scope;
     scope.enter(scene, target, allSceneItems, oldSceneBg);
 
-    // 渲染到 BGRA QImage
+    // 用 sceneRect 计算渲染区域，保留亚像素偏移使内容在 overlay 中精确定位
+    QRectF renderSrcRect = sceneRect.intersected(exportRect);
+    double offX = renderSrcRect.left() - (outRect.left() + exportRect.left());
+    double offY = renderSrcRect.top() - (outRect.top() + exportRect.top());
+    QRectF renderDstRect(offX, offY, renderSrcRect.width(),
+                         renderSrcRect.height());
     QImage img(w, h, QImage::Format_ARGB32);
     img.fill(Qt::transparent);
     {
         QPainter painter(&img);
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setRenderHint(QPainter::TextAntialiasing);
-        scene->render(&painter, QRectF(0, 0, w, h),
-                      sceneRect.intersected(exportRect));
+        scene->render(&painter, renderDstRect, renderSrcRect);
     }
 
     scope.exit();
@@ -372,21 +380,37 @@ QList<ImageUtils::CmykOverlay> TiffExportEngine::renderOverlays(
         return overlays;
 
     for (auto *item : nonImageItems) {
-        QRectF sceneRect = item->sceneBoundingRect();
+        // 使用不含画笔的几何矩形确定 overlay 位置和尺寸，
+        // 再按画笔宽度扩展渲染源，确保 1:1 映射且画笔完整包含
+        auto *gi = dynamic_cast<IGraphicsItem *>(item);
+        QRectF localRect = (gi && gi->supportsGeometryRect())
+                               ? gi->geometryRect()
+                               : item->boundingRect();
+        QRectF sceneRect = item->mapToScene(localRect).boundingRect();
 
-        // 裁剪到导出区域
-        QRectF outRect = sceneRect.intersected(exportRect);
-        if (outRect.isEmpty())
+        // 按画笔宽度扩展渲染区域，包含完整的画笔像素
+        qreal penExpand = 0.0;
+        if (gi && gi->itemPen().style() != Qt::NoPen)
+            penExpand = gi->itemPen().widthF() / 2.0;
+        QRectF expandedRect =
+            sceneRect.adjusted(-penExpand, -penExpand, penExpand, penExpand);
+
+        // overlay 位置和尺寸基于扩展后的矩形（含画笔）
+        QRectF clipped = expandedRect.intersected(exportRect);
+        if (clipped.isEmpty())
             continue;
-        outRect.translate(-exportRect.topLeft());
 
-        int w = std::max(1, qCeil(outRect.width()));
-        int h = std::max(1, qCeil(outRect.height()));
+        int olLeft = static_cast<int>(std::floor(clipped.left()));
+        int olTop = static_cast<int>(std::floor(clipped.top()));
+        int olRight = static_cast<int>(std::ceil(clipped.right()));
+        int olBottom = static_cast<int>(std::ceil(clipped.bottom()));
+        int w = std::max(1, olRight - olLeft);
+        int h = std::max(1, olBottom - olTop);
+        QRectF outRect(olLeft - exportRect.left(), olTop - exportRect.top(), w,
+                       h);
 
         ImageUtils::CmykOverlay overlay;
         overlay.zOrder = static_cast<int>(item->zValue());
-
-        auto *gi = dynamic_cast<IGraphicsItem *>(item);
 
         // 检查精确 CMYK 值
         bool hasBrushCmyk = false, hasPenCmyk = false;
@@ -421,12 +445,12 @@ QList<ImageUtils::CmykOverlay> TiffExportEngine::renderOverlays(
 
         if ((hasBrushCmyk || hasPenCmyk) && !hasAsymmetricTextCmyk) {
             overlay = renderCmykOverlay(
-                scene, gi, sceneRect, exportRect, outRect, w, h, allSceneItems,
-                oldSceneBg, hasBrushCmyk, hasPenCmyk, brushC, brushM, brushY,
-                brushK, penC, penM, penY, penK);
+                scene, gi, expandedRect, exportRect, outRect, w, h,
+                allSceneItems, oldSceneBg, hasBrushCmyk, hasPenCmyk, brushC,
+                brushM, brushY, brushK, penC, penM, penY, penK);
         } else {
             overlay = renderBgraOverlay(
-                scene, item, sceneRect, exportRect, outRect, w, h,
+                scene, item, expandedRect, exportRect, outRect, w, h,
                 allSceneItems, oldSceneBg, sharedXform, hasSharedXform);
         }
 
@@ -570,6 +594,20 @@ bool TiffExportEngine::startExport(QGraphicsScene *scene, QGraphicsView *view,
         return false;
     }
 
+    // 注意：画布矩形在"适配图元"时已包含留白，此处不再重复扩展
+
+    // 将 exportRect 对齐到整数像素边界，消除 mm→px 转换中的浮点精度误差。
+    // 例如：留白 6.35mm @300dpi = 75px（精确），但 6.35mm @150dpi = 37.5px（半像素），
+    // 或 6.35 在 float64 中不可精确表示导致 ceil(right) 比预期大 1。
+    // 使用 floor(left/top) + ceil(right/bottom) 保证所有内容像素被完整覆盖。
+    {
+        int exLeft = static_cast<int>(std::floor(exportRect.left()));
+        int exTop = static_cast<int>(std::floor(exportRect.top()));
+        int exRight = static_cast<int>(std::ceil(exportRect.right()));
+        int exBottom = static_cast<int>(std::ceil(exportRect.bottom()));
+        exportRect = QRectF(exLeft, exTop, exRight - exLeft, exBottom - exTop);
+    }
+
     // ---- 3. 构建源 TIFF 输入 ----
     QList<ImageUtils::SourceTiffInput> sources =
         buildSources(imageItems, exportRect);
@@ -621,7 +659,10 @@ bool TiffExportEngine::startExport(QGraphicsScene *scene, QGraphicsView *view,
     settings.dpi = targetDpi;
 
     // ---- 6. 启动后台线程 ----
-    QSize outSize = exportRect.size().toSize();
+    // exportRect 已对齐到整数像素边界，直接取整即可。
+    // 不能使用 toSize()（内部 qRound 四舍五入），必须保证尺寸 >= 浮点宽高。
+    QSize outSize(static_cast<int>(exportRect.width()),
+                  static_cast<int>(exportRect.height()));
     m_running = true;
 
     launchExport(outputPath, std::move(sources), std::move(overlays), outSize,

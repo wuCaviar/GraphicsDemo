@@ -40,6 +40,7 @@ HEADERS += \
     UI/PreferencesDialog.h \
     UI/PreferencesPage.h \
     UI/GeneralPage.h \
+    UI/CanvasPage.h \
     UI/TaskHistoryPopup.h \
     Items/IGraphicsItem.h \
     Items/RectItem.h \
@@ -94,6 +95,7 @@ SOURCES += \
     UI/SettingsDialog.cpp \
     UI/PreferencesDialog.cpp \
     UI/GeneralPage.cpp \
+    UI/CanvasPage.cpp \
     UI/TaskHistoryPopup.cpp \
     Items/IGraphicsItem.cpp \
     Items/RectItem.cpp \

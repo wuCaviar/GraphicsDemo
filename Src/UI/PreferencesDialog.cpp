@@ -1,6 +1,7 @@
 #include "PreferencesDialog.h"
 #include "PreferencesPage.h"
 #include "GeneralPage.h"
+#include "CanvasPage.h"
 
 #include <QDialogButtonBox>
 #include <QTabWidget>
@@ -13,6 +14,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent) : QDialog(parent)
     setupUI();
 
     addPage(new GeneralPage(this));
+    addPage(new CanvasPage(this));
 
     for (auto *page : m_pages)
         page->load();

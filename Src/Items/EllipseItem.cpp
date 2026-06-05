@@ -25,6 +25,12 @@ QGraphicsItem *EllipseItem::cloneItem() const
     item->setRotation(rotation());
     item->setTransform(transform());
     item->setTransformOriginPoint(transformOriginPoint());
+    if (m_penCmyk.valid)
+        item->setItemPenCmyk(m_penCmyk.c, m_penCmyk.m, m_penCmyk.y, m_penCmyk.k);
+    if (m_brushCmyk.valid)
+        item->setItemBrushCmyk(m_brushCmyk.c, m_brushCmyk.m, m_brushCmyk.y, m_brushCmyk.k);
+    if (!m_gradientCmyk.isEmpty())
+        item->setGradientStopCmykMap(m_gradientCmyk);
     return item;
 }
 

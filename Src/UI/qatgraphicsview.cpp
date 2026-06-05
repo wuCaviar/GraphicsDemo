@@ -271,32 +271,41 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
     case Tool::Rect: {
         auto *item = new RectItem(QRectF(scenePos, scenePos));
         item->setPen(m_defaultPen);
+        item->setItemPenCmyk(0, 0, 0, 100);
+
         item->setBrush(m_defaultBrush);
+        item->setItemBrushCmyk(0, 0, 0, 100);
         m_tempItem = item;
         break;
     }
     case Tool::Ellipse: {
         auto *item = new EllipseItem(QRectF(scenePos, scenePos));
         item->setPen(m_defaultPen);
+        item->setItemPenCmyk(0, 0, 0, 100);
+
         item->setBrush(m_defaultBrush);
+        item->setItemBrushCmyk(0, 0, 0, 100);
         m_tempItem = item;
         break;
     }
     case Tool::Line: {
         auto *item = new LineItem(QLineF(scenePos, scenePos));
         item->setPen(m_defaultPen);
+        item->setItemPenCmyk(0, 0, 0, 100);
         m_tempItem = item;
         break;
     }
     case Tool::BezierCurve: {
         auto *item = new BezierCurveItem();
         item->setPen(m_defaultPen);
+        item->setItemPenCmyk(0, 0, 0, 100);
         m_tempItem = item;
         break;
     }
     case Tool::Freehand: {
         auto *item = new FreehandItem();
         item->setPen(m_defaultPen);
+        item->setItemPenCmyk(0, 0, 0, 100);
         item->appendPoint(scenePos);
         m_tempItem = item;
         break;
@@ -390,7 +399,8 @@ void QAtGraphicsView::mouseReleaseEvent(QMouseEvent *event)
 
     if (m_handPanning) {
         m_handPanning = false;
-        viewport()->setCursor(m_tool == Tool::Hand ? Qt::OpenHandCursor : Qt::ArrowCursor);
+        viewport()->setCursor(m_tool == Tool::Hand ? Qt::OpenHandCursor
+                                                   : Qt::ArrowCursor);
         event->accept();
         return;
     }
