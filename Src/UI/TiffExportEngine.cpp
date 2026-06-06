@@ -434,16 +434,7 @@ QList<ImageUtils::CmykOverlay> TiffExportEngine::renderOverlays(
             }
         }
 
-        // TextItem 有双层渲染（背景画刷 + 文本色），单属性精确 CMYK 路径
-        // 的"全填充+蒙版"模式会导致一种颜色渗透到错误的图层。
-        // 不对称 CMYK（仅 pen 或仅 brush 有精确值）时降级为 BGRA 路径。
-        bool hasAsymmetricTextCmyk = false;
-        if (gi && gi->itemType() == IGraphicsItem::TextItemType
-            && hasBrushCmyk != hasPenCmyk) {
-            hasAsymmetricTextCmyk = true;
-        }
-
-        if ((hasBrushCmyk || hasPenCmyk) && !hasAsymmetricTextCmyk) {
+        if (hasBrushCmyk || hasPenCmyk) {
             overlay = renderCmykOverlay(
                 scene, gi, expandedRect, exportRect, outRect, w, h,
                 allSceneItems, oldSceneBg, hasBrushCmyk, hasPenCmyk, brushC,

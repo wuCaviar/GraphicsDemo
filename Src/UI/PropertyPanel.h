@@ -140,7 +140,6 @@ private:
     QPushButton *m_boldBtn = nullptr;
     QPushButton *m_italicBtn = nullptr;
     ColorSelector *m_textColorSelector = nullptr;
-    ColorSelector *m_textBgColorSelector = nullptr;
 
     QLineEdit *m_textEdit = nullptr;
 

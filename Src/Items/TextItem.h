@@ -4,12 +4,17 @@
 #include "IGraphicsItem.h"
 #include <QGraphicsTextItem>
 
-class TextItem : public QGraphicsTextItem, public IGraphicsItem
+class TextItem
+    : public QGraphicsTextItem
+    , public IGraphicsItem
 {
     Q_OBJECT
 
 public:
-    enum { Type = UserType + TextItemType };
+    enum
+    {
+        Type = UserType + TextItemType
+    };
 
     explicit TextItem(QGraphicsItem *parent = nullptr);
     TextItem(const QString &text, QGraphicsItem *parent = nullptr);
@@ -17,49 +22,47 @@ public:
     int type() const override { return Type; }
 
     ItemType itemType() const override { return TextItemType; }
-    PropertyFlags propertyFlags() const override { return HasFont | HasText | HasRotation; }
+    PropertyFlags propertyFlags() const override
+    {
+        return HasFont | HasText | HasRotation;
+    }
     QGraphicsItem *cloneItem() const override;
 
     QPen itemPen() const override;
     void setItemPen(const QPen &pen) override;
-    QBrush itemBrush() const override;
-    void setItemBrush(const QBrush &brush) override;
+    QBrush itemBrush() const override { return Qt::NoBrush; }
+    void setItemBrush(const QBrush &) override { }
 
-    // CMYK 颜色存储
-    void setItemPenCmyk(double c, double m, double y, double k) override { m_penCmyk = {c, m, y, k, true}; }
+    // CMYK 颜色存储（仅笔/文字颜色）
+    void setItemPenCmyk(double c, double m, double y, double k) override
+    {
+        m_penCmyk = { c, m, y, k, true };
+    }
     bool hasPenCmyk() const override { return m_penCmyk.valid; }
-    void penCmyk(double &c, double &m, double &y, double &k) const override { c = m_penCmyk.c; m = m_penCmyk.m; y = m_penCmyk.y; k = m_penCmyk.k; }
+    void penCmyk(double &c, double &m, double &y, double &k) const override
+    {
+        c = m_penCmyk.c;
+        m = m_penCmyk.m;
+        y = m_penCmyk.y;
+        k = m_penCmyk.k;
+    }
     void clearPenCmyk() override { m_penCmyk.valid = false; }
-    void setItemBrushCmyk(double c, double m, double y, double k) override { m_brushCmyk = {c, m, y, k, true}; }
-    bool hasBrushCmyk() const override { return m_brushCmyk.valid; }
-    void brushCmyk(double &c, double &m, double &y, double &k) const override { c = m_brushCmyk.c; m = m_brushCmyk.m; y = m_brushCmyk.y; k = m_brushCmyk.k; }
-    void clearBrushCmyk() override { m_brushCmyk.valid = false; }
-
-    // 渐变 CMYK 存储
-    void setGradientStopCmyk(double pos, double c, double m, double y, double k) override { m_gradientCmyk[pos] = {c, m, y, k, true}; }
-    bool hasGradientStopCmyk(double pos) const override { return m_gradientCmyk.contains(pos) && m_gradientCmyk[pos].valid; }
-    void gradientStopCmyk(double pos, double &c, double &m, double &y, double &k) const override { if (auto it = m_gradientCmyk.find(pos); it != m_gradientCmyk.end()) { c = it->c; m = it->m; y = it->y; k = it->k; } }
-    void clearGradientCmyk() override { m_gradientCmyk.clear(); }
-    QMap<double, CmykColor> gradientStopCmykMap() const override { return m_gradientCmyk; }
-    void setGradientStopCmykMap(const QMap<double, CmykColor> &map) override { m_gradientCmyk = map; }
 
     QString text() const override;
     void setText(const QString &text) override;
     QFont itemFont() const override;
     void setItemFont(const QFont &font) override;
 
-    // 矩形尺寸（支持拖拽缩放）
-    QRectF rect() const;
-    void setRect(const QRectF &rect);
-
-    // 重写 boundingRect 以返回 m_rect（若有）或自然文本尺寸
-    QRectF boundingRect() const override;
-
-    // 精确几何矩形 — 返回 m_rect 或自然文本包围
+    // 精确几何矩形 — 始终返回文字自然包围盒
     QRectF geometryRect() const override;
     bool supportsGeometryRect() const override { return true; }
-    void setGeometryRect(const QRectF &rect) override { setRect(rect); }
+    // 拖拽句柄缩放：字号等比缩放 + 设置文本宽度启用自动换行
+    void setGeometryRect(const QRectF &rect) override;
     bool supportsSetGeometryRect() const override { return true; }
+
+    // 文本宽度：<=0 为点文本（无换行），>0 为区域文本（自动换行）
+    qreal textWidth() const { return m_textWidth; }
+    void setTextWidth(qreal w);
 
     void serialize(QDataStream &out) const override;
     bool deserialize(QDataStream &in) override;
@@ -71,24 +74,19 @@ signals:
     void editingFinished();
 
 protected:
-    QPainterPath shape() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget) override;
     void mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event) override;
     void focusOutEvent(QFocusEvent *event) override;
 
 private:
-    QBrush m_bgBrush;   // 背景画刷
-    QRectF m_rect;       // 自定义包围矩形（由缩放手柄设置）
     bool m_editing = false;
     CmykColor m_penCmyk;
-    CmykColor m_brushCmyk;
-    QMap<double, CmykColor> m_gradientCmyk;
+    qreal m_textWidth = -1; // <=0 = 点文本（无换行），>0 = 区域文本宽度
 
-    // 缩放相关
-    QRectF m_originalRect;        // 初始矩形（用于计算缩放比例）
-    qreal m_originalFontSize = 0; // 初始字体大小
-    void updateFontScale();       // 根据矩形变化更新字体缩放
+    // 获取当前字号的点数值
+    qreal currentFontSize() const;
+    void applyTextWidth();
 };
 
 #endif // TEXTITEM_H

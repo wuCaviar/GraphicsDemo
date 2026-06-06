@@ -59,7 +59,7 @@ ResizeHandleItem::ResizeHandleItem(QGraphicsItem *parent)
     setAcceptHoverEvents(true);
 }
 
-ResizeHandleItem::~ResizeHandleItem() {}
+ResizeHandleItem::~ResizeHandleItem() { }
 
 // ============================================================
 // Bounding rect / painting — always in scene coordinates (handle at origin)
@@ -67,11 +67,12 @@ ResizeHandleItem::~ResizeHandleItem() {}
 
 QRectF ResizeHandleItem::boundingRect() const
 {
-    return m_selectionPolygon.boundingRect()
-        .adjusted(-kHandleSize, -kHandleSize, kHandleSize, kHandleSize);
+    return m_selectionPolygon.boundingRect().adjusted(
+        -kHandleSize, -kHandleSize, kHandleSize, kHandleSize);
 }
 
-void ResizeHandleItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+void ResizeHandleItem::paint(QPainter *painter,
+                             const QStyleOptionGraphicsItem *, QWidget *)
 {
     if (!isTargetValid())
         return;
@@ -102,8 +103,7 @@ void ResizeHandleItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
             if (brush.style() != Qt::NoBrush)
                 itemColor = brush.color();
         }
-        insideColor = QColor(255 - itemColor.red(),
-                             255 - itemColor.green(),
+        insideColor = QColor(255 - itemColor.red(), 255 - itemColor.green(),
                              255 - itemColor.blue());
     }
 
@@ -132,13 +132,15 @@ void ResizeHandleItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
             insideRect = QRectF(c.x(), c.y() - halfHs, halfHs, handleSize);
             break;
         case Right:
-            insideRect = QRectF(c.x() - halfHs, c.y() - halfHs, halfHs, handleSize);
+            insideRect =
+                QRectF(c.x() - halfHs, c.y() - halfHs, halfHs, handleSize);
             break;
         case BottomLeft:
             insideRect = QRectF(c.x(), c.y() - halfHs, halfHs, halfHs);
             break;
         case Bottom:
-            insideRect = QRectF(c.x() - halfHs, c.y() - halfHs, handleSize, halfHs);
+            insideRect =
+                QRectF(c.x() - halfHs, c.y() - halfHs, handleSize, halfHs);
             break;
         case BottomRight:
             insideRect = QRectF(c.x() - halfHs, c.y() - halfHs, halfHs, halfHs);
@@ -163,8 +165,8 @@ QPolygonF ResizeHandleItem::computeSelectionPolygon() const
     if (isGroupMode()) {
         QRectF r = computeGroupBoundingRect();
         if (r.isValid()) {
-            poly << r.topLeft() << r.topRight()
-                 << r.bottomRight() << r.bottomLeft();
+            poly << r.topLeft() << r.topRight() << r.bottomRight()
+                 << r.bottomLeft();
         }
     } else if (m_target) {
         QRectF br = m_target->boundingRect();
@@ -182,7 +184,8 @@ QRectF ResizeHandleItem::computeGroupBoundingRect() const
     for (auto *item : m_targetItems) {
         if (item->type() == CanvasItem::Type)
             continue;
-        QRectF itemSceneRect = item->mapToScene(item->boundingRect()).boundingRect();
+        QRectF itemSceneRect =
+            item->mapToScene(item->boundingRect()).boundingRect();
         result = result.united(itemSceneRect);
     }
     return result;
@@ -202,7 +205,8 @@ void ResizeHandleItem::updateHandlePositions()
     // 保存旧多边形区域用于显式失效（处理选中框缩小时残影问题）
     QRectF oldBounds;
     if (m_selectionPolygon.size() >= 4)
-        oldBounds = m_selectionPolygon.boundingRect().adjusted(-kHandleSize, -kHandleSize, kHandleSize, kHandleSize);
+        oldBounds = m_selectionPolygon.boundingRect().adjusted(
+            -kHandleSize, -kHandleSize, kHandleSize, kHandleSize);
 
     prepareGeometryChange();
 
@@ -216,7 +220,8 @@ void ResizeHandleItem::updateHandlePositions()
 
     // 显式失效旧区域，防止多边形缩小时残留旧选中框
     if (!oldBounds.isNull() && scene()) {
-        QRectF newBounds = m_selectionPolygon.boundingRect().adjusted(-kHandleSize, -kHandleSize, kHandleSize, kHandleSize);
+        QRectF newBounds = m_selectionPolygon.boundingRect().adjusted(
+            -kHandleSize, -kHandleSize, kHandleSize, kHandleSize);
         if (oldBounds != newBounds)
             scene()->update(oldBounds);
     }
@@ -227,7 +232,7 @@ void ResizeHandleItem::updateHandlePositions()
         auto *igi = dynamic_cast<IGraphicsItem *>(m_target);
         if (igi && !igi->isResizable())
             shouldSuppressHandles = true;
-        else if (containsImageItem({m_target}))
+        else if (containsImageItem({ m_target }))
             shouldSuppressHandles = true;
     } else if (isGroupMode()) {
         if (containsImageItem(m_targetItems))
@@ -249,15 +254,26 @@ void ResizeHandleItem::updateHandlePositions()
     };
 
     m_handles = {
-        { makeRect(tl), TopLeft },
-        { makeRect((tl + tr) / 2), Top },
-        { makeRect(tr), TopRight },
-        { makeRect((tl + bl) / 2), Left },
-        { makeRect((tr + br) / 2), Right },
-        { makeRect(bl), BottomLeft },
-        { makeRect((bl + br) / 2), Bottom },
-        { makeRect(br), BottomRight },
+        { makeRect(tl), TopLeft },           { makeRect((tl + tr) / 2), Top },
+        { makeRect(tr), TopRight },          { makeRect((tl + bl) / 2), Left },
+        { makeRect((tr + br) / 2), Right },  { makeRect(bl), BottomLeft },
+        { makeRect((bl + br) / 2), Bottom }, { makeRect(br), BottomRight },
     };
+
+    // 文字图元只允许顶点句柄缩放，移除边中点句柄
+    if (!isGroupMode() && m_target) {
+        auto *igi = dynamic_cast<IGraphicsItem *>(m_target);
+        if (igi && igi->itemType() == IGraphicsItem::TextItemType) {
+            m_handles.erase(std::remove_if(m_handles.begin(), m_handles.end(),
+                                           [](const HandleInfo &h) {
+                                               return h.role == Top
+                                                      || h.role == Bottom
+                                                      || h.role == Left
+                                                      || h.role == Right;
+                                           }),
+                            m_handles.end());
+        }
+    }
 
     update();
 }
@@ -289,8 +305,9 @@ void ResizeHandleItem::setPastedStyle(bool pasted)
 bool ResizeHandleItem::isTargetValid() const
 {
     if (isGroupMode()) {
-        return std::all_of(m_targetItems.begin(), m_targetItems.end(),
-                           [](QGraphicsItem *item) { return item && item->scene(); });
+        return std::all_of(
+            m_targetItems.begin(), m_targetItems.end(),
+            [](QGraphicsItem *item) { return item && item->scene(); });
     }
     return m_target && m_target->scene();
 }
@@ -309,7 +326,8 @@ qreal ResizeHandleItem::zoomLevel() const
     return views.first()->transform().m11();
 }
 
-ResizeHandleItem::HandleRole ResizeHandleItem::handleAtPos(const QPointF &scenePos) const
+ResizeHandleItem::HandleRole
+ResizeHandleItem::handleAtPos(const QPointF &scenePos) const
 {
     qreal zoom = zoomLevel();
     qreal handleSize = kHandleSize / zoom;
@@ -317,8 +335,8 @@ ResizeHandleItem::HandleRole ResizeHandleItem::handleAtPos(const QPointF &sceneP
 
     for (const auto &h : m_handles) {
         QPointF center = h.rect.center();
-        QRectF scaledRect(center.x() - halfHs, center.y() - halfHs,
-                           handleSize, handleSize);
+        QRectF scaledRect(center.x() - halfHs, center.y() - halfHs, handleSize,
+                          handleSize);
         if (scaledRect.contains(scenePos))
             return h.role;
     }
@@ -329,14 +347,19 @@ Qt::CursorShape ResizeHandleItem::cursorForRole(HandleRole role) const
 {
     switch (role) {
     case TopLeft:
-    case BottomRight: return Qt::SizeFDiagCursor;
+    case BottomRight:
+        return Qt::SizeFDiagCursor;
     case TopRight:
-    case BottomLeft: return Qt::SizeBDiagCursor;
+    case BottomLeft:
+        return Qt::SizeBDiagCursor;
     case Top:
-    case Bottom: return Qt::SizeVerCursor;
+    case Bottom:
+        return Qt::SizeVerCursor;
     case Left:
-    case Right: return Qt::SizeHorCursor;
-    default: return Qt::ArrowCursor;
+    case Right:
+        return Qt::SizeHorCursor;
+    default:
+        return Qt::ArrowCursor;
     }
 }
 
@@ -453,14 +476,15 @@ void ResizeHandleItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
             QRectF oldRect = m_originalItemRects.value(item);
 
             if (oldPos != newPos) {
-                m_undoStack->push(new MoveItemsCommand({item}, {oldPos}, {newPos}, s));
+                m_undoStack->push(
+                    new MoveItemsCommand({ item }, { oldPos }, { newPos }, s));
             }
 
             QRectF newRect = getItemGeometry(item);
             if (newRect.isValid() && oldRect.isValid() && oldRect != newRect) {
                 m_undoStack->push(new PropertyChangeCommand(
-                        item, PropertyChangeCommand::Geometry,
-                        QVariant(oldRect), QVariant(newRect), s));
+                    item, PropertyChangeCommand::Geometry, QVariant(oldRect),
+                    QVariant(newRect), s));
             }
         }
 
@@ -470,10 +494,23 @@ void ResizeHandleItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
         QPointF newPos = m_target->pos();
 
         if (m_preResizeRect != newRect || m_preResizePos != newPos) {
-            if (dynamic_cast<IGraphicsItem *>(m_target)) {
-                m_undoStack->push(new PropertyChangeCommand(
+            if (auto *igi = dynamic_cast<IGraphicsItem *>(m_target)) {
+                if (igi->itemType() == IGraphicsItem::TextItemType) {
+                    // TextItem: 字体缩放 + 锚点偏移，两者都需记录
+                    m_undoStack->beginMacro(QStringLiteral("Resize Text"));
+                    if (m_preResizePos != newPos) {
+                        m_undoStack->push(new MoveItemsCommand(
+                            { m_target }, { m_preResizePos }, { newPos }, s));
+                    }
+                    m_undoStack->push(new PropertyChangeCommand(
                         m_target, PropertyChangeCommand::Geometry,
                         QVariant(m_preResizeRect), QVariant(newRect), s));
+                    m_undoStack->endMacro();
+                } else {
+                    m_undoStack->push(new PropertyChangeCommand(
+                        m_target, PropertyChangeCommand::Geometry,
+                        QVariant(m_preResizeRect), QVariant(newRect), s));
+                }
             }
         }
     }
@@ -505,15 +542,36 @@ void ResizeHandleItem::applyResize(HandleRole role, const QPointF &scenePos)
     qreal bottom = m_originalRect.bottom();
 
     switch (role) {
-    case TopLeft:     left += delta.x(); top += delta.y(); break;
-    case Top:         top += delta.y(); break;
-    case TopRight:    right += delta.x(); top += delta.y(); break;
-    case Left:        left += delta.x(); break;
-    case Right:       right += delta.x(); break;
-    case BottomLeft:  left += delta.x(); bottom += delta.y(); break;
-    case Bottom:      bottom += delta.y(); break;
-    case BottomRight: right += delta.x(); bottom += delta.y(); break;
-    default: return;
+    case TopLeft:
+        left += delta.x();
+        top += delta.y();
+        break;
+    case Top:
+        top += delta.y();
+        break;
+    case TopRight:
+        right += delta.x();
+        top += delta.y();
+        break;
+    case Left:
+        left += delta.x();
+        break;
+    case Right:
+        right += delta.x();
+        break;
+    case BottomLeft:
+        left += delta.x();
+        bottom += delta.y();
+        break;
+    case Bottom:
+        bottom += delta.y();
+        break;
+    case BottomRight:
+        right += delta.x();
+        bottom += delta.y();
+        break;
+    default:
+        return;
     }
 
     if (right - left < 10) {
@@ -533,6 +591,23 @@ void ResizeHandleItem::applyResize(HandleRole role, const QPointF &scenePos)
 
     if (igi && igi->supportsSetGeometryRect()) {
         setItemGeometry(m_target, newRect);
+
+        // TextItem: 字体等比缩放，调整 pos 使对角锚点固定在场景中
+        if (igi->itemType() == IGraphicsItem::TextItemType) {
+            QRectF after = getItemGeometry(m_target);
+            // 检测锚边：newRect 中未移动的边即为锚定边
+            bool anchorLeft =
+                qFuzzyCompare(newRect.left(), m_originalRect.left());
+            bool anchorTop = qFuzzyCompare(newRect.top(), m_originalRect.top());
+
+            qreal x = m_preResizePos.x();
+            qreal y = m_preResizePos.y();
+            if (!anchorLeft)
+                x += m_originalRect.width() - after.width();
+            if (!anchorTop)
+                y += m_originalRect.height() - after.height();
+            m_target->setPos(x, y);
+        }
     } else {
         QSizeF originalSize = m_originalRect.size();
         if (originalSize.width() > 0 && originalSize.height() > 0) {
@@ -547,7 +622,8 @@ void ResizeHandleItem::applyResize(HandleRole role, const QPointF &scenePos)
 // 组缩放 — 场景坐标系中按比例缩放所有图元
 // ============================================================
 
-void ResizeHandleItem::applyGroupResize(HandleRole role, const QPointF &scenePos)
+void ResizeHandleItem::applyGroupResize(HandleRole role,
+                                        const QPointF &scenePos)
 {
     // 包含图片图元时禁止组缩放
     if (containsImageItem(m_targetItems))
@@ -561,15 +637,36 @@ void ResizeHandleItem::applyGroupResize(HandleRole role, const QPointF &scenePos
     qreal bottom = m_originalGroupRect.bottom();
 
     switch (role) {
-    case TopLeft:     left += delta.x(); top += delta.y(); break;
-    case Top:         top += delta.y(); break;
-    case TopRight:    right += delta.x(); top += delta.y(); break;
-    case Left:        left += delta.x(); break;
-    case Right:       right += delta.x(); break;
-    case BottomLeft:  left += delta.x(); bottom += delta.y(); break;
-    case Bottom:      bottom += delta.y(); break;
-    case BottomRight: right += delta.x(); bottom += delta.y(); break;
-    default: return;
+    case TopLeft:
+        left += delta.x();
+        top += delta.y();
+        break;
+    case Top:
+        top += delta.y();
+        break;
+    case TopRight:
+        right += delta.x();
+        top += delta.y();
+        break;
+    case Left:
+        left += delta.x();
+        break;
+    case Right:
+        right += delta.x();
+        break;
+    case BottomLeft:
+        left += delta.x();
+        bottom += delta.y();
+        break;
+    case Bottom:
+        bottom += delta.y();
+        break;
+    case BottomRight:
+        right += delta.x();
+        bottom += delta.y();
+        break;
+    default:
+        return;
     }
 
     if (right - left < 20) {
@@ -605,8 +702,10 @@ void ResizeHandleItem::applyGroupResize(HandleRole role, const QPointF &scenePos
 
         qreal origCenterX = origPos.x() + origRect.center().x();
         qreal origCenterY = origPos.y() + origRect.center().y();
-        qreal newCenterX = groupCenter.x() + (origCenterX - groupCenter.x()) * sx;
-        qreal newCenterY = groupCenter.y() + (origCenterY - groupCenter.y()) * sy;
+        qreal newCenterX =
+            groupCenter.x() + (origCenterX - groupCenter.x()) * sx;
+        qreal newCenterY =
+            groupCenter.y() + (origCenterY - groupCenter.y()) * sy;
         QSizeF scaledSize(origRect.width() * sx, origRect.height() * sy);
 
         auto *igi = dynamic_cast<IGraphicsItem *>(item);

@@ -141,16 +141,11 @@ void PropertyPanel::setupUI()
     m_textColorSelector->setFixedSize(60, 24);
     m_textColorSelector->setUpdateMode(ColorSelector::Continuous);
     m_textColorSelector->setDialogModality(Qt::ApplicationModal);
-    m_textBgColorSelector = new ColorSelector(this);
-    m_textBgColorSelector->setFixedSize(60, 24);
-    m_textBgColorSelector->setUpdateMode(ColorSelector::Continuous);
-    m_textBgColorSelector->setDialogModality(Qt::ApplicationModal);
     m_textEdit = new QLineEdit;
     textLayout->addRow(tr("Font:"), m_fontCombo);
     textLayout->addRow(tr("Size:"), m_fontSizeSpin);
     textLayout->addRow(tr("Style:"), styleLayout);
     textLayout->addRow(tr("Color:"), m_textColorSelector);
-    textLayout->addRow(tr("Background:"), m_textBgColorSelector);
     textLayout->addRow(tr("Text:"), m_textEdit);
     mainLayout->addWidget(m_textGroup);
 
@@ -306,30 +301,6 @@ void PropertyPanel::setupUI()
                         gi->setItemPenCmyk(c, m, y, k);
                     else
                         gi->clearPenCmyk();
-                }
-            });
-
-    connect(m_textBgColorSelector, &ColorSelector::colorEditingStarted, this,
-            [this](const QColor &) {
-                beginColorPreview(ColorPreviewTarget::TextBackground);
-            });
-    connect(m_textBgColorSelector, &ColorSelector::colorChanged, this,
-            [this](const QColor &color) {
-                previewColorChange(ColorPreviewTarget::TextBackground, color);
-            });
-    connect(m_textBgColorSelector, &ColorSelector::colorSelected, this,
-            &PropertyPanel::onTextBgColorClicked);
-    connect(m_textBgColorSelector, &ColorSelector::colorSelectionCanceled, this,
-            [this](const QColor &) {
-                cancelColorPreview(ColorPreviewTarget::TextBackground);
-            });
-    connect(m_textBgColorSelector, &ColorSelector::colorSelectedCmyk, this,
-            [this](const QColor &, double c, double m, double y, double k) {
-                if (auto *gi = dynamic_cast<IGraphicsItem *>(m_currentItem)) {
-                    if (c >= 0)
-                        gi->setItemBrushCmyk(c, m, y, k);
-                    else
-                        gi->clearBrushCmyk();
                 }
             });
 
@@ -583,8 +554,9 @@ void PropertyPanel::updatePanel()
     m_xSpin->setValue(minX * kPxToMm);
     m_ySpin->setValue(minY * kPxToMm);
 
-    // 判断 W/H 是否可编辑：支持 setGeometryRect 的图元
-    bool canResizeRect = gi->supportsSetGeometryRect();
+    // 判断 W/H 是否可编辑：支持 setGeometryRect 的图元（文字图元除外，其尺寸由字号派生）
+    bool canResizeRect = gi->supportsSetGeometryRect()
+                         && gi->itemType() != IGraphicsItem::TextItemType;
     m_wSpin->setReadOnly(!canResizeRect);
     m_hSpin->setReadOnly(!canResizeRect);
 
@@ -684,9 +656,8 @@ void PropertyPanel::updatePanel()
         m_textEdit->setText(m_oldText);
 
         // 文字颜色（仅 TextItem 有此概念）
-        if (qgraphicsitem_cast<TextItem *>(m_currentItem)) {
+        if (auto *ti = qgraphicsitem_cast<TextItem *>(m_currentItem)) {
             m_textColorSelector->setVisible(true);
-            m_textBgColorSelector->setVisible(true);
 
             double c, m, y, k;
             if (gi->hasPenCmyk()) {
@@ -696,16 +667,8 @@ void PropertyPanel::updatePanel()
             } else {
                 m_textColorSelector->setColor(gi->itemPen().color());
             }
-            if (gi->hasBrushCmyk()) {
-                gi->brushCmyk(c, m, y, k);
-                m_textBgColorSelector->setCmykColor(gi->itemBrush().color(), c,
-                                                    m, y, k);
-            } else {
-                m_textBgColorSelector->setColor(gi->itemBrush().color());
-            }
         } else {
             m_textColorSelector->setVisible(false);
-            m_textBgColorSelector->setVisible(false);
         }
     }
 
