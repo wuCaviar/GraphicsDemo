@@ -118,13 +118,10 @@ private:
     void loadWindowState();
     void saveWindowState();
 
-    void importSingleImage(const QStringList &paths);
     void importMultipleImages(const QStringList &paths);
 
-    // DPI 管理
-    bool _tryLockCanvasDpi(int dpiX,
-                           int dpiY); // 尝试锁定画布 DPI，返回是否允许导入
-    void _unlockCanvasDpiIfNoImages(); // 画布无图片时解除 DPI 锁定
+    // DPI 已移除 — 画布以物理 mm 为单位，无 DPI 锁定概念
+    // 导出时由用户指定 DPI
 
     void copyItemsToClipboard(const QList<QGraphicsItem *> &items);
     QList<QGraphicsItem *> pasteItemsFromClipboard();

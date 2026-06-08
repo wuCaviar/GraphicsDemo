@@ -135,7 +135,9 @@ bool ProjectFile::saveFromSerialized(const QString &filePath,
     };
     addCanvasProp(QStringLiteral("Width"), canvas.width);
     addCanvasProp(QStringLiteral("Height"), canvas.height);
-    addCanvasProp(QStringLiteral("Dpi"), canvas.dpi);
+    addCanvasProp(QStringLiteral("DisplayPpi"), canvas.dpi);
+    addCanvasProp(QStringLiteral("WidthMm"), canvas.canvasWidthMm);
+    addCanvasProp(QStringLiteral("HeightMm"), canvas.canvasHeightMm);
 
     // <Items>
     QDomElement itemsEl = doc.createElement(QStringLiteral("Items"));
@@ -275,8 +277,20 @@ bool ProjectFile::parseForDeserialize(const QString &filePath,
             canvasEl.firstChildElement(QStringLiteral("Width")).text().toDouble();
         canvas.height =
             canvasEl.firstChildElement(QStringLiteral("Height")).text().toDouble();
-        canvas.dpi =
-            canvasEl.firstChildElement(QStringLiteral("Dpi")).text().toDouble();
+
+        // 优先读取 DisplayPpi，回退到旧的 Dpi 标签
+        QDomElement dpiEl = canvasEl.firstChildElement(QStringLiteral("DisplayPpi"));
+        if (dpiEl.isNull())
+            dpiEl = canvasEl.firstChildElement(QStringLiteral("Dpi"));
+        canvas.dpi = dpiEl.text().toDouble();
+
+        // 读取物理 mm 尺寸（新字段，可空）
+        QDomElement wMmEl = canvasEl.firstChildElement(QStringLiteral("WidthMm"));
+        if (!wMmEl.isNull())
+            canvas.canvasWidthMm = wMmEl.text().toDouble();
+        QDomElement hMmEl = canvasEl.firstChildElement(QStringLiteral("HeightMm"));
+        if (!hMmEl.isNull())
+            canvas.canvasHeightMm = hMmEl.text().toDouble();
     }
 
     // <Items> → extract DeserialTask list

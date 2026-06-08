@@ -56,12 +56,12 @@ public:
     // scene:       画布场景
     // view:        视图（用于 setUpdatesEnabled 优化，可为 nullptr）
     // outputPath:  输出 .tif 文件的完整路径
-    // dpiOverride: 覆盖 DPI（≤0 表示自动从画布/首个图片检测）
+    // exportDpi:   用户指定的导出 DPI（必填）
     //
     // 返回 false 表示同步校验失败（调用方应读取 lastError() 展示错误对话框）。
     // 返回 true  表示后台导出已启动，结果通过 exportFinished 信号异步通知。
     bool startExport(QGraphicsScene *scene, QGraphicsView *view,
-                     const QString &outputPath, int dpiOverride = 0);
+                     const QString &outputPath, int exportDpi);
 
 signals:
     // 后台线程中的进度回调，0–100，通过 QueuedConnection 跨线程投递
@@ -84,10 +84,8 @@ private:
     // 确定导出矩形（优先 CanvasItem，否则 itemsBoundingRect + margin）
     static QRectF determineExportRect(QGraphicsScene *scene);
 
-    // 确定目标 DPI
-    static int determineTargetDpi(QGraphicsScene *scene,
-                                  const QList<ImageItem *> &imageItems,
-                                  int dpiOverride);
+    // 确定目标 DPI — 直接返回用户指定值
+    static int determineTargetDpi(int exportDpi) { return exportDpi; }
 
     // ================================================================
     //  源 TIFF 输入构建
@@ -95,7 +93,7 @@ private:
 
     QList<ImageUtils::SourceTiffInput>
     buildSources(const QList<ImageItem *> &imageItems,
-                 const QRectF &exportRect) const;
+                 const QRectF &exportRect, int exportDpi, qreal displayPpi) const;
 
     // ================================================================
     //  Overlay 渲染

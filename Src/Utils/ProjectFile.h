@@ -87,7 +87,9 @@ public:
     struct CanvasInfo {
         double width = 1920.0;
         double height = 1080.0;
-        double dpi = 96.0;
+        double dpi = 96.0; // 存储为 displayPpi（旧称 dpi，保持兼容）
+        double canvasWidthMm = 210.0; // 画布物理宽 (mm)
+        double canvasHeightMm = 297.0; // 画布物理高 (mm)
     };
 
     // 从已序列化的 item 列表组装并保存 XML（在主线程调用）

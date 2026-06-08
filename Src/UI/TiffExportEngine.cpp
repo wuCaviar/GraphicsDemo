@@ -94,30 +94,8 @@ QRectF TiffExportEngine::determineExportRect(QGraphicsScene *scene)
     return scene->itemsBoundingRect().adjusted(-10, -10, 10, 10);
 }
 
-int TiffExportEngine::determineTargetDpi(QGraphicsScene *scene,
-                                         const QList<ImageItem *> &imageItems,
-                                         int dpiOverride)
-{
-    if (dpiOverride > 0)
-        return dpiOverride;
-
-    // 检查 CanvasItem 是否锁定 DPI
-    const auto &items = scene->items();
-    for (auto *item : items) {
-        auto *canvas = dynamic_cast<CanvasItem *>(item);
-        if (canvas && canvas->isDpiLocked())
-            return canvas->canvasDpiX();
-    }
-
-    // 使用首个图片的 DPI
-    if (!imageItems.isEmpty()) {
-        int dpi = imageItems.first()->dpiX();
-        if (dpi > 0)
-            return dpi;
-    }
-
-    return 0; // 无法确定：调用方应提示用户设置 DPI
-}
+// DPI determination now trivial — always user-specified.
+// The static inline method in the header handles this directly.
 
 // ============================================================================
 //  构造 / 析构 / 配置
@@ -146,18 +124,38 @@ void TiffExportEngine::cancelExport()
 
 QList<ImageUtils::SourceTiffInput>
 TiffExportEngine::buildSources(const QList<ImageItem *> &imageItems,
-                               const QRectF &exportRect) const
+                               const QRectF &exportRect, int exportDpi,
+                               qreal displayPpi) const
 {
     QList<ImageUtils::SourceTiffInput> sources;
     sources.reserve(imageItems.size());
 
+    // 场景像素 → 导出像素换算系数
+    qreal pxToExportPx = exportDpi / displayPpi;
+
     for (auto *imgItem : imageItems) {
         ImageUtils::SourceTiffInput src;
         src.filePath = imgItem->filePath();
+
+        // 计算目标输出像素尺寸
+        QSize targetPx = imgItem->targetOutputPixels(exportDpi);
+        src.targetPixelSize = targetPx;
+
+        // 判断是否需要重采样
+        QSize origSize = imgItem->originalSize();
+        if (origSize.isValid() && targetPx.isValid()
+            && (targetPx.width() != origSize.width()
+                || targetPx.height() != origSize.height())) {
+            src.needsResample = true;
+        }
+
+        // 导出像素坐标: 场景像素 × exportDpi / displayPpi
         QRectF sceneRect = imgItem->sceneBoundingRect();
-        src.outputRect = QRectF(sceneRect.left() - exportRect.left(),
-                                sceneRect.top() - exportRect.top(),
-                                sceneRect.width(), sceneRect.height());
+        qreal outX = (sceneRect.left() - exportRect.left()) * pxToExportPx;
+        qreal outY = (sceneRect.top() - exportRect.top()) * pxToExportPx;
+        qreal outW = sceneRect.width() * pxToExportPx;
+        qreal outH = sceneRect.height() * pxToExportPx;
+        src.outputRect = QRectF(outX, outY, outW, outH);
         src.zOrder = static_cast<int>(imgItem->zValue());
         sources.append(src);
     }
@@ -528,7 +526,7 @@ void TiffExportEngine::launchExport(
 // ============================================================================
 
 bool TiffExportEngine::startExport(QGraphicsScene *scene, QGraphicsView *view,
-                                   const QString &outputPath, int dpiOverride)
+                                   const QString &outputPath, int exportDpi)
 {
     m_lastError.clear();
 
@@ -555,17 +553,24 @@ bool TiffExportEngine::startExport(QGraphicsScene *scene, QGraphicsView *view,
 
     // ---- 2. 导出区域与 DPI ----
     QRectF exportRect = determineExportRect(scene);
-    int targetDpi = determineTargetDpi(scene, imageItems, dpiOverride);
-    if (targetDpi <= 0) {
-        m_lastError =
-            QStringLiteral("Export DPI has not been set. "
-                           "Please specify a DPI value for the export.");
-        return false;
+    int targetDpi = determineTargetDpi(exportDpi);
+
+    // 获取画布显示 PPI（用于场景像素 → 导出像素换算）
+    qreal displayPpi = 300.0;
+    {
+        const auto &sceneItems = scene->items();
+        for (auto *item : sceneItems) {
+            auto *canvas = dynamic_cast<CanvasItem *>(item);
+            if (canvas) {
+                displayPpi = canvas->displayPpi();
+                break;
+            }
+        }
     }
 
     // ---- 3. 构建源 TIFF 输入 ----
     QList<ImageUtils::SourceTiffInput> sources =
-        buildSources(imageItems, exportRect);
+        buildSources(imageItems, exportRect, targetDpi, displayPpi);
 
     // 校验源文件
     for (const auto &src : sources) {
@@ -613,8 +618,10 @@ bool TiffExportEngine::startExport(QGraphicsScene *scene, QGraphicsView *view,
     ImageUtils::TiffExportSettings settings;
     settings.dpi = targetDpi;
 
-    // ---- 6. 启动后台线程 ----
-    QSize outSize = exportRect.size().toSize();
+    // ---- 6. 计算导出像素尺寸（场景像素 × exportDpi / displayPpi） ----
+    qreal pxToExportPx = exportDpi / displayPpi;
+    QSize outSize(qCeil(exportRect.width() * pxToExportPx),
+                  qCeil(exportRect.height() * pxToExportPx));
     m_running = true;
 
     launchExport(outputPath, std::move(sources), std::move(overlays), outSize,

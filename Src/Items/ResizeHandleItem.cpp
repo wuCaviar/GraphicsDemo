@@ -19,20 +19,6 @@ const int ResizeHandleItem::kHandleSize;
 
 // ---- helpers using IGraphicsItem interface ----
 
-// 递归检查图元列表中是否包含图片图元（含成组内的图片）
-static bool containsImageItem(const QList<QGraphicsItem *> &items)
-{
-    for (auto *item : items) {
-        auto *igi = dynamic_cast<IGraphicsItem *>(item);
-        if (igi && !igi->isResizable())
-            return true;
-        auto *group = dynamic_cast<QGraphicsItemGroup *>(item);
-        if (group && containsImageItem(group->childItems()))
-            return true;
-    }
-    return false;
-}
-
 static QRectF getItemGeometry(QGraphicsItem *item)
 {
     auto *igi = dynamic_cast<IGraphicsItem *>(item);
@@ -209,23 +195,7 @@ void ResizeHandleItem::updateHandlePositions()
     if (m_selectionPolygon.size() < 4)
         return;
 
-    // 不可缩放时（含图片图元），只显示选中框，不绘制缩放手柄
-    bool shouldSuppressHandles = false;
-    if (!isGroupMode() && m_target) {
-        auto *igi = dynamic_cast<IGraphicsItem *>(m_target);
-        if (igi && !igi->isResizable())
-            shouldSuppressHandles = true;
-        else if (containsImageItem({m_target}))
-            shouldSuppressHandles = true;
-    } else if (isGroupMode()) {
-        if (containsImageItem(m_targetItems))
-            shouldSuppressHandles = true;
-    }
-    if (shouldSuppressHandles) {
-        update();
-        return;
-    }
-
+    // 解析四个角点
     const QPointF &tl = m_selectionPolygon[0];
     const QPointF &tr = m_selectionPolygon[1];
     const QPointF &br = m_selectionPolygon[2];
@@ -480,8 +450,6 @@ void ResizeHandleItem::applyResize(HandleRole role, const QPointF &scenePos)
         return;
 
     auto *igi = dynamic_cast<IGraphicsItem *>(m_target);
-    if (igi && !igi->isResizable())
-        return;
 
     QPointF localPress = m_target->mapFromScene(m_pressPos);
     QPointF localCurrent = m_target->mapFromScene(scenePos);
@@ -537,10 +505,6 @@ void ResizeHandleItem::applyResize(HandleRole role, const QPointF &scenePos)
 
 void ResizeHandleItem::applyGroupResize(HandleRole role, const QPointF &scenePos)
 {
-    // 包含图片图元时禁止组缩放
-    if (containsImageItem(m_targetItems))
-        return;
-
     QPointF delta = scenePos - m_pressPos;
 
     qreal left = m_originalGroupRect.left();

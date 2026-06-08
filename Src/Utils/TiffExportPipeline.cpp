@@ -399,17 +399,28 @@ void StripPipeline::producerStage(StripSlot &slot,
                 return;
             }
 
-            // 1:1 映射：outputRect 尺寸 == 源图像像素尺寸
+            // 只读阶段：计算映射参数
+            const int srcWidth = static_cast<int>(reader.width());
+            const int srcRectW = static_cast<int>(std::ceil(src.outputRect.width()));
+            const int srcRectH = static_cast<int>(std::ceil(src.outputRect.height()));
+
+            // 输出行 → 源行映射（浮点缩放）
+            double scaleY =
+                static_cast<double>(reader.height()) / srcRectH;
+            double scaleX =
+                static_cast<double>(srcWidth) / srcRectW;
+
             int stripSrcY0 = std::max(stripY0, srcRectY0);
             int stripSrcY1 = std::min(stripY1, srcRectY1);
-            int sourceRow0 =
-                stripSrcY0 - static_cast<int>(src.outputRect.top());
-            int sourceRow1 =
-                stripSrcY1 - static_cast<int>(src.outputRect.top()) - 1;
-            sourceRow0 = std::clamp(sourceRow0, 0,
-                                    static_cast<int>(reader.height()) - 1);
-            sourceRow1 = std::clamp(sourceRow1, 0,
-                                    static_cast<int>(reader.height()) - 1);
+
+            // 映射到源图像行号（取整覆盖所有涉及的源行）
+            // srcY1F 用 ceil 保证不遗漏上边界
+            double srcY0F = (stripSrcY0 - srcRectY0) * scaleY;
+            double srcY1F = (stripSrcY1 - srcRectY0) * scaleY;
+            int sourceRow0 = std::clamp(static_cast<int>(std::floor(srcY0F)), 0,
+                                        static_cast<int>(reader.height()) - 1);
+            int sourceRow1 = std::clamp(static_cast<int>(std::ceil(srcY1F) - 1), 0,
+                                        static_cast<int>(reader.height()) - 1);
 
             int numRows = sourceRow1 - sourceRow0 + 1;
             if (numRows <= 0) {
@@ -439,6 +450,8 @@ void StripPipeline::producerStage(StripSlot &slot,
             sd.hasData = true;
             sd.outputRect = src.outputRect;
             sd.zOrder = src.zOrder;
+            sd.scaleX = scaleX;
+            sd.scaleY = scaleY;
 
             // 逐行读取并转换为 CMYK（预分配行缓冲区，避免每行 malloc）
             size_t rowBytes = static_cast<size_t>(reader.width()) * 4;
@@ -543,7 +556,7 @@ void StripPipeline::organizerStage(StripSlot &slot,
         // 按 z-order 叠加每个参与者
         for (const auto &p : participants) {
             if (p.type == CompositorParticipant::Type::SourceReader) {
-                // ============ 源 TIFF 数据（1:1 直接拷贝） ============
+                // ============ 源 TIFF 数据（带缩放映射） ============
                 const auto *sd = p.sourceData;
                 if (!sd || !sd->hasData)
                     continue;
@@ -556,30 +569,67 @@ void StripPipeline::organizerStage(StripSlot &slot,
                 if (globalY < sdRectY0 || globalY >= sdRectY1)
                     continue;
 
-                // 1:1 映射：输出行 → 源行 = globalY - outputRect.top()
-                int srcRow =
-                    globalY
-                    - static_cast<int>(std::floor(sd->outputRect.top()));
-                int localRow = srcRow - sd->startSourceRow;
-                if (localRow < 0 || localRow >= sd->numSourceRows)
-                    continue;
+                // 输出行 → 源行映射（浮点，双线性插值）
+                // srcY 是浮点源行号，映射到 localRow0..localRow1 范围
+                double srcY =
+                    (globalY - sd->outputRect.top()) * sd->scaleY;
+                int srcY0 = static_cast<int>(std::floor(srcY));
+                int srcY1 = std::min(srcY0 + 1,
+                                     static_cast<int>(sd->startSourceRow
+                                                      + sd->numSourceRows) - 1);
+                double yFrac = srcY - srcY0;
 
-                int srcWidth =
-                    static_cast<int>(std::ceil(sd->outputRect.width()));
+                int localRow0 = std::clamp(
+                    srcY0 - sd->startSourceRow, 0, sd->numSourceRows - 1);
+                int localRow1 = std::clamp(
+                    srcY1 - sd->startSourceRow, 0, sd->numSourceRows - 1);
+
+                // 源图像像素宽度 (reader.width())，不是输出目标宽度
+                // sd->cmykRows 每行 = reader.width() * 4 字节
+                // sd->outputRect.width() 是输出像素坐标中的宽度
+
                 int bx0 = std::max(
                     0, static_cast<int>(std::floor(sd->outputRect.left())));
                 int bx1 = std::min(outWidth, static_cast<int>(std::ceil(
                                                  sd->outputRect.right())));
 
-                const uint8_t *srcRowData =
+                // sd->cmykRows 中每行的像素数 = reader.width() (原始TIFF宽度)
+                // 这里无法直接访问 reader，用 sd->scaleX 反推:
+                // scaleX = reader.width() / outputRect.width()
+                // => reader.width() = scaleX * outputRect.width()
+                int storedWidth = static_cast<int>(
+                    std::ceil(sd->outputRect.width() * sd->scaleX));
+
+                const uint8_t *srcRowData0 =
                     sd->cmykRows.data()
-                    + static_cast<size_t>(localRow) * srcWidth * 4;
-                // 源像素直接覆盖到输出行对应位置
-                std::memcpy(
-                    outRow + bx0 * 4,
-                    srcRowData
-                        + (bx0 - static_cast<int>(sd->outputRect.left())) * 4,
-                    static_cast<size_t>(bx1 - bx0) * 4);
+                    + static_cast<size_t>(localRow0) * storedWidth * 4;
+                const uint8_t *srcRowData1 =
+                    (localRow1 == localRow0)
+                        ? srcRowData0
+                        : sd->cmykRows.data()
+                            + static_cast<size_t>(localRow1) * storedWidth * 4;
+
+                // 逐像素 X 方向双线性插值
+                // sd->scaleX = originalTIFF.width / outputRect.width
+                for (int x = bx0; x < bx1; ++x) {
+                    double srcX = (x - sd->outputRect.left()) * sd->scaleX;
+                    int srcX0 = static_cast<int>(std::floor(srcX));
+                    int srcX1 = std::min(srcX0 + 1, storedWidth - 1);
+                    double xFrac = srcX - srcX0;
+
+                    int i0 = srcX0 * 4;
+                    int i1 = srcX1 * 4;
+
+                    for (int c = 0; c < 4; ++c) {
+                        double v0 = srcRowData0[i0 + c] * (1.0 - xFrac)
+                                    + srcRowData0[i1 + c] * xFrac;
+                        double v1 = srcRowData1[i0 + c] * (1.0 - xFrac)
+                                    + srcRowData1[i1 + c] * xFrac;
+                        double v = v0 * (1.0 - yFrac) + v1 * yFrac;
+                        outRow[x * 4 + c] = static_cast<uint8_t>(
+                            qBound(0.0, v, 255.0));
+                    }
+                }
             } else {
                 // ============ Overlay（1:1 直接拷贝） ============
                 const auto *ov = p.overlay;
