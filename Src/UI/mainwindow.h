@@ -84,21 +84,14 @@ private slots:
     void onItemAdded(QGraphicsItem *item);
 
     // 属性变更槽
-    void onPenChanged(QGraphicsItem *item, const QPen &oldPen,
-                      const QPen &newPen);
-    void onBrushChanged(QGraphicsItem *item, const QBrush &oldBrush,
-                        const QBrush &newBrush);
-    void onFontChanged(QGraphicsItem *item, const QFont &oldFont,
-                       const QFont &newFont);
-    void onTextChanged(QGraphicsItem *item, const QString &oldText,
-                       const QString &newText);
-    void onGeometryChanged(QGraphicsItem *item, const QRectF &oldRect,
-                           const QRectF &newRect);
+    void onPenChanged(QGraphicsItem *item, const QPen &oldPen, const QPen &newPen);
+    void onBrushChanged(QGraphicsItem *item, const QBrush &oldBrush, const QBrush &newBrush);
+    void onFontChanged(QGraphicsItem *item, const QFont &oldFont, const QFont &newFont);
+    void onTextChanged(QGraphicsItem *item, const QString &oldText, const QString &newText);
+    void onGeometryChanged(QGraphicsItem *item, const QRectF &oldRect, const QRectF &newRect);
     void onCornerRadiusChanged(QGraphicsItem *item, qreal oldR, qreal newR);
-    void onPositionChanged(QGraphicsItem *item, const QPointF &oldPos,
-                           const QPointF &newPos);
-    void onRotationChanged(QGraphicsItem *item, qreal oldRotation,
-                           qreal newRotation);
+    void onPositionChanged(QGraphicsItem *item, const QPointF &oldPos, const QPointF &newPos);
+    void onRotationChanged(QGraphicsItem *item, qreal oldRotation, qreal newRotation);
     void onRequestFinished(const QJsonDocument &json, NetworkRequestType type);
     void onUpdateInfo();
 
@@ -135,9 +128,9 @@ private:
 
     // 对齐/分布辅助方法
     void applyAlign(AlignmentUtils::AlignDirection direction);
-    void applyDistribute(AlignmentUtils::DistributeDirection direction,
-                         const AlignmentUtils::DistributeParams &params =
-                             AlignmentUtils::DistributeParams());
+    void applyDistribute(
+        AlignmentUtils::DistributeDirection direction,
+        const AlignmentUtils::DistributeParams &params = AlignmentUtils::DistributeParams());
 
     Ui::MainWindow *ui;
 
@@ -149,6 +142,11 @@ private:
 
     TiffExportEngine *m_tiffEngine = nullptr; // TIFF 导出模块
     QString m_exportTaskId; // 当前导出进度任务 ID
+
+    // 当前导出的 RIP 配置（由 onExportImage 设置，exportFinished 回调中使用）
+    bool m_ripEnabled = false;
+    int m_ripXRes = 0;
+    int m_ripYRes = 0;
 
     QString m_currentProjectPath; // 当前工程文件路径，空表示未保存
     bool m_projectModified = false; // 工程文件是否已修改（未保存）

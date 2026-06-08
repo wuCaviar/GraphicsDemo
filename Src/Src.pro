@@ -61,6 +61,7 @@ HEADERS += \
     Utils/TiffExportPipeline.h \
     Utils/ProcessGuard.h \
     Utils/ProgressManager.h \
+    Utils/SceneToJsonConverter.h \
     Utils/ColorUtils.h \
     Utils/AlignmentUtils.h \
     NetWork/QHttp.h \
@@ -115,6 +116,7 @@ SOURCES += \
     Utils/TiffExportPipeline.cpp \
     Utils/ProcessGuard.cpp \
     Utils/ProgressManager.cpp \
+    Utils/SceneToJsonConverter.cpp \
     Utils/ColorUtils.cpp \
     Utils/AlignmentUtils.cpp \
     NetWork/QHttp.cpp \

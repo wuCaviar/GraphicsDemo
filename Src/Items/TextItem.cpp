@@ -11,8 +11,7 @@ TextItem::TextItem(QGraphicsItem *parent) : QGraphicsTextItem(parent)
     setFlag(ItemIsMovable, true);
 }
 
-TextItem::TextItem(const QString &text, QGraphicsItem *parent)
-    : QGraphicsTextItem(text, parent)
+TextItem::TextItem(const QString &text, QGraphicsItem *parent) : QGraphicsTextItem(text, parent)
 {
     setTextInteractionFlags(Qt::NoTextInteraction);
     setFlag(ItemIsFocusable, false);
@@ -33,8 +32,7 @@ QGraphicsItem *TextItem::cloneItem() const
     item->applyTextWidth();
     // 复制 CMYK 颜色存储
     if (m_penCmyk.valid)
-        item->setItemPenCmyk(m_penCmyk.c, m_penCmyk.m, m_penCmyk.y,
-                             m_penCmyk.k);
+        item->setItemPenCmyk(m_penCmyk.c, m_penCmyk.m, m_penCmyk.y, m_penCmyk.k);
     return item;
 }
 
@@ -148,8 +146,7 @@ void TextItem::enableEditing(bool on)
     }
 }
 
-void TextItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
-                     QWidget *widget)
+void TextItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
     QGraphicsTextItem::paint(painter, option, widget);
 }

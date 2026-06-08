@@ -52,10 +52,8 @@ private:
 class MoveItemsCommand : public QUndoCommand
 {
 public:
-    MoveItemsCommand(const QList<QGraphicsItem *> &items,
-                     const QList<QPointF> &oldPositions,
-                     const QList<QPointF> &newPositions,
-                     QGraphicsScene *scene = nullptr,
+    MoveItemsCommand(const QList<QGraphicsItem *> &items, const QList<QPointF> &oldPositions,
+                     const QList<QPointF> &newPositions, QGraphicsScene *scene = nullptr,
                      QUndoCommand *parent = nullptr);
 
     void undo() override;
@@ -74,11 +72,18 @@ private:
 class PropertyChangeCommand : public QUndoCommand
 {
 public:
-    enum PropType { Pen, Brush, Font, Text, Geometry, CornerRadius };
+    enum PropType
+    {
+        Pen,
+        Brush,
+        Font,
+        Text,
+        Geometry,
+        CornerRadius
+    };
 
-    PropertyChangeCommand(QGraphicsItem *item, PropType propType,
-                          const QVariant &oldValue, const QVariant &newValue,
-                          QGraphicsScene *scene = nullptr,
+    PropertyChangeCommand(QGraphicsItem *item, PropType propType, const QVariant &oldValue,
+                          const QVariant &newValue, QGraphicsScene *scene = nullptr,
                           QUndoCommand *parent = nullptr);
 
     void undo() override;
@@ -117,9 +122,8 @@ private:
 class ZValueChangeCommand : public QUndoCommand
 {
 public:
-    ZValueChangeCommand(const QList<QGraphicsItem *> &items,
-                        const QList<qreal> &oldZ, const QList<qreal> &newZ,
-                        QGraphicsScene *scene = nullptr,
+    ZValueChangeCommand(const QList<QGraphicsItem *> &items, const QList<qreal> &oldZ,
+                        const QList<qreal> &newZ, QGraphicsScene *scene = nullptr,
                         QUndoCommand *parent = nullptr);
 
     void undo() override;
@@ -138,12 +142,9 @@ private:
 class AlignItemsCommand : public QUndoCommand
 {
 public:
-    AlignItemsCommand(const QList<QGraphicsItem *> &items,
-                      const QList<QPointF> &oldPositions,
-                      const QList<QPointF> &newPositions,
-                      const QString &description = QString(),
-                      QGraphicsScene *scene = nullptr,
-                      QUndoCommand *parent = nullptr);
+    AlignItemsCommand(const QList<QGraphicsItem *> &items, const QList<QPointF> &oldPositions,
+                      const QList<QPointF> &newPositions, const QString &description = QString(),
+                      QGraphicsScene *scene = nullptr, QUndoCommand *parent = nullptr);
 
     void undo() override;
     void redo() override;
@@ -162,13 +163,10 @@ class StretchAlignItemsCommand : public QUndoCommand
 {
 public:
     StretchAlignItemsCommand(const QList<QGraphicsItem *> &items,
-                             const QList<QPointF> &oldPositions,
-                             const QList<QPointF> &newPositions,
-                             const QList<QRectF> &oldGeometries,
-                             const QList<QRectF> &newGeometries,
+                             const QList<QPointF> &oldPositions, const QList<QPointF> &newPositions,
+                             const QList<QRectF> &oldGeometries, const QList<QRectF> &newGeometries,
                              const QString &description = QString(),
-                             QGraphicsScene *scene = nullptr,
-                             QUndoCommand *parent = nullptr);
+                             QGraphicsScene *scene = nullptr, QUndoCommand *parent = nullptr);
 
     void undo() override;
     void redo() override;
@@ -218,8 +216,8 @@ private:
     QGraphicsItem *m_item;
     qreal m_oldRotation;
     qreal m_newRotation;
-    QPointF m_oldPos;  // 旋转前位置
-    QPointF m_newPos;  // 中心旋转补偿后的位置
+    QPointF m_oldPos; // 旋转前位置
+    QPointF m_newPos; // 中心旋转补偿后的位置
     QPointer<QGraphicsScene> m_scene;
 };
 
@@ -240,10 +238,10 @@ public:
 
 private:
     QPointer<QGraphicsScene> m_scene;
-    QList<QGraphicsItem *> m_children;   // 子图元列表
-    QGraphicsItem *m_group = nullptr;    // 成组后的图元
-    QPointF m_groupPos;                  // 组的位置（子图元包围中心）
-    bool m_owned = true;                 // 首次 redo 前自己持有
+    QList<QGraphicsItem *> m_children; // 子图元列表
+    QGraphicsItem *m_group = nullptr; // 成组后的图元
+    QPointF m_groupPos; // 组的位置（子图元包围中心）
+    bool m_owned = true; // 首次 redo 前自己持有
 };
 
 // ============================================================
@@ -262,9 +260,9 @@ public:
 private:
     QPointer<QGraphicsScene> m_scene;
     QGraphicsItem *m_group = nullptr;
-    QList<QGraphicsItem *> m_children;   // 解散后的子图元
-    QPointF m_groupPos;                  // 组的原始位置
-    qreal m_groupRotation = 0;           // 组的原始旋转
+    QList<QGraphicsItem *> m_children; // 解散后的子图元
+    QPointF m_groupPos; // 组的原始位置
+    qreal m_groupRotation = 0; // 组的原始旋转
     bool m_owned = false;
 };
 
@@ -275,8 +273,7 @@ class CanvasResizeCommand : public QUndoCommand
 {
 public:
     CanvasResizeCommand(class CanvasItem *canvas, const QSizeF &oldSize, const QSizeF &newSize,
-                        QGraphicsScene *scene = nullptr,
-                        QUndoCommand *parent = nullptr);
+                        QGraphicsScene *scene = nullptr, QUndoCommand *parent = nullptr);
 
     void undo() override;
     void redo() override;

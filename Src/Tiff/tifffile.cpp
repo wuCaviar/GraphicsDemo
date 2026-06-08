@@ -7,11 +7,10 @@
 
 Q_LOGGING_CATEGORY(tiffLog, "dbzhang800.tiffFile")
 
-const static char *g_dataTypeName[] = {
-    nullptr,  "BYTE",      "ASCII",  "SHORT",  "LONG",      "RATIONAL",
-    "SBYTE",  "UNDEFINED", "SSHORT", "SLONG",  "SRATIONAL", "FLOAT",
-    "DOUBLE", "IFD",       "LONG8",  "SLONG8", "IFD8"
-};
+const static char *g_dataTypeName[] = { nullptr,     "BYTE",  "ASCII",     "SHORT",  "LONG",
+                                        "RATIONAL",  "SBYTE", "UNDEFINED", "SSHORT", "SLONG",
+                                        "SRATIONAL", "FLOAT", "DOUBLE",    "IFD",    "LONG8",
+                                        "SLONG8",    "IFD8" };
 
 const static QMap<int, QByteArray> g_tagNames = {
     { 254, "SUBFILETYPE" },
@@ -262,8 +261,7 @@ const static QMap<int, QByteArray> g_compressionNames = {
 };
 
 template<typename T>
-static inline T getValueFromBytes(const char *bytes,
-                                  TiffFile::ByteOrder byteOrder)
+static inline T getValueFromBytes(const char *bytes, TiffFile::ByteOrder byteOrder)
 {
     if (byteOrder == TiffFile::LittleEndian)
         return qFromLittleEndian<T>(reinterpret_cast<const uchar *>(bytes));
@@ -288,7 +286,8 @@ public:
         , type(other.type)
         , count(other.count)
         , valueOrOffset(other.valueOrOffset)
-    { }
+    {
+    }
     ~TiffIfdEntryPrivate() { }
 
     int typeSize()
@@ -329,15 +328,13 @@ public:
     QVariantList values;
 };
 
-void TiffIfdEntryPrivate::parserValues(const char *bytes,
-                                       TiffFile::ByteOrder byteOrder)
+void TiffIfdEntryPrivate::parserValues(const char *bytes, TiffFile::ByteOrder byteOrder)
 {
     if (type == TiffIfdEntry::DT_Ascii) {
         int start = 0;
         for (int i = 0; i < count; ++i) {
             if (bytes[i] == '\0') {
-                values.append(
-                    QString::fromLatin1(bytes + start, i - start + 1));
+                values.append(QString::fromLatin1(bytes + start, i - start + 1));
                 start = i + 1;
             }
         }
@@ -363,12 +360,11 @@ void TiffIfdEntryPrivate::parserValues(const char *bytes,
             values.append(static_cast<qint32>(bytes[i]));
             break;
         case TiffIfdEntry::DT_Short:
-            values.append(static_cast<quint32>(
-                getValueFromBytes<quint16>(bytes + i * 2, byteOrder)));
+            values.append(
+                static_cast<quint32>(getValueFromBytes<quint16>(bytes + i * 2, byteOrder)));
             break;
         case TiffIfdEntry::DT_SShort:
-            values.append(static_cast<qint32>(
-                getValueFromBytes<qint16>(bytes + i * 2, byteOrder)));
+            values.append(static_cast<qint32>(getValueFromBytes<qint16>(bytes + i * 2, byteOrder)));
             break;
         case TiffIfdEntry::DT_Long:
         case TiffIfdEntry::DT_Ifd:
@@ -385,13 +381,11 @@ void TiffIfdEntryPrivate::parserValues(const char *bytes,
             break;
         case TiffIfdEntry::DT_Rational:
             values.append(getValueFromBytes<quint32>(bytes + i * 4, byteOrder));
-            values.append(
-                getValueFromBytes<quint32>(bytes + i * 4 + 4, byteOrder));
+            values.append(getValueFromBytes<quint32>(bytes + i * 4 + 4, byteOrder));
             break;
         case TiffIfdEntry::DT_SRational:
             values.append(getValueFromBytes<qint32>(bytes + i * 4, byteOrder));
-            values.append(
-                getValueFromBytes<qint32>(bytes + i * 4 + 4, byteOrder));
+            values.append(getValueFromBytes<qint32>(bytes + i * 4 + 4, byteOrder));
             break;
         case TiffIfdEntry::DT_Long8:
         case TiffIfdEntry::DT_Ifd8:
@@ -482,7 +476,8 @@ public:
         , ifdEntries(other.ifdEntries)
         , subIfds(other.subIfds)
         , nextIfdOffset(other.nextIfdOffset)
-    { }
+    {
+    }
     ~TiffIfdPrivate() { }
 
     bool hasIfdEntry(quint16 tag);
@@ -500,9 +495,8 @@ bool TiffIfdPrivate::hasIfdEntry(quint16 tag)
 
 TiffIfdEntry TiffIfdPrivate::ifdEntry(quint16 tag)
 {
-    auto it =
-        std::find_if(ifdEntries.cbegin(), ifdEntries.cend(),
-                     [tag](const TiffIfdEntry &de) { return tag == de.tag(); });
+    auto it = std::find_if(ifdEntries.cbegin(), ifdEntries.cend(),
+                           [tag](const TiffIfdEntry &de) { return tag == de.tag(); });
     if (it == ifdEntries.cend())
         return TiffIfdEntry();
     return *it;
@@ -608,8 +602,7 @@ bool TiffFilePrivate::readHeader()
     }
 
     // version
-    header.version =
-        getValueFromBytes<quint16>(headerBytes.data() + 2, header.byteOrder);
+    header.version = getValueFromBytes<quint16>(headerBytes.data() + 2, header.byteOrder);
     if (!(header.version == 42 || header.version == 43)) {
         setError(QStringLiteral("Invalid tiff file: Unknown version"));
         return false;
@@ -618,11 +611,10 @@ bool TiffFilePrivate::readHeader()
 
     // ifd0Offset
     if (!header.isBigTiff())
-        header.ifd0Offset = getValueFromBytes<quint32>(
-            header.rawBytes.data() + 4, header.byteOrder);
+        header.ifd0Offset =
+            getValueFromBytes<quint32>(header.rawBytes.data() + 4, header.byteOrder);
     else
-        header.ifd0Offset = getValueFromBytes<qint64>(
-            header.rawBytes.data() + 8, header.byteOrder);
+        header.ifd0Offset = getValueFromBytes<qint64>(header.rawBytes.data() + 8, header.byteOrder);
 
     return true;
 }
@@ -674,14 +666,12 @@ bool TiffFilePrivate::readIfd(qint64 offset, TiffIfd *parentIfd)
             continue;
         QByteArray valueBytes;
         if (!header.isBigTiff() && valueBytesCount > 4) {
-            auto valueOffset = getValueFromBytes<quint32>(de.valueOrOffset(),
-                                                          header.byteOrder);
+            auto valueOffset = getValueFromBytes<quint32>(de.valueOrOffset(), header.byteOrder);
             if (!file.seek(valueOffset))
                 qCDebug(tiffLog) << "Fail to seek pos: " << valueOffset;
             valueBytes = file.read(valueBytesCount);
         } else if (header.isBigTiff() && valueBytesCount > 8) {
-            auto valueOffset = getValueFromBytes<quint64>(de.valueOrOffset(),
-                                                          header.byteOrder);
+            auto valueOffset = getValueFromBytes<quint64>(de.valueOrOffset(), header.byteOrder);
             if (!file.seek(valueOffset))
                 qCDebug(tiffLog) << "Fail to seek pos: " << valueOffset;
             valueBytes = file.read(valueBytesCount);

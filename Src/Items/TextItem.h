@@ -22,10 +22,7 @@ public:
     int type() const override { return Type; }
 
     ItemType itemType() const override { return TextItemType; }
-    PropertyFlags propertyFlags() const override
-    {
-        return HasFont | HasText | HasRotation;
-    }
+    PropertyFlags propertyFlags() const override { return HasFont | HasText | HasRotation; }
     QGraphicsItem *cloneItem() const override;
 
     QPen itemPen() const override;
@@ -74,8 +71,7 @@ signals:
     void editingFinished();
 
 protected:
-    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
-               QWidget *widget) override;
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
     void mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event) override;
     void focusOutEvent(QFocusEvent *event) override;
 

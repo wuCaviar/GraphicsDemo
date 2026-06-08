@@ -28,6 +28,7 @@
 #include "TaskHistoryPopup.h"
 #include "GraphicsItemGroup.h"
 #include "FitCanvasDlg.h"
+#include "SceneToJsonConverter.h"
 
 #include <algorithm>
 #include <memory>
@@ -82,8 +83,7 @@ QFrame *createStatusSeparator(QWidget *parent)
 }
 } // namespace
 
-MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
     m_undoStack = new QUndoStack(this);
@@ -136,21 +136,23 @@ void MainWindow::_initWidget()
     // TIFF 导出引擎：管理场景检查、Overlay 渲染、后台线程导出
     m_tiffEngine = new TiffExportEngine(this);
 
-    connect(
-        m_tiffEngine, &TiffExportEngine::progressChanged, this,
-        [this](int pct) { m_pProgressMgr->updateTask(m_exportTaskId, pct); });
+    connect(m_tiffEngine, &TiffExportEngine::progressChanged, this,
+            [this](int pct) { m_pProgressMgr->updateTask(m_exportTaskId, pct); });
 
     connect(m_tiffEngine, &TiffExportEngine::exportFinished, this,
-            [this](bool success, const QString &filePath,
-                   const QString &errorMessage) {
+            [this](bool success, const QString &filePath, const QString &errorMessage) {
                 if (success) {
+                    // 导出成功后，在主线程发起 RIP 添加请求
+                    if (m_ripEnabled && m_pNetWorkUtils) {
+                        m_pNetWorkUtils->doAddRip(m_ripXRes, m_ripYRes, filePath);
+                    }
                     m_pProgressMgr->finishTask(m_exportTaskId);
+                    setEnabled(false); // 导出完成后禁止操作，等待 RIP 结果
                 } else {
                     m_pProgressMgr->cancelTask(m_exportTaskId);
                     if (!errorMessage.isEmpty()) {
-                        QMessageBox::warning(
-                            this, tr("Export"),
-                            tr("Export failed: %1").arg(errorMessage));
+                        QMessageBox::warning(this, tr("Export"),
+                                             tr("Export failed: %1").arg(errorMessage));
                     }
                 }
             });
@@ -191,38 +193,35 @@ void MainWindow::_initMenuBar()
     // ---- 文件 ----
     QMenu *fileMenu = menu->addMenu(tr("&File"));
 
-    QAction *newAct =
-        fileMenu->addAction(QIcon(":/icons/icons/file-new.svg"), tr("&New..."));
+    QAction *newAct = fileMenu->addAction(QIcon(":/icons/icons/file-new.svg"), tr("&New..."));
     newAct->setShortcut(QKeySequence::New);
     newAct->setToolTip(tr("Create a new canvas"));
     connect(newAct, &QAction::triggered, this, &MainWindow::onNew);
 
     fileMenu->addSeparator();
 
-    QAction *openProjAct =
-        fileMenu->addAction(style()->standardIcon(QStyle::SP_DialogOpenButton),
-                            tr("&Open Project..."));
+    QAction *openProjAct = fileMenu->addAction(style()->standardIcon(QStyle::SP_DialogOpenButton),
+                                               tr("&Open Project..."));
     openProjAct->setShortcut(QKeySequence::Open);
     openProjAct->setToolTip(tr("Open a project file"));
     connect(openProjAct, &QAction::triggered, this, &MainWindow::onOpenProject);
 
-    QAction *saveProjAct =
-        fileMenu->addAction(style()->standardIcon(QStyle::SP_DialogSaveButton),
-                            tr("&Save Project..."));
+    QAction *saveProjAct = fileMenu->addAction(style()->standardIcon(QStyle::SP_DialogSaveButton),
+                                               tr("&Save Project..."));
     saveProjAct->setShortcut(QKeySequence::Save);
     saveProjAct->setToolTip(tr("Save the current project"));
     connect(saveProjAct, &QAction::triggered, this, &MainWindow::onSaveProject);
 
     fileMenu->addSeparator();
 
-    QAction *importAct = fileMenu->addAction(
-        QIcon(":/icons/icons/file-import.svg"), tr("&Import Image..."));
+    QAction *importAct =
+        fileMenu->addAction(QIcon(":/icons/icons/file-import.svg"), tr("&Import Image..."));
     importAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_I));
     importAct->setToolTip(tr("Import an image onto the canvas"));
     connect(importAct, &QAction::triggered, this, &MainWindow::onImportImage);
 
-    QAction *exportAct = fileMenu->addAction(
-        QIcon(":/icons/icons/file-export.svg"), tr("&Export Image..."));
+    QAction *exportAct =
+        fileMenu->addAction(QIcon(":/icons/icons/file-export.svg"), tr("&Export Image..."));
     exportAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     exportAct->setToolTip(tr("Export the canvas to an image file"));
     connect(exportAct, &QAction::triggered, this, &MainWindow::onExportImage);
@@ -237,48 +236,42 @@ void MainWindow::_initMenuBar()
     // ---- 编辑 ----
     QMenu *editMenu = menu->addMenu(tr("&Edit"));
 
-    m_undoAction =
-        editMenu->addAction(QIcon(":/icons/icons/edit-undo.svg"), tr("&Undo"));
+    m_undoAction = editMenu->addAction(QIcon(":/icons/icons/edit-undo.svg"), tr("&Undo"));
     m_undoAction->setShortcut(QKeySequence::Undo);
     m_undoAction->setToolTip(tr("Undo the last action"));
     connect(m_undoAction, &QAction::triggered, this, &MainWindow::onUndo);
 
-    m_redoAction =
-        editMenu->addAction(QIcon(":/icons/icons/edit-redo.svg"), tr("&Redo"));
+    m_redoAction = editMenu->addAction(QIcon(":/icons/icons/edit-redo.svg"), tr("&Redo"));
     m_redoAction->setShortcut(QKeySequence::Redo);
     m_redoAction->setToolTip(tr("Redo the last undone action"));
     connect(m_redoAction, &QAction::triggered, this, &MainWindow::onRedo);
 
     editMenu->addSeparator();
 
-    QAction *cutAct =
-        editMenu->addAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cu&t"));
+    QAction *cutAct = editMenu->addAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cu&t"));
     cutAct->setShortcut(QKeySequence::Cut);
     cutAct->setToolTip(tr("Cut the selected items to clipboard"));
     connect(cutAct, &QAction::triggered, this, &MainWindow::onCut);
 
-    QAction *copyAct =
-        editMenu->addAction(QIcon(":/icons/icons/edit-copy.svg"), tr("&Copy"));
+    QAction *copyAct = editMenu->addAction(QIcon(":/icons/icons/edit-copy.svg"), tr("&Copy"));
     copyAct->setShortcut(QKeySequence::Copy);
     copyAct->setToolTip(tr("Copy the selected items to clipboard"));
     connect(copyAct, &QAction::triggered, this, &MainWindow::onCopy);
 
-    QAction *pasteAct = editMenu->addAction(
-        QIcon(":/icons/icons/edit-paste.svg"), tr("&Paste"));
+    QAction *pasteAct = editMenu->addAction(QIcon(":/icons/icons/edit-paste.svg"), tr("&Paste"));
     pasteAct->setShortcut(QKeySequence::Paste);
     pasteAct->setToolTip(tr("Paste items from clipboard"));
     connect(pasteAct, &QAction::triggered, this, &MainWindow::onPaste);
 
     editMenu->addSeparator();
 
-    QAction *deleteAct = editMenu->addAction(
-        QIcon(":/icons/icons/edit-delete.svg"), tr("&Delete"));
+    QAction *deleteAct = editMenu->addAction(QIcon(":/icons/icons/edit-delete.svg"), tr("&Delete"));
     deleteAct->setShortcut(QKeySequence::Delete);
     deleteAct->setToolTip(tr("Delete the selected items"));
     connect(deleteAct, &QAction::triggered, this, &MainWindow::onDelete);
 
-    QAction *selectAllAct = editMenu->addAction(
-        QIcon(":/icons/icons/edit-select-all.svg"), tr("Select &All"));
+    QAction *selectAllAct =
+        editMenu->addAction(QIcon(":/icons/icons/edit-select-all.svg"), tr("Select &All"));
     selectAllAct->setShortcut(QKeySequence::SelectAll);
     selectAllAct->setToolTip(tr("Select all items on the canvas"));
     connect(selectAllAct, &QAction::triggered, this, &MainWindow::onSelectAll);
@@ -286,58 +279,48 @@ void MainWindow::_initMenuBar()
     // ---- 排列 ----
     QMenu *arrMenu = menu->addMenu(tr("&Arrange"));
     arrMenu
-        ->addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring Forward"),
-                    this, &MainWindow::onBringToFront)
+        ->addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring Forward"), this,
+                    &MainWindow::onBringToFront)
         ->setToolTip(tr("Bring selected items forward one step"));
     arrMenu
-        ->addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send Backward"),
-                    this, &MainWindow::onSendToBack)
+        ->addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send Backward"), this,
+                    &MainWindow::onSendToBack)
         ->setToolTip(tr("Send selected items backward one step"));
     arrMenu->addSeparator();
-    QAction *groupAct =
-        arrMenu->addAction(QIcon(":/icons/icons/group.svg"), tr("&Group"));
+    QAction *groupAct = arrMenu->addAction(QIcon(":/icons/icons/group.svg"), tr("&Group"));
     groupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
     groupAct->setToolTip(tr("Group selected items together"));
     connect(groupAct, &QAction::triggered, this, &MainWindow::onGroup);
-    QAction *ungroupAct =
-        arrMenu->addAction(QIcon(":/icons/icons/ungroup.svg"), tr("&Ungroup"));
+    QAction *ungroupAct = arrMenu->addAction(QIcon(":/icons/icons/ungroup.svg"), tr("&Ungroup"));
     ungroupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
     ungroupAct->setToolTip(tr("Ungroup selected items"));
     connect(ungroupAct, &QAction::triggered, this, &MainWindow::onUngroup);
     arrMenu->addSeparator();
-    arrMenu
-        ->addAction(tr("Align && Layout..."), this,
-                    &MainWindow::onAlignLayoutDialog)
+    arrMenu->addAction(tr("Align && Layout..."), this, &MainWindow::onAlignLayoutDialog)
         ->setToolTip(tr("Open the Align & Layout dialog"));
     arrMenu->addSeparator();
-    QAction *fitCanvasAct = arrMenu->addAction(
-        tr("Fit Canvas to Selection"), this, &MainWindow::onFitCanvasToItems);
+    QAction *fitCanvasAct =
+        arrMenu->addAction(tr("Fit Canvas to Selection"), this, &MainWindow::onFitCanvasToItems);
     fitCanvasAct->setToolTip(tr("Resize the canvas to fit the selected items"));
     arrMenu->addSeparator();
     QMenu *rotateMenu = arrMenu->addMenu(tr("Rotate"));
     rotateMenu
-        ->addAction(QIcon(":/icons/icons/rotate-cw.svg"),
-                    tr("90\u00b0 Clockwise"), this,
+        ->addAction(QIcon(":/icons/icons/rotate-cw.svg"), tr("90\u00b0 Clockwise"), this,
                     [this]() { rotateSelectedItems(90.0); })
         ->setToolTip(tr("Rotate selected items 90 degrees clockwise"));
     rotateMenu
-        ->addAction(QIcon(":/icons/icons/rotate-ccw.svg"),
-                    tr("90\u00b0 Counter-clockwise"), this,
+        ->addAction(QIcon(":/icons/icons/rotate-ccw.svg"), tr("90\u00b0 Counter-clockwise"), this,
                     [this]() { rotateSelectedItems(-90.0); })
         ->setToolTip(tr("Rotate selected items 90 degrees counter-clockwise"));
-    rotateMenu
-        ->addAction(tr("180\u00b0"), this,
-                    [this]() { rotateSelectedItems(180.0); })
+    rotateMenu->addAction(tr("180\u00b0"), this, [this]() { rotateSelectedItems(180.0); })
         ->setToolTip(tr("Rotate selected items 180 degrees"));
 
     // ---- 设置 ----
     QMenu *settingsMenu = menu->addMenu(tr("&Settings"));
-    settingsMenu
-        ->addAction(tr("&RIP Settings..."), this, &MainWindow::onSettings)
+    settingsMenu->addAction(tr("&RIP Settings..."), this, &MainWindow::onSettings)
         ->setToolTip(tr("Configure RIP settings"));
     settingsMenu->addSeparator();
-    settingsMenu
-        ->addAction(tr("&Preferences..."), this, &MainWindow::onPreferences)
+    settingsMenu->addAction(tr("&Preferences..."), this, &MainWindow::onPreferences)
         ->setToolTip(tr("Open application preferences"));
 
     // ---- 视图 ----
@@ -363,19 +346,16 @@ void MainWindow::_initMenuBar()
 
     viewMenu->addSeparator();
     // 缩放适配
-    QAction *fitAct = new QAction(QIcon(":/icons/icons/view-fit.svg"),
-                                  tr("Fit to Canvas"), this);
+    QAction *fitAct = new QAction(QIcon(":/icons/icons/view-fit.svg"), tr("Fit to Canvas"), this);
     fitAct->setToolTip(tr("Fit the view to the canvas"));
-    connect(fitAct, &QAction::triggered, this,
-            [this]() { m_pView->fitToCanvas(); });
+    connect(fitAct, &QAction::triggered, this, [this]() { m_pView->fitToCanvas(); });
     viewMenu->addAction(fitAct);
 
-    QAction *resetZoomAct = new QAction(
-        QIcon(":/icons/icons/view-zoom-reset.svg"), tr("Reset Zoom (0)"), this);
+    QAction *resetZoomAct =
+        new QAction(QIcon(":/icons/icons/view-zoom-reset.svg"), tr("Reset Zoom (0)"), this);
     resetZoomAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
     resetZoomAct->setToolTip(tr("Reset zoom to 100%"));
-    connect(resetZoomAct, &QAction::triggered, this,
-            [this]() { m_pView->setZoomLevel(1.0); });
+    connect(resetZoomAct, &QAction::triggered, this, [this]() { m_pView->setZoomLevel(1.0); });
     viewMenu->addAction(resetZoomAct);
 
     _updateUndoRedoActions();
@@ -396,10 +376,8 @@ void MainWindow::_initThemeMenu(QMenu *viewMenu)
     m_darkThemeAction->setCheckable(true);
     themeGroup->addAction(m_darkThemeAction);
 
-    connect(m_lightThemeAction, &QAction::triggered, this,
-            [this]() { switchTheme("light"); });
-    connect(m_darkThemeAction, &QAction::triggered, this,
-            [this]() { switchTheme("dark"); });
+    connect(m_lightThemeAction, &QAction::triggered, this, [this]() { switchTheme("light"); });
+    connect(m_darkThemeAction, &QAction::triggered, this, [this]() { switchTheme("dark"); });
 
     // 恢复保存的主题设置
     QSettings settings;
@@ -440,22 +418,21 @@ void MainWindow::_initToolBar()
     addToolBar(Qt::TopToolBarArea, fileEditBar);
 
     // New 按钮
-    QAction *newAct =
-        new QAction(QIcon(":/icons/icons/file-new.svg"), tr("New"), this);
+    QAction *newAct = new QAction(QIcon(":/icons/icons/file-new.svg"), tr("New"), this);
     newAct->setToolTip(tr("Create a new canvas"));
     connect(newAct, &QAction::triggered, this, &MainWindow::onNew);
     fileEditBar->addAction(newAct);
 
     // Import 按钮
-    QAction *importAct = new QAction(QIcon(":/icons/icons/file-import.svg"),
-                                     tr("Import Image"), this);
+    QAction *importAct =
+        new QAction(QIcon(":/icons/icons/file-import.svg"), tr("Import Image"), this);
     importAct->setToolTip(tr("Import an image onto the canvas"));
     connect(importAct, &QAction::triggered, this, &MainWindow::onImportImage);
     fileEditBar->addAction(importAct);
 
     // Export 按钮
-    QAction *exportAct = new QAction(QIcon(":/icons/icons/file-export.svg"),
-                                     tr("Export Image"), this);
+    QAction *exportAct =
+        new QAction(QIcon(":/icons/icons/file-export.svg"), tr("Export Image"), this);
     exportAct->setToolTip(tr("Export the canvas to an image file"));
     connect(exportAct, &QAction::triggered, this, &MainWindow::onExportImage);
     fileEditBar->addAction(exportAct);
@@ -468,24 +445,21 @@ void MainWindow::_initToolBar()
     fileEditBar->addSeparator();
 
     // Cut 按钮
-    QAction *cutAct =
-        new QAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cut"), this);
+    QAction *cutAct = new QAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cut"), this);
     cutAct->setShortcut(QKeySequence::Cut);
     cutAct->setToolTip(tr("Cut the selected items to clipboard"));
     connect(cutAct, &QAction::triggered, this, &MainWindow::onCut);
     fileEditBar->addAction(cutAct);
 
     // Copy 按钮
-    QAction *copyAct =
-        new QAction(QIcon(":/icons/icons/edit-copy.svg"), tr("Copy"), this);
+    QAction *copyAct = new QAction(QIcon(":/icons/icons/edit-copy.svg"), tr("Copy"), this);
     copyAct->setShortcut(QKeySequence::Copy);
     copyAct->setToolTip(tr("Copy the selected items to clipboard"));
     connect(copyAct, &QAction::triggered, this, &MainWindow::onCopy);
     fileEditBar->addAction(copyAct);
 
     // Paste 按钮
-    QAction *pasteAct =
-        new QAction(QIcon(":/icons/icons/edit-paste.svg"), tr("Paste"), this);
+    QAction *pasteAct = new QAction(QIcon(":/icons/icons/edit-paste.svg"), tr("Paste"), this);
     pasteAct->setShortcut(QKeySequence::Paste);
     pasteAct->setToolTip(tr("Paste items from clipboard"));
     connect(pasteAct, &QAction::triggered, this, &MainWindow::onPaste);
@@ -502,35 +476,28 @@ void MainWindow::_initToolBar()
     auto *actionGroup = new QActionGroup(this);
     actionGroup->setExclusive(true);
 
-    auto addToolAction = [&](const QString &iconPath, const QString &text,
-                             Tool tool, const QString &shortcut = { }) {
+    auto addToolAction = [&](const QString &iconPath, const QString &text, Tool tool,
+                             const QString &shortcut = { }) {
         QAction *act = drawBar->addAction(QIcon(iconPath), text);
         act->setCheckable(true);
         act->setToolTip(text);
         actionGroup->addAction(act);
         if (!shortcut.isEmpty())
             act->setShortcut(QKeySequence(shortcut));
-        connect(act, &QAction::triggered, this,
-                [this, tool]() { onToolTriggered(tool); });
+        connect(act, &QAction::triggered, this, [this, tool]() { onToolTriggered(tool); });
         m_toolActions[tool] = act;
         return act;
     };
 
-    auto *selectAct = addToolAction(":/icons/icons/tool-select.svg",
-                                    tr("Select (V)"), Tool::Select, "V");
+    auto *selectAct =
+        addToolAction(":/icons/icons/tool-select.svg", tr("Select (V)"), Tool::Select, "V");
     selectAct->setChecked(true);
-    addToolAction(":/icons/icons/tool-rect.svg", tr("Rectangle (R)"),
-                  Tool::Rect, "R");
-    addToolAction(":/icons/icons/tool-ellipse.svg", tr("Ellipse (E)"),
-                  Tool::Ellipse, "E");
-    addToolAction(":/icons/icons/tool-line.svg", tr("Line (L)"), Tool::Line,
-                  "L");
-    addToolAction(":/icons/icons/tool-curve.svg", tr("Curve (C)"),
-                  Tool::BezierCurve, "C");
-    addToolAction(":/icons/icons/tool-freehand.svg", tr("Freehand (F)"),
-                  Tool::Freehand, "F");
-    addToolAction(":/icons/icons/tool-text.svg", tr("Text (T)"), Tool::Text,
-                  "T");
+    addToolAction(":/icons/icons/tool-rect.svg", tr("Rectangle (R)"), Tool::Rect, "R");
+    addToolAction(":/icons/icons/tool-ellipse.svg", tr("Ellipse (E)"), Tool::Ellipse, "E");
+    addToolAction(":/icons/icons/tool-line.svg", tr("Line (L)"), Tool::Line, "L");
+    addToolAction(":/icons/icons/tool-curve.svg", tr("Curve (C)"), Tool::BezierCurve, "C");
+    addToolAction(":/icons/icons/tool-freehand.svg", tr("Freehand (F)"), Tool::Freehand, "F");
+    addToolAction(":/icons/icons/tool-text.svg", tr("Text (T)"), Tool::Text, "T");
 
     // 对齐工具栏
     QToolBar *alignToolBar = new QToolBar(tr("Align"), this);
@@ -540,23 +507,21 @@ void MainWindow::_initToolBar()
     alignToolBar->setIconSize(QSize(20, 20));
     addToolBar(Qt::TopToolBarArea, alignToolBar);
 
-    QAction *alignLayoutAct = alignToolBar->addAction(
-        QIcon(":/icons/icons/align-layout.svg"), tr("Align && Layout..."));
+    QAction *alignLayoutAct =
+        alignToolBar->addAction(QIcon(":/icons/icons/align-layout.svg"), tr("Align && Layout..."));
     alignLayoutAct->setToolTip(tr("Open Align & Layout dialog"));
-    connect(alignLayoutAct, &QAction::triggered, this,
-            &MainWindow::onAlignLayoutDialog);
+    connect(alignLayoutAct, &QAction::triggered, this, &MainWindow::onAlignLayoutDialog);
 
     alignToolBar->addSeparator();
 
     // 成组/解组
-    QAction *groupAct =
-        alignToolBar->addAction(QIcon(":/icons/icons/group.svg"), tr("Group"));
+    QAction *groupAct = alignToolBar->addAction(QIcon(":/icons/icons/group.svg"), tr("Group"));
     groupAct->setToolTip(tr("Group selected items (Ctrl+G)"));
     groupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
     connect(groupAct, &QAction::triggered, this, &MainWindow::onGroup);
 
-    QAction *ungroupAct = alignToolBar->addAction(
-        QIcon(":/icons/icons/ungroup.svg"), tr("Ungroup"));
+    QAction *ungroupAct =
+        alignToolBar->addAction(QIcon(":/icons/icons/ungroup.svg"), tr("Ungroup"));
     ungroupAct->setToolTip(tr("Ungroup selected items (Ctrl+Shift+G)"));
     ungroupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
     connect(ungroupAct, &QAction::triggered, this, &MainWindow::onUngroup);
@@ -564,27 +529,24 @@ void MainWindow::_initToolBar()
     alignToolBar->addSeparator();
 
     // 顺时针旋转 90°
-    QAction *rotateCWAct = alignToolBar->addAction(
-        QIcon(":/icons/icons/rotate-cw.svg"), tr("Rotate 90\u00b0 CW"));
+    QAction *rotateCWAct =
+        alignToolBar->addAction(QIcon(":/icons/icons/rotate-cw.svg"), tr("Rotate 90\u00b0 CW"));
     rotateCWAct->setToolTip(tr("Rotate 90\u00b0 clockwise"));
-    connect(rotateCWAct, &QAction::triggered, this,
-            [this]() { rotateSelectedItems(90.0); });
+    connect(rotateCWAct, &QAction::triggered, this, [this]() { rotateSelectedItems(90.0); });
 
     // 逆时针旋转 90°
-    QAction *rotateCCWAct = alignToolBar->addAction(
-        QIcon(":/icons/icons/rotate-ccw.svg"), tr("Rotate 90\u00b0 CCW"));
+    QAction *rotateCCWAct =
+        alignToolBar->addAction(QIcon(":/icons/icons/rotate-ccw.svg"), tr("Rotate 90\u00b0 CCW"));
     rotateCCWAct->setToolTip(tr("Rotate 90\u00b0 counter-clockwise"));
-    connect(rotateCCWAct, &QAction::triggered, this,
-            [this]() { rotateSelectedItems(-90.0); });
+    connect(rotateCCWAct, &QAction::triggered, this, [this]() { rotateSelectedItems(-90.0); });
 
     alignToolBar->addSeparator();
 
     // 画布适配选中图元
-    QAction *fitCanvasAct = alignToolBar->addAction(
-        QIcon(":/icons/icons/view-fit.svg"), tr("Fit Canvas to Selection"));
+    QAction *fitCanvasAct =
+        alignToolBar->addAction(QIcon(":/icons/icons/view-fit.svg"), tr("Fit Canvas to Selection"));
     fitCanvasAct->setToolTip(tr("Resize the canvas to fit the selected items"));
-    connect(fitCanvasAct, &QAction::triggered, this,
-            &MainWindow::onFitCanvasToItems);
+    connect(fitCanvasAct, &QAction::triggered, this, &MainWindow::onFitCanvasToItems);
 }
 
 void MainWindow::_initPropertyPanel()
@@ -594,8 +556,7 @@ void MainWindow::_initPropertyPanel()
     m_pPropertyPanel->setMinimumWidth(300);
     addDockWidget(Qt::RightDockWidgetArea, m_pPropertyPanel);
 
-    m_alignLayoutDlg =
-        new AlignLayoutDialog(m_pView->scene(), m_undoStack, this);
+    m_alignLayoutDlg = new AlignLayoutDialog(m_pView->scene(), m_undoStack, this);
     m_alignLayoutDlg->setObjectName("AlignLayoutDock");
     m_alignLayoutDlg->setMinimumWidth(300);
     splitDockWidget(m_pPropertyPanel, m_alignLayoutDlg, Qt::Vertical);
@@ -604,31 +565,21 @@ void MainWindow::_initPropertyPanel()
 
 void MainWindow::_initConnections()
 {
-    connect(m_pView, &QAtGraphicsView::selectionChanged, this,
-            &MainWindow::onSelectionChanged);
-    connect(m_pView, &QAtGraphicsView::itemAdded, this,
-            &MainWindow::onItemAdded);
+    connect(m_pView, &QAtGraphicsView::selectionChanged, this, &MainWindow::onSelectionChanged);
+    connect(m_pView, &QAtGraphicsView::itemAdded, this, &MainWindow::onItemAdded);
 
     // 右键菜单 → 复用菜单栏的 Bring Forward / Send Backward
-    connect(m_pView, &QAtGraphicsView::bringToFrontRequested, this,
-            &MainWindow::onBringToFront);
-    connect(m_pView, &QAtGraphicsView::sendToBackRequested, this,
-            &MainWindow::onSendToBack);
-    connect(m_pView, &QAtGraphicsView::groupRequested, this,
-            &MainWindow::onGroup);
-    connect(m_pView, &QAtGraphicsView::ungroupRequested, this,
-            &MainWindow::onUngroup);
+    connect(m_pView, &QAtGraphicsView::bringToFrontRequested, this, &MainWindow::onBringToFront);
+    connect(m_pView, &QAtGraphicsView::sendToBackRequested, this, &MainWindow::onSendToBack);
+    connect(m_pView, &QAtGraphicsView::groupRequested, this, &MainWindow::onGroup);
+    connect(m_pView, &QAtGraphicsView::ungroupRequested, this, &MainWindow::onUngroup);
     connect(m_pView, &QAtGraphicsView::fitCanvasToItemsRequested, this,
             &MainWindow::onFitCanvasToItems);
 
-    connect(m_pPropertyPanel, &PropertyPanel::penChanged, this,
-            &MainWindow::onPenChanged);
-    connect(m_pPropertyPanel, &PropertyPanel::brushChanged, this,
-            &MainWindow::onBrushChanged);
-    connect(m_pPropertyPanel, &PropertyPanel::fontChanged, this,
-            &MainWindow::onFontChanged);
-    connect(m_pPropertyPanel, &PropertyPanel::textChanged, this,
-            &MainWindow::onTextChanged);
+    connect(m_pPropertyPanel, &PropertyPanel::penChanged, this, &MainWindow::onPenChanged);
+    connect(m_pPropertyPanel, &PropertyPanel::brushChanged, this, &MainWindow::onBrushChanged);
+    connect(m_pPropertyPanel, &PropertyPanel::fontChanged, this, &MainWindow::onFontChanged);
+    connect(m_pPropertyPanel, &PropertyPanel::textChanged, this, &MainWindow::onTextChanged);
     connect(m_pPropertyPanel, &PropertyPanel::geometryChanged, this,
             &MainWindow::onGeometryChanged);
     connect(m_pPropertyPanel, &PropertyPanel::cornerRadiusChanged, this,
@@ -638,10 +589,8 @@ void MainWindow::_initConnections()
     connect(m_pPropertyPanel, &PropertyPanel::rotationChanged, this,
             &MainWindow::onRotationChanged);
 
-    connect(m_undoStack, &QUndoStack::canUndoChanged, this,
-            [this]() { _updateUndoRedoActions(); });
-    connect(m_undoStack, &QUndoStack::canRedoChanged, this,
-            [this]() { _updateUndoRedoActions(); });
+    connect(m_undoStack, &QUndoStack::canUndoChanged, this, [this]() { _updateUndoRedoActions(); });
+    connect(m_undoStack, &QUndoStack::canRedoChanged, this, [this]() { _updateUndoRedoActions(); });
 
     // undo/redo 后更新 ResizeHandleItem 位置（而非重建，避免选中框闪烁）
     // 同时标记工程为已修改
@@ -661,13 +610,12 @@ void MainWindow::_initConnections()
             &RulerBar::updateRuler);
 
     // 状态栏：鼠标位置 & 缩放变化 & 刻度尺鼠标位置同步
-    connect(m_pView, &QAtGraphicsView::mousePositionChanged, this,
-            [this](const QPointF &pos) {
-                _updatePosLabel(pos);
-                // 同步鼠标位置到刻度尺
-                m_hRuler->setMousePosition(pos);
-                m_vRuler->setMousePosition(pos);
-            });
+    connect(m_pView, &QAtGraphicsView::mousePositionChanged, this, [this](const QPointF &pos) {
+        _updatePosLabel(pos);
+        // 同步鼠标位置到刻度尺
+        m_hRuler->setMousePosition(pos);
+        m_vRuler->setMousePosition(pos);
+    });
     connect(m_pView, &QAtGraphicsView::zoomChanged, this, [this](qreal level) {
         int pct = qRound(level * 100);
         m_zoomLabel->setText(tr("%1%").arg(pct));
@@ -683,8 +631,7 @@ void MainWindow::_initConnections()
 
     // TextItem 编辑完成时更新属性面板
     connect(m_pView->scene(), &QGraphicsScene::focusItemChanged, this,
-            [this](QGraphicsItem *newFocus, QGraphicsItem *oldFocus,
-                   Qt::FocusReason) {
+            [this](QGraphicsItem *newFocus, QGraphicsItem *oldFocus, Qt::FocusReason) {
                 Q_UNUSED(oldFocus);
                 Q_UNUSED(newFocus);
                 // 当焦点离开 TextItem 时更新属性面板
@@ -740,8 +687,7 @@ void MainWindow::_initStatusBar()
     m_resizeCanvasBtn->setAutoRaise(true);
     m_resizeCanvasBtn->setToolTip(tr("Resize canvas"));
     m_resizeCanvasBtn->setVisible(false);
-    connect(m_resizeCanvasBtn, &QToolButton::clicked, this,
-            &MainWindow::onResizeCanvas);
+    connect(m_resizeCanvasBtn, &QToolButton::clicked, this, &MainWindow::onResizeCanvas);
 
     // 画布尺寸
     m_canvasLabel = new QLabel;
@@ -763,27 +709,23 @@ void MainWindow::_initStatusBar()
     m_taskHistoryBtn->setAutoRaise(true);
     m_taskHistoryBtn->setToolTip(tr("Task history"));
     m_taskHistoryBtn->setEnabled(false);
-    connect(m_taskHistoryBtn, &QToolButton::clicked, this,
-            &MainWindow::_toggleHistoryPopup);
+    connect(m_taskHistoryBtn, &QToolButton::clicked, this, &MainWindow::_toggleHistoryPopup);
 
     // 任务历史弹窗
     m_taskHistoryPopup = new TaskHistoryPopup(this);
     connect(m_taskHistoryPopup, &TaskHistoryPopup::taskClicked, this,
-            [this](const QString &taskId) {
-                m_pProgressMgr->setFocusTask(taskId);
-            });
+            [this](const QString &taskId) { m_pProgressMgr->setFocusTask(taskId); });
     connect(m_taskHistoryPopup, &TaskHistoryPopup::popupHidden, this,
             [this]() { m_taskHistoryBtn->setChecked(false); });
 
     // 弹窗数据刷新
-    connect(
-        m_pProgressMgr, &ProgressManager::taskHistoryChanged, this, [this]() {
-            m_taskHistoryBtn->setEnabled(m_pProgressMgr->hasActiveTasks()
-                                         || m_pProgressMgr->hasFinishedTasks());
-            if (m_taskHistoryPopup && m_taskHistoryPopup->isVisible())
-                m_taskHistoryPopup->refresh(m_pProgressMgr->activeTaskList(),
-                                            m_pProgressMgr->finishedTaskList());
-        });
+    connect(m_pProgressMgr, &ProgressManager::taskHistoryChanged, this, [this]() {
+        m_taskHistoryBtn->setEnabled(m_pProgressMgr->hasActiveTasks()
+                                     || m_pProgressMgr->hasFinishedTasks());
+        if (m_taskHistoryPopup && m_taskHistoryPopup->isVisible())
+            m_taskHistoryPopup->refresh(m_pProgressMgr->activeTaskList(),
+                                        m_pProgressMgr->finishedTaskList());
+    });
 
     // 按钮 + 标签紧凑布局
     auto *taskContainer = new QWidget;
@@ -808,10 +750,7 @@ void MainWindow::_initStatusBar()
 void MainWindow::_initNetWork()
 {
     m_pNetWorkUtils = new NetWorkUtils(this);
-    connect(m_pNetWorkUtils, &NetWorkUtils::requestFinished, this,
-            &MainWindow::onRequestFinished);
-
-    m_tiffEngine->setNetWorkUtils(m_pNetWorkUtils);
+    connect(m_pNetWorkUtils, &NetWorkUtils::requestFinished, this, &MainWindow::onRequestFinished);
 }
 
 void MainWindow::_initProcess()
@@ -837,8 +776,7 @@ void MainWindow::_updatePosLabel(const QPointF &scenePos)
     qreal kPxToMm = 25.4 / ppi;
     qreal xmm = scenePos.x() * kPxToMm;
     qreal ymm = scenePos.y() * kPxToMm;
-    m_posLabel->setText(
-        tr("X: %1 mm  Y: %2 mm").arg(xmm, 0, 'f', 1).arg(ymm, 0, 'f', 1));
+    m_posLabel->setText(tr("X: %1 mm  Y: %2 mm").arg(xmm, 0, 'f', 1).arg(ymm, 0, 'f', 1));
 }
 
 void MainWindow::_updateCanvasLabel()
@@ -949,11 +887,11 @@ bool MainWindow::_maybeSaveProject()
     if (!m_projectModified || !m_pView->canvasItem())
         return true;
 
-    QMessageBox::StandardButton btn = QMessageBox::question(
-        this, tr("Unsaved Changes"),
-        tr("The current project has unsaved changes.\n"
-           "Do you want to save them?"),
-        QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+    QMessageBox::StandardButton btn =
+        QMessageBox::question(this, tr("Unsaved Changes"),
+                              tr("The current project has unsaved changes.\n"
+                                 "Do you want to save them?"),
+                              QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
     if (btn == QMessageBox::Cancel)
         return false;
     if (btn == QMessageBox::Yes) {
@@ -973,9 +911,8 @@ bool MainWindow::_maybeSaveProject()
             auto items = ::filterSelectableItems(m_pView->scene()->items());
             ProjectFile pf;
             if (!pf.save(m_currentProjectPath, info, canvasInfo, items)) {
-                QMessageBox::warning(
-                    this, tr("Save Project"),
-                    tr("Failed to save:\n%1").arg(pf.lastError()));
+                QMessageBox::warning(this, tr("Save Project"),
+                                     tr("Failed to save:\n%1").arg(pf.lastError()));
                 return false;
             }
             m_projectModified = false;
@@ -1004,8 +941,7 @@ void MainWindow::onNew()
     QSizeF sizeMM = dlg.selectedSizeMM();
     static constexpr qreal kDefaultPpi = 300.0;
     qreal mmToPx = kDefaultPpi / 25.4;
-    QSizeF canvasSize(std::ceil(sizeMM.width() * mmToPx),
-                      std::ceil(sizeMM.height() * mmToPx));
+    QSizeF canvasSize(std::ceil(sizeMM.width() * mmToPx), std::ceil(sizeMM.height() * mmToPx));
 
     // 先清空 undo 栈，避免命令引用即将被删除的图元
     m_undoStack->clear();
@@ -1050,9 +986,8 @@ void MainWindow::onOpenProject()
     if (!_maybeSaveProject())
         return;
 
-    QString path = QFileDialog::getOpenFileName(
-        this, tr("Open Project"), QString(),
-        tr("AT Project Files (*.atp);;All Files (*)"));
+    QString path = QFileDialog::getOpenFileName(this, tr("Open Project"), QString(),
+                                                tr("AT Project Files (*.atp);;All Files (*)"));
     if (path.isEmpty())
         return;
 
@@ -1063,9 +998,8 @@ void MainWindow::onOpenProject()
     QList<DeserialTask> tasks;
 
     if (!pf.parseForDeserialize(path, info, canvasInfo, tasks)) {
-        QMessageBox::warning(
-            this, tr("Open Project"),
-            tr("Failed to open project:\n%1").arg(pf.lastError()));
+        QMessageBox::warning(this, tr("Open Project"),
+                             tr("Failed to open project:\n%1").arg(pf.lastError()));
         return;
     }
 
@@ -1099,18 +1033,15 @@ void MainWindow::onOpenProject()
     }
 
     // ---- 阶段 2：并发 Base64 解码（纯 CPU，不创建 QGraphicsItem） ----
-    const QString taskId =
-        m_pProgressMgr->startTask(tr("Open Project"), tasks.size());
+    const QString taskId = m_pProgressMgr->startTask(tr("Open Project"), tasks.size());
 
     // 禁用视图，防止用户在加载期间操作画布
     m_pView->setEnabled(false);
 
     auto *watcher = new QFutureWatcher<DeserializedItem>(this);
 
-    connect(watcher, &QFutureWatcher<DeserializedItem>::progressValueChanged,
-            this, [this, taskId](int value) {
-                m_pProgressMgr->updateTask(taskId, value);
-            });
+    connect(watcher, &QFutureWatcher<DeserializedItem>::progressValueChanged, this,
+            [this, taskId](int value) { m_pProgressMgr->updateTask(taskId, value); });
 
     connect(watcher, &QFutureWatcher<DeserializedItem>::finished, this,
             [this, watcher, taskId, info, canvasInfo, path]() {
@@ -1120,8 +1051,7 @@ void MainWindow::onOpenProject()
                 QList<QGraphicsItem *> loadedItems;
                 auto future = watcher->future();
                 for (int i = 0; i < future.resultCount(); ++i) {
-                    QGraphicsItem *item =
-                        createItemFromDeserialized(future.resultAt(i));
+                    QGraphicsItem *item = createItemFromDeserialized(future.resultAt(i));
                     if (item)
                         loadedItems.append(item);
                 }
@@ -1129,8 +1059,7 @@ void MainWindow::onOpenProject()
                 // 清空当前画布并重建
                 m_undoStack->clear();
                 m_pPropertyPanel->setItem(nullptr);
-                m_pView->resetCanvas(
-                    QSizeF(canvasInfo.width, canvasInfo.height));
+                m_pView->resetCanvas(QSizeF(canvasInfo.width, canvasInfo.height));
 
                 qreal ppi = canvasInfo.dpi > 0 ? canvasInfo.dpi : 300.0;
                 if (auto *canvas = m_pView->canvasItem()) {
@@ -1170,15 +1099,13 @@ void MainWindow::onSaveProject()
 {
     CanvasItem *canvas = m_pView->canvasItem();
     if (!canvas) {
-        QMessageBox::warning(
-            this, tr("Save Project"),
-            tr("No canvas to save. Create a new canvas first."));
+        QMessageBox::warning(this, tr("Save Project"),
+                             tr("No canvas to save. Create a new canvas first."));
         return;
     }
 
-    QString path = QFileDialog::getSaveFileName(
-        this, tr("Save Project"), QString(),
-        tr("AT Project Files (*.atp);;All Files (*)"));
+    QString path = QFileDialog::getSaveFileName(this, tr("Save Project"), QString(),
+                                                tr("AT Project Files (*.atp);;All Files (*)"));
     if (path.isEmpty())
         return;
 
@@ -1190,7 +1117,7 @@ void MainWindow::onSaveProject()
     QFileInfo fi(path);
     info.name = fi.completeBaseName();
     info.version = QStringLiteral("1.0.0");
-    info.author = QStringLiteral("Caviar");
+    info.author = QStringLiteral("ATHC");
 
     ProjectFile::CanvasInfo canvasInfo;
     canvasInfo.width = canvas->canvasSize().width();
@@ -1221,13 +1148,12 @@ void MainWindow::onSaveProject()
             // 采集 CMYK 数据（写入 XML 属性，用于 TIFF 导出精确颜色）
             if (igi->hasPenCmyk()) {
                 input.cmyk.hasPen = true;
-                igi->penCmyk(input.cmyk.penC, input.cmyk.penM, input.cmyk.penY,
-                             input.cmyk.penK);
+                igi->penCmyk(input.cmyk.penC, input.cmyk.penM, input.cmyk.penY, input.cmyk.penK);
             }
             if (igi->hasBrushCmyk()) {
                 input.cmyk.hasBrush = true;
-                igi->brushCmyk(input.cmyk.brushC, input.cmyk.brushM,
-                               input.cmyk.brushY, input.cmyk.brushK);
+                igi->brushCmyk(input.cmyk.brushC, input.cmyk.brushM, input.cmyk.brushY,
+                               input.cmyk.brushK);
             }
             input.cmyk.gradient = igi->gradientStopCmykMap();
         }
@@ -1235,17 +1161,14 @@ void MainWindow::onSaveProject()
     }
 
     // ---- 并发序列化（禁用视图防止用户在序列化期间修改图元） ----
-    const QString taskId =
-        m_pProgressMgr->startTask(tr("Save Project"), inputs.size());
+    const QString taskId = m_pProgressMgr->startTask(tr("Save Project"), inputs.size());
 
     m_pView->setEnabled(false);
 
     auto *watcher = new QFutureWatcher<SerializedItem>(this);
 
-    connect(watcher, &QFutureWatcher<SerializedItem>::progressValueChanged,
-            this, [this, taskId](int value) {
-                m_pProgressMgr->updateTask(taskId, value);
-            });
+    connect(watcher, &QFutureWatcher<SerializedItem>::progressValueChanged, this,
+            [this, taskId](int value) { m_pProgressMgr->updateTask(taskId, value); });
 
     connect(watcher, &QFutureWatcher<SerializedItem>::finished, this,
             [this, watcher, taskId, path, info, canvasInfo]() {
@@ -1260,9 +1183,8 @@ void MainWindow::onSaveProject()
                 // 主线程组装 XML 并写入文件
                 ProjectFile pf;
                 if (!pf.saveFromSerialized(path, info, canvasInfo, results)) {
-                    QMessageBox::warning(
-                        this, tr("Save Project"),
-                        tr("Failed to save project:\n%1").arg(pf.lastError()));
+                    QMessageBox::warning(this, tr("Save Project"),
+                                         tr("Failed to save project:\n%1").arg(pf.lastError()));
                     m_pView->setEnabled(true);
                     watcher->deleteLater();
                     return;
@@ -1310,14 +1232,12 @@ bool MainWindow::_tryLockCanvasDpi(int dpiX, int dpiY)
         // 同步缩放非图片图元的像素尺寸和位置（factor = newPpi/oldPpi）
         qreal factor = static_cast<qreal>(dpiX) / oldPpi;
         if (!qFuzzyCompare(factor, 1.0)) {
-            const auto selectable =
-                ::filterSelectableItems(m_pView->scene()->items());
+            const auto selectable = ::filterSelectableItems(m_pView->scene()->items());
             for (auto *item : selectable) {
                 if (dynamic_cast<ImageItem *>(item) || item->parentItem())
                     continue;
                 item->setPos(item->pos() * factor);
-                item->setTransform(QTransform::fromScale(factor, factor)
-                                   * item->transform());
+                item->setTransform(QTransform::fromScale(factor, factor) * item->transform());
             }
         }
 
@@ -1335,14 +1255,13 @@ bool MainWindow::_tryLockCanvasDpi(int dpiX, int dpiY)
     if (canvas->canvasDpiX() == dpiX && canvas->canvasDpiY() == dpiY)
         return true;
 
-    QMessageBox::warning(
-        this, tr("DPI Mismatch"),
-        tr("The image DPI (%1×%2) does not match the canvas DPI (%3×%4).\n"
-           "Please use images with matching DPI.")
-            .arg(dpiX)
-            .arg(dpiY)
-            .arg(canvas->canvasDpiX())
-            .arg(canvas->canvasDpiY()));
+    QMessageBox::warning(this, tr("DPI Mismatch"),
+                         tr("The image DPI (%1×%2) does not match the canvas DPI (%3×%4).\n"
+                            "Please use images with matching DPI.")
+                             .arg(dpiX)
+                             .arg(dpiY)
+                             .arg(canvas->canvasDpiX())
+                             .arg(canvas->canvasDpiY()));
     return false;
 }
 
@@ -1370,14 +1289,14 @@ void MainWindow::_unlockCanvasDpiIfNoImages()
 
 void MainWindow::onImportImage()
 {
-    const QStringList paths = QFileDialog::getOpenFileNames(
-        this, tr("Import Images"), QString(),
-        tr("Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;"
-           "TIFF (*.tif *.tiff);;"
-           "PNG (*.png);;"
-           "JPEG (*.jpg *.jpeg);;"
-           "BMP (*.bmp);;"
-           "All Files (*)"));
+    const QStringList paths =
+        QFileDialog::getOpenFileNames(this, tr("Import Images"), QString(),
+                                      tr("Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;"
+                                         "TIFF (*.tif *.tiff);;"
+                                         "PNG (*.png);;"
+                                         "JPEG (*.jpg *.jpeg);;"
+                                         "BMP (*.bmp);;"
+                                         "All Files (*)"));
     if (paths.isEmpty())
         return;
 
@@ -1401,127 +1320,115 @@ void MainWindow::importSingleImage(const QStringList &paths)
     FitCanvasType fitType = dlg.fitType();
     double fitVal = dlg.fitValue();
 
-    const QString taskId =
-        m_pProgressMgr->startTask(tr("Import"), paths.size());
+    const QString taskId = m_pProgressMgr->startTask(tr("Import"), paths.size());
 
     auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
     auto *importedItems = new QList<ImageItem *>();
     auto runningY = std::make_shared<qreal>(0);
 
     connect(
-        watcher,
-        &QFutureWatcher<ImageUtils::ImportWorkerResult>::progressValueChanged,
-        this, [this, taskId](int progressValue) {
-            m_pProgressMgr->updateTask(taskId, progressValue);
-        });
+        watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::progressValueChanged, this,
+        [this, taskId](int progressValue) { m_pProgressMgr->updateTask(taskId, progressValue); });
 
-    connect(
-        watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
-        this, [this, watcher, importedItems, runningY](int index) {
-            auto result = watcher->resultAt(index);
-            if (result.isValid()) {
-                // DPI 检查：画布 DPI 已锁定时必须匹配
-                if (result.dpiX > 0 && result.dpiY > 0) {
-                    if (!_tryLockCanvasDpi(result.dpiX, result.dpiY)) {
-                        qWarning() << "Skipped (DPI mismatch):" << result.path;
-                        return; // DPI 不匹配，拒绝导入
+    connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt, this,
+            [this, watcher, importedItems, runningY](int index) {
+                auto result = watcher->resultAt(index);
+                if (result.isValid()) {
+                    // DPI 检查：画布 DPI 已锁定时必须匹配
+                    if (result.dpiX > 0 && result.dpiY > 0) {
+                        if (!_tryLockCanvasDpi(result.dpiX, result.dpiY)) {
+                            qWarning() << "Skipped (DPI mismatch):" << result.path;
+                            return; // DPI 不匹配，拒绝导入
+                        }
                     }
+
+                    auto *item = new ImageItem(result.pixmap, result.size);
+                    item->setItemPen(QPen(Qt::NoPen));
+                    item->setFilePath(result.path);
+                    item->setOriginalSize(result.size);
+
+                    // 设置图片 DPI 到 ImageItem
+                    if (result.dpiX > 0 && result.dpiY > 0)
+                        item->setDpi(result.dpiX, result.dpiY);
+
+                    item->setPos(0, *runningY);
+                    *runningY += result.size.height() + 10;
+
+                    m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
+                    importedItems->append(item);
+                } else {
+                    qWarning() << "Import failed:" << result.path << result.errorMessage;
                 }
+            });
 
-                auto *item = new ImageItem(result.pixmap, result.size);
-                item->setItemPen(QPen(Qt::NoPen));
-                item->setFilePath(result.path);
-                item->setOriginalSize(result.size);
+    connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished, this,
+            [this, watcher, taskId, importedItems, fitType, fitVal]() {
+                m_pProgressMgr->finishTask(taskId);
+                watcher->deleteLater();
 
-                // 设置图片 DPI 到 ImageItem
-                if (result.dpiX > 0 && result.dpiY > 0)
-                    item->setDpi(result.dpiX, result.dpiY);
+                // 导入完成后刷新状态栏（DPI 锁定可能已变更）
+                _updateCanvasLabel();
+                _updatePosLabel(m_lastScenePos);
 
-                item->setPos(0, *runningY);
-                *runningY += result.size.height() + 10;
-
-                m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
-                importedItems->append(item);
-            } else {
-                qWarning() << "Import failed:" << result.path
-                           << result.errorMessage;
-            }
-        });
-
-    connect(
-        watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished,
-        this, [this, watcher, taskId, importedItems, fitType, fitVal]() {
-            m_pProgressMgr->finishTask(taskId);
-            watcher->deleteLater();
-
-            // 导入完成后刷新状态栏（DPI 锁定可能已变更）
-            _updateCanvasLabel();
-            _updatePosLabel(m_lastScenePos);
-
-            if (fitType != fctNone && !importedItems->isEmpty()) {
-                CanvasItem *canvas = m_pView->canvasItem();
-                if (canvas) {
-                    QRectF unitedRect;
-                    for (auto *item : *importedItems) {
-                        QRectF r = item->mapToScene(item->boundingRect())
-                                       .boundingRect();
-                        unitedRect =
-                            unitedRect.isValid() ? unitedRect.united(r) : r;
-                    }
-
-                    qreal offsetX =
-                        unitedRect.left() < 0 ? -unitedRect.left() : 0;
-                    qreal offsetY =
-                        unitedRect.top() < 0 ? -unitedRect.top() : 0;
-
-                    QSizeF oldSize = canvas->canvasSize();
-                    QSizeF newSize;
-                    switch (fitType) {
-                    case fctAdapt:
-                        newSize = QSizeF(unitedRect.right() + offsetX,
-                                         unitedRect.bottom() + offsetY);
-                        break;
-                    case fctWidth:
-                        newSize = QSizeF(fitVal, oldSize.height());
-                        break;
-                    case fctHeight:
-                        newSize = QSizeF(oldSize.width(), fitVal);
-                        break;
-                    default:
-                        break;
-                    }
-
-                    if (newSize.isValid() && newSize.width() > 0
-                        && newSize.height() > 0 && newSize != oldSize) {
-                        m_undoStack->beginMacro(tr("Fit Canvas on Import"));
-
-                        if (offsetX > 0 || offsetY > 0) {
-                            QPointF delta(offsetX, offsetY);
-                            QList<QPointF> oldPositions, newPositions;
-                            for (auto *item : *importedItems) {
-                                oldPositions << item->pos();
-                                newPositions << item->pos() + delta;
-                                item->setPos(item->pos() + delta);
-                            }
-                            m_undoStack->push(new MoveItemsCommand(
-                                QList<QGraphicsItem *>(importedItems->begin(),
-                                                       importedItems->end()),
-                                oldPositions, newPositions, m_pView->scene()));
+                if (fitType != fctNone && !importedItems->isEmpty()) {
+                    CanvasItem *canvas = m_pView->canvasItem();
+                    if (canvas) {
+                        QRectF unitedRect;
+                        for (auto *item : *importedItems) {
+                            QRectF r = item->mapToScene(item->boundingRect()).boundingRect();
+                            unitedRect = unitedRect.isValid() ? unitedRect.united(r) : r;
                         }
 
-                        m_undoStack->push(new CanvasResizeCommand(
-                            canvas, oldSize, newSize, m_pView->scene()));
-                        m_undoStack->endMacro();
-                        _updateCanvasLabel();
-                        m_pView->fitToCanvas();
+                        qreal offsetX = unitedRect.left() < 0 ? -unitedRect.left() : 0;
+                        qreal offsetY = unitedRect.top() < 0 ? -unitedRect.top() : 0;
+
+                        QSizeF oldSize = canvas->canvasSize();
+                        QSizeF newSize;
+                        switch (fitType) {
+                        case fctAdapt:
+                            newSize =
+                                QSizeF(unitedRect.right() + offsetX, unitedRect.bottom() + offsetY);
+                            break;
+                        case fctWidth:
+                            newSize = QSizeF(fitVal, oldSize.height());
+                            break;
+                        case fctHeight:
+                            newSize = QSizeF(oldSize.width(), fitVal);
+                            break;
+                        default:
+                            break;
+                        }
+
+                        if (newSize.isValid() && newSize.width() > 0 && newSize.height() > 0
+                            && newSize != oldSize) {
+                            m_undoStack->beginMacro(tr("Fit Canvas on Import"));
+
+                            if (offsetX > 0 || offsetY > 0) {
+                                QPointF delta(offsetX, offsetY);
+                                QList<QPointF> oldPositions, newPositions;
+                                for (auto *item : *importedItems) {
+                                    oldPositions << item->pos();
+                                    newPositions << item->pos() + delta;
+                                    item->setPos(item->pos() + delta);
+                                }
+                                m_undoStack->push(new MoveItemsCommand(
+                                    QList<QGraphicsItem *>(importedItems->begin(),
+                                                           importedItems->end()),
+                                    oldPositions, newPositions, m_pView->scene()));
+                            }
+
+                            m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize,
+                                                                      m_pView->scene()));
+                            m_undoStack->endMacro();
+                            _updateCanvasLabel();
+                            m_pView->fitToCanvas();
+                        }
                     }
                 }
-            }
 
-            delete importedItems;
-            qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz")
-                     << "Finished import";
-        });
+                delete importedItems;
+                qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz") << "Finished import";
+            });
 
     auto future = QtConcurrent::mapped(paths, ImageUtils::runImportWorker);
     watcher->setFuture(future);
@@ -1547,8 +1454,7 @@ void MainWindow::importMultipleImages(const QStringList &paths)
     FitCanvasType fitType = fitDlg.fitType();
     double fitVal = fitDlg.fitValue();
 
-    const QString taskId =
-        m_pProgressMgr->startTask(tr("Import"), ordered.size());
+    const QString taskId = m_pProgressMgr->startTask(tr("Import"), ordered.size());
 
     auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
     auto *importedItems = new QList<ImageItem *>();
@@ -1557,140 +1463,125 @@ void MainWindow::importMultipleImages(const QStringList &paths)
     auto runningCoord = std::make_shared<qreal>(0);
 
     connect(
-        watcher,
-        &QFutureWatcher<ImageUtils::ImportWorkerResult>::progressValueChanged,
-        this, [this, taskId](int progressValue) {
-            m_pProgressMgr->updateTask(taskId, progressValue);
-        });
+        watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::progressValueChanged, this,
+        [this, taskId](int progressValue) { m_pProgressMgr->updateTask(taskId, progressValue); });
 
-    connect(
-        watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
-        this,
-        [this, watcher, importedItems, runningCoord, arr,
-         commonDpi](int index) {
-            auto result = watcher->resultAt(index);
-            if (result.isValid()) {
-                // 多图 DPI 筛选：以首个有效 DPI 为准，筛选相同 DPI 的图片
-                if (result.dpiX > 0 && result.dpiY > 0) {
-                    if (commonDpi->first == 0 && commonDpi->second == 0) {
-                        // 首个有效 DPI：尝试锁定画布，失败则跳过
-                        if (!_tryLockCanvasDpi(result.dpiX, result.dpiY)) {
+    connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt, this,
+            [this, watcher, importedItems, runningCoord, arr, commonDpi](int index) {
+                auto result = watcher->resultAt(index);
+                if (result.isValid()) {
+                    // 多图 DPI 筛选：以首个有效 DPI 为准，筛选相同 DPI 的图片
+                    if (result.dpiX > 0 && result.dpiY > 0) {
+                        if (commonDpi->first == 0 && commonDpi->second == 0) {
+                            // 首个有效 DPI：尝试锁定画布，失败则跳过
+                            if (!_tryLockCanvasDpi(result.dpiX, result.dpiY)) {
+                                qWarning() << "Skipped (DPI rejected):" << result.path;
+                                return;
+                            }
+                            *commonDpi = { result.dpiX, result.dpiY };
+                        } else if (result.dpiX != commonDpi->first
+                                   || result.dpiY != commonDpi->second) {
+                            // DPI 不匹配，跳过此图片
                             qWarning()
-                                << "Skipped (DPI rejected):" << result.path;
+                                << "Skipped (DPI mismatch):" << result.path << "DPI:" << result.dpiX
+                                << "x" << result.dpiY << "expected:" << commonDpi->first << "x"
+                                << commonDpi->second;
                             return;
                         }
-                        *commonDpi = { result.dpiX, result.dpiY };
-                    } else if (result.dpiX != commonDpi->first
-                               || result.dpiY != commonDpi->second) {
-                        // DPI 不匹配，跳过此图片
-                        qWarning()
-                            << "Skipped (DPI mismatch):" << result.path
-                            << "DPI:" << result.dpiX << "x" << result.dpiY
-                            << "expected:" << commonDpi->first << "x"
-                            << commonDpi->second;
-                        return;
                     }
-                }
 
-                auto *item = new ImageItem(result.pixmap, result.size);
-                item->setItemPen(QPen(Qt::NoPen));
-                item->setFilePath(result.path);
-                item->setOriginalSize(result.size);
+                    auto *item = new ImageItem(result.pixmap, result.size);
+                    item->setItemPen(QPen(Qt::NoPen));
+                    item->setFilePath(result.path);
+                    item->setOriginalSize(result.size);
 
-                // 设置图片 DPI
-                if (result.dpiX > 0 && result.dpiY > 0)
-                    item->setDpi(result.dpiX, result.dpiY);
+                    // 设置图片 DPI
+                    if (result.dpiX > 0 && result.dpiY > 0)
+                        item->setDpi(result.dpiX, result.dpiY);
 
-                if (arr == ArrangeHorizontal) {
-                    item->setPos(*runningCoord, 0);
-                    *runningCoord += result.size.width();
+                    if (arr == ArrangeHorizontal) {
+                        item->setPos(*runningCoord, 0);
+                        *runningCoord += result.size.width();
+                    } else {
+                        item->setPos(0, *runningCoord);
+                        *runningCoord += result.size.height();
+                    }
+
+                    m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
+                    importedItems->append(item);
                 } else {
-                    item->setPos(0, *runningCoord);
-                    *runningCoord += result.size.height();
+                    qWarning() << "Import failed:" << result.path << result.errorMessage;
                 }
+            });
 
-                m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
-                importedItems->append(item);
-            } else {
-                qWarning() << "Import failed:" << result.path
-                           << result.errorMessage;
-            }
-        });
+    connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished, this,
+            [this, watcher, taskId, importedItems, fitType, fitVal]() {
+                m_pProgressMgr->finishTask(taskId);
+                watcher->deleteLater();
 
-    connect(
-        watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished,
-        this, [this, watcher, taskId, importedItems, fitType, fitVal]() {
-            m_pProgressMgr->finishTask(taskId);
-            watcher->deleteLater();
+                // 多图导入完成后刷新状态栏
+                _updateCanvasLabel();
+                _updatePosLabel(m_lastScenePos);
 
-            // 多图导入完成后刷新状态栏
-            _updateCanvasLabel();
-            _updatePosLabel(m_lastScenePos);
-
-            if (fitType != fctNone && !importedItems->isEmpty()) {
-                CanvasItem *canvas = m_pView->canvasItem();
-                if (canvas) {
-                    QRectF unitedRect;
-                    for (auto *item : *importedItems) {
-                        QRectF r = item->mapToScene(item->boundingRect())
-                                       .boundingRect();
-                        unitedRect =
-                            unitedRect.isValid() ? unitedRect.united(r) : r;
-                    }
-
-                    qreal offsetX =
-                        unitedRect.left() < 0 ? -unitedRect.left() : 0;
-                    qreal offsetY =
-                        unitedRect.top() < 0 ? -unitedRect.top() : 0;
-
-                    QSizeF oldSize = canvas->canvasSize();
-                    QSizeF newSize;
-                    switch (fitType) {
-                    case fctAdapt:
-                        newSize = QSizeF(unitedRect.right() + offsetX,
-                                         unitedRect.bottom() + offsetY);
-                        break;
-                    case fctWidth:
-                        newSize = QSizeF(fitVal, oldSize.height());
-                        break;
-                    case fctHeight:
-                        newSize = QSizeF(oldSize.width(), fitVal);
-                        break;
-                    default:
-                        break;
-                    }
-
-                    if (newSize.isValid() && newSize.width() > 0
-                        && newSize.height() > 0 && newSize != oldSize) {
-                        m_undoStack->beginMacro(tr("Fit Canvas on Import"));
-
-                        if (offsetX > 0 || offsetY > 0) {
-                            QPointF delta(offsetX, offsetY);
-                            QList<QPointF> oldPositions, newPositions;
-                            for (auto *item : *importedItems) {
-                                oldPositions << item->pos();
-                                newPositions << item->pos() + delta;
-                                item->setPos(item->pos() + delta);
-                            }
-                            m_undoStack->push(new MoveItemsCommand(
-                                QList<QGraphicsItem *>(importedItems->begin(),
-                                                       importedItems->end()),
-                                oldPositions, newPositions, m_pView->scene()));
+                if (fitType != fctNone && !importedItems->isEmpty()) {
+                    CanvasItem *canvas = m_pView->canvasItem();
+                    if (canvas) {
+                        QRectF unitedRect;
+                        for (auto *item : *importedItems) {
+                            QRectF r = item->mapToScene(item->boundingRect()).boundingRect();
+                            unitedRect = unitedRect.isValid() ? unitedRect.united(r) : r;
                         }
 
-                        m_undoStack->push(new CanvasResizeCommand(
-                            canvas, oldSize, newSize, m_pView->scene()));
-                        m_undoStack->endMacro();
-                        _updateCanvasLabel();
-                        m_pView->fitToCanvas();
+                        qreal offsetX = unitedRect.left() < 0 ? -unitedRect.left() : 0;
+                        qreal offsetY = unitedRect.top() < 0 ? -unitedRect.top() : 0;
+
+                        QSizeF oldSize = canvas->canvasSize();
+                        QSizeF newSize;
+                        switch (fitType) {
+                        case fctAdapt:
+                            newSize =
+                                QSizeF(unitedRect.right() + offsetX, unitedRect.bottom() + offsetY);
+                            break;
+                        case fctWidth:
+                            newSize = QSizeF(fitVal, oldSize.height());
+                            break;
+                        case fctHeight:
+                            newSize = QSizeF(oldSize.width(), fitVal);
+                            break;
+                        default:
+                            break;
+                        }
+
+                        if (newSize.isValid() && newSize.width() > 0 && newSize.height() > 0
+                            && newSize != oldSize) {
+                            m_undoStack->beginMacro(tr("Fit Canvas on Import"));
+
+                            if (offsetX > 0 || offsetY > 0) {
+                                QPointF delta(offsetX, offsetY);
+                                QList<QPointF> oldPositions, newPositions;
+                                for (auto *item : *importedItems) {
+                                    oldPositions << item->pos();
+                                    newPositions << item->pos() + delta;
+                                    item->setPos(item->pos() + delta);
+                                }
+                                m_undoStack->push(new MoveItemsCommand(
+                                    QList<QGraphicsItem *>(importedItems->begin(),
+                                                           importedItems->end()),
+                                    oldPositions, newPositions, m_pView->scene()));
+                            }
+
+                            m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize,
+                                                                      m_pView->scene()));
+                            m_undoStack->endMacro();
+                            _updateCanvasLabel();
+                            m_pView->fitToCanvas();
+                        }
                     }
                 }
-            }
 
-            delete importedItems;
-            qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz")
-                     << "Finished import";
-        });
+                delete importedItems;
+                qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz") << "Finished import";
+            });
 
     auto future = QtConcurrent::mapped(ordered, ImageUtils::runImportWorker);
     watcher->setFuture(future);
@@ -1713,8 +1604,7 @@ static bool containsImageItemRecursive(const QList<QGraphicsItem *> &items)
 void MainWindow::onExportImage()
 {
     if (m_tiffEngine->isRunning()) {
-        QMessageBox::information(this, tr("Export"),
-                                 tr("An export is already in progress."));
+        QMessageBox::information(this, tr("Export"), tr("An export is already in progress."));
         return;
     }
 
@@ -1722,19 +1612,18 @@ void MainWindow::onExportImage()
     int dpiOverride = 0;
     {
         auto *canvas = m_pView->canvasItem();
-        const auto allItems =
-            ::filterSelectableItems(m_pView->scene()->items());
+        const auto allItems = ::filterSelectableItems(m_pView->scene()->items());
         bool hasImages = containsImageItemRecursive(allItems);
         if (!hasImages && (!canvas || !canvas->isDpiLocked())) {
             QStringList dpiItems;
             for (int dpi : kDpiValues)
                 dpiItems << QString::number(dpi);
             bool ok = false;
-            const QString chosen = QInputDialog::getItem(
-                this, tr("Set Export DPI"),
-                tr("No image items on the canvas.\n"
-                   "Please set the export DPI:"),
-                dpiItems, /* current = */ 2, /* editable = */ false, &ok);
+            const QString chosen =
+                QInputDialog::getItem(this, tr("Set Export DPI"),
+                                      tr("No image items on the canvas.\n"
+                                         "Please set the export DPI:"),
+                                      dpiItems, /* current = */ 2, /* editable = */ false, &ok);
             if (!ok)
                 return; // 用户取消导出
             dpiOverride = chosen.toInt();
@@ -1763,14 +1652,12 @@ void MainWindow::onExportImage()
             // 同步缩放非图片图元的像素尺寸和位置（factor = newPpi/oldPpi）
             qreal factor = static_cast<qreal>(dpiOverride) / oldPpi;
             if (!qFuzzyCompare(factor, 1.0)) {
-                const auto selectable =
-                    ::filterSelectableItems(m_pView->scene()->items());
+                const auto selectable = ::filterSelectableItems(m_pView->scene()->items());
                 for (auto *item : selectable) {
                     if (dynamic_cast<ImageItem *>(item) || item->parentItem())
                         continue;
                     item->setPos(item->pos() * factor);
-                    item->setTransform(QTransform::fromScale(factor, factor)
-                                       * item->transform());
+                    item->setTransform(QTransform::fromScale(factor, factor) * item->transform());
                 }
             }
 
@@ -1784,8 +1671,8 @@ void MainWindow::onExportImage()
     }
 
     // 1. 选择保存路径
-    QString path = QFileDialog::getSaveFileName(
-        this, tr("Export Image"), QString(), tr("prn Files (*.prn)"));
+    QString path =
+        QFileDialog::getSaveFileName(this, tr("Export Image"), QString(), tr("prn Files (*.prn)"));
     if (path.isEmpty())
         return;
 
@@ -1802,16 +1689,16 @@ void MainWindow::onExportImage()
         ripYRes = dlg.resolutionY();
     }
 
-    const QString tiffPath =
-        fi.absolutePath() + "/" + fi.completeBaseName() + ".tif";
+    const QString tiffPath = fi.absolutePath() + "/" + fi.completeBaseName() + ".tif";
 
     // 4. 委托给导出引擎 — 自动完成场景检查、Overlay 渲染、后台线程导出
     //    结果通过 TiffExportEngine::exportFinished / progressChanged 信号回传
     m_exportTaskId = m_pProgressMgr->startTask(tr("Export"));
-    m_tiffEngine->setRipConfig(bRip, ripXRes, ripYRes);
+    m_ripEnabled = bRip;
+    m_ripXRes = ripXRes;
+    m_ripYRes = ripYRes;
 
-    if (!m_tiffEngine->startExport(m_pView->scene(), m_pView, tiffPath,
-                                   dpiOverride)) {
+    if (!m_tiffEngine->startExport(m_pView->scene(), m_pView, tiffPath, dpiOverride)) {
         m_pProgressMgr->cancelTask(m_exportTaskId);
         QMessageBox::warning(this, tr("Export"), m_tiffEngine->lastError());
     }
@@ -1922,8 +1809,7 @@ void MainWindow::onBringToFront()
         oldZ << item->zValue();
         newZ << item->zValue() + 1.0;
     }
-    m_undoStack->push(
-        new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
+    m_undoStack->push(new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
 }
 
 void MainWindow::onSendToBack()
@@ -1937,8 +1823,7 @@ void MainWindow::onSendToBack()
         oldZ << item->zValue();
         newZ << item->zValue() - 1.0;
     }
-    m_undoStack->push(
-        new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
+    m_undoStack->push(new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
 }
 
 // ============================================================
@@ -2060,8 +1945,7 @@ void MainWindow::applyAlign(AlignmentUtils::AlignDirection direction)
 
     m_undoStack->push(new AlignItemsCommand(
         items, result.oldPositions, result.newPositions,
-        tr("Align %1").arg(AlignmentUtils::alignDirectionName(direction)),
-        m_pView->scene()));
+        tr("Align %1").arg(AlignmentUtils::alignDirectionName(direction)), m_pView->scene()));
 }
 
 void MainWindow::applyDistribute(AlignmentUtils::DistributeDirection direction,
@@ -2077,8 +1961,7 @@ void MainWindow::applyDistribute(AlignmentUtils::DistributeDirection direction,
 
     m_undoStack->push(new AlignItemsCommand(
         items, result.oldPositions, result.newPositions,
-        tr("Distribute %1")
-            .arg(AlignmentUtils::distributeDirectionName(direction)),
+        tr("Distribute %1").arg(AlignmentUtils::distributeDirectionName(direction)),
         m_pView->scene()));
 }
 
@@ -2163,76 +2046,65 @@ void MainWindow::onItemAdded(QGraphicsItem *item)
 // ============================================================
 // 属性变更（通过属性面板触发，创建撤销命令）
 // ============================================================
-void MainWindow::onPenChanged(QGraphicsItem *item, const QPen &oldPen,
-                              const QPen &newPen)
+void MainWindow::onPenChanged(QGraphicsItem *item, const QPen &oldPen, const QPen &newPen)
 {
-    m_undoStack->push(new PropertyChangeCommand(
-        item, PropertyChangeCommand::Pen, QVariant::fromValue(oldPen),
-        QVariant::fromValue(newPen), m_pView->scene()));
+    m_undoStack->push(new PropertyChangeCommand(item, PropertyChangeCommand::Pen,
+                                                QVariant::fromValue(oldPen),
+                                                QVariant::fromValue(newPen), m_pView->scene()));
 }
 
-void MainWindow::onBrushChanged(QGraphicsItem *item, const QBrush &oldBrush,
-                                const QBrush &newBrush)
+void MainWindow::onBrushChanged(QGraphicsItem *item, const QBrush &oldBrush, const QBrush &newBrush)
 {
-    m_undoStack->push(new PropertyChangeCommand(
-        item, PropertyChangeCommand::Brush, QVariant::fromValue(oldBrush),
-        QVariant::fromValue(newBrush), m_pView->scene()));
+    m_undoStack->push(new PropertyChangeCommand(item, PropertyChangeCommand::Brush,
+                                                QVariant::fromValue(oldBrush),
+                                                QVariant::fromValue(newBrush), m_pView->scene()));
 }
 
-void MainWindow::onFontChanged(QGraphicsItem *item, const QFont &oldFont,
-                               const QFont &newFont)
+void MainWindow::onFontChanged(QGraphicsItem *item, const QFont &oldFont, const QFont &newFont)
 {
-    m_undoStack->push(new PropertyChangeCommand(
-        item, PropertyChangeCommand::Font, QVariant::fromValue(oldFont),
-        QVariant::fromValue(newFont), m_pView->scene()));
+    m_undoStack->push(new PropertyChangeCommand(item, PropertyChangeCommand::Font,
+                                                QVariant::fromValue(oldFont),
+                                                QVariant::fromValue(newFont), m_pView->scene()));
 }
 
-void MainWindow::onTextChanged(QGraphicsItem *item, const QString &oldText,
-                               const QString &newText)
+void MainWindow::onTextChanged(QGraphicsItem *item, const QString &oldText, const QString &newText)
 {
     m_undoStack->push(new PropertyChangeCommand(
-        item, PropertyChangeCommand::Text, QVariant(oldText), QVariant(newText),
-        m_pView->scene()));
+        item, PropertyChangeCommand::Text, QVariant(oldText), QVariant(newText), m_pView->scene()));
 }
 
 void MainWindow::onGeometryChanged(QGraphicsItem *item, const QRectF &oldRect,
                                    const QRectF &newRect)
 {
-    m_undoStack->push(new PropertyChangeCommand(
-        item, PropertyChangeCommand::Geometry, QVariant(oldRect),
-        QVariant(newRect), m_pView->scene()));
+    m_undoStack->push(new PropertyChangeCommand(item, PropertyChangeCommand::Geometry,
+                                                QVariant(oldRect), QVariant(newRect),
+                                                m_pView->scene()));
     // 尺寸变更后需要更新 ResizeHandleItem 以正确显示选中框
     m_pView->scheduleResizeHandleUpdate();
 }
 
-void MainWindow::onCornerRadiusChanged(QGraphicsItem *item, qreal oldR,
-                                       qreal newR)
+void MainWindow::onCornerRadiusChanged(QGraphicsItem *item, qreal oldR, qreal newR)
 {
-    m_undoStack->push(new PropertyChangeCommand(
-        item, PropertyChangeCommand::CornerRadius, QVariant(oldR),
-        QVariant(newR), m_pView->scene()));
+    m_undoStack->push(new PropertyChangeCommand(item, PropertyChangeCommand::CornerRadius,
+                                                QVariant(oldR), QVariant(newR), m_pView->scene()));
 }
 
 void MainWindow::onPositionChanged(QGraphicsItem *item, const QPointF &oldPos,
                                    const QPointF &newPos)
 {
-    m_undoStack->push(
-        new PositionChangeCommand(item, oldPos, newPos, m_pView->scene()));
+    m_undoStack->push(new PositionChangeCommand(item, oldPos, newPos, m_pView->scene()));
     // 位置变更后需要更新 ResizeHandleItem 以正确显示选中框
     m_pView->scheduleResizeHandleUpdate();
 }
 
-void MainWindow::onRotationChanged(QGraphicsItem *item, qreal oldRotation,
-                                   qreal newRotation)
+void MainWindow::onRotationChanged(QGraphicsItem *item, qreal oldRotation, qreal newRotation)
 {
-    m_undoStack->push(new RotationChangeCommand(item, oldRotation, newRotation,
-                                                m_pView->scene()));
+    m_undoStack->push(new RotationChangeCommand(item, oldRotation, newRotation, m_pView->scene()));
     // 旋转后需要更新 ResizeHandleItem 以正确显示选中框
     m_pView->scheduleResizeHandleUpdate();
 }
 
-void MainWindow::onRequestFinished(const QJsonDocument &json,
-                                   NetworkRequestType type)
+void MainWindow::onRequestFinished(const QJsonDocument &json, NetworkRequestType type)
 {
     // 解析返回数据
     if (json.isEmpty())
@@ -2253,6 +2125,7 @@ void MainWindow::onRequestFinished(const QJsonDocument &json,
         if (progress >= RIP_PROGRESS_MAX) {
             m_pNetWorkUtils->doStopWhile();
             m_pProgressMgr->finishTask(m_ripTaskId);
+            setEnabled(true);
         }
     } break;
     case NetworkRequestType::RequestRipVersion: {
@@ -2282,8 +2155,7 @@ void MainWindow::onFitCanvasToItems()
     // 优先使用选中的图元，无选中时使用场景中全部可操作图元
     auto selected = filterSelectableItems();
     QList<QGraphicsItem *> items =
-        selected.isEmpty() ? ::filterSelectableItems(m_pView->scene()->items())
-                           : selected;
+        selected.isEmpty() ? ::filterSelectableItems(m_pView->scene()->items()) : selected;
     if (items.isEmpty())
         return;
 
@@ -2291,16 +2163,13 @@ void MainWindow::onFitCanvasToItems()
     QRectF unitedRect;
     for (auto *item : items) {
         auto *igi = dynamic_cast<IGraphicsItem *>(item);
-        QRectF localRect = (igi && igi->supportsGeometryRect())
-                               ? igi->geometryRect()
-                               : item->boundingRect();
+        QRectF localRect =
+            (igi && igi->supportsGeometryRect()) ? igi->geometryRect() : item->boundingRect();
         QRectF itemSceneRect = item->mapToScene(localRect).boundingRect();
-        unitedRect = unitedRect.isValid() ? unitedRect.united(itemSceneRect)
-                                          : itemSceneRect;
+        unitedRect = unitedRect.isValid() ? unitedRect.united(itemSceneRect) : itemSceneRect;
     }
 
-    if (!unitedRect.isValid() || unitedRect.width() < 1
-        || unitedRect.height() < 1)
+    if (!unitedRect.isValid() || unitedRect.width() < 1 || unitedRect.height() < 1)
         return;
 
     // 留白（从首选项读取，单位 mm → 像素）
@@ -2334,14 +2203,13 @@ void MainWindow::onFitCanvasToItems()
             newPositions << item->pos() + delta;
             item->setPos(item->pos() + delta);
         }
-        m_undoStack->push(new MoveItemsCommand(items, oldPositions,
-                                               newPositions, m_pView->scene()));
+        m_undoStack->push(
+            new MoveItemsCommand(items, oldPositions, newPositions, m_pView->scene()));
     }
 
     // 画布尺寸变更
     if (oldSize != newSize)
-        m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize,
-                                                  m_pView->scene()));
+        m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize, m_pView->scene()));
 
     m_undoStack->endMacro();
     _updateCanvasLabel();
@@ -2368,8 +2236,7 @@ void MainWindow::onResizeCanvas()
     if (newSize == oldSize)
         return;
 
-    m_undoStack->push(
-        new CanvasResizeCommand(canvas, oldSize, newSize, m_pView->scene()));
+    m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize, m_pView->scene()));
 
     m_hRuler->updateRuler();
     m_vRuler->updateRuler();
@@ -2404,22 +2271,20 @@ void MainWindow::rotateSelectedItems(qreal angleDelta)
         auto *item = items.first();
         qreal oldRotation = item->rotation();
         qreal newRotation = oldRotation + angleDelta;
-        m_undoStack->push(new RotationChangeCommand(
-            item, oldRotation, newRotation, m_pView->scene()));
+        m_undoStack->push(
+            new RotationChangeCommand(item, oldRotation, newRotation, m_pView->scene()));
     } else {
         // 多个图元：绕组中心整体旋转
         // 1. 计算组中心（所有图元场景包围矩形的并集中心）
         QRectF groupSceneRect;
         for (auto *item : items) {
-            QRectF itemSceneRect =
-                item->mapToScene(item->boundingRect()).boundingRect();
+            QRectF itemSceneRect = item->mapToScene(item->boundingRect()).boundingRect();
             groupSceneRect = groupSceneRect.united(itemSceneRect);
         }
         QPointF groupCenter = groupSceneRect.center();
 
         // 2. 对每个图元：先绕自身中心旋转，再绕组中心公转
-        m_undoStack->beginMacro(
-            tr("Rotate %1\u00b0").arg(angleDelta, 0, 'f', 0));
+        m_undoStack->beginMacro(tr("Rotate %1\u00b0").arg(angleDelta, 0, 'f', 0));
 
         QList<QGraphicsItem *> moveItems;
         QList<QPointF> oldPositions;
@@ -2430,16 +2295,15 @@ void MainWindow::rotateSelectedItems(qreal angleDelta)
             qreal newRotation = oldRotation + angleDelta;
 
             // 推入旋转命令（含中心补偿：旋转后图元中心位置不变）
-            m_undoStack->push(new RotationChangeCommand(
-                item, oldRotation, newRotation, m_pView->scene()));
+            m_undoStack->push(
+                new RotationChangeCommand(item, oldRotation, newRotation, m_pView->scene()));
 
             // 旋转命令 redo 后，图元中心仍位于旋转前的场景位置
             // 记录中心补偿后的位置（公转前的位置）
             QPointF posAfterCenterComp = item->pos();
 
             // 计算绕组中心的公转位移
-            QPointF currentCenter =
-                item->mapToScene(item->boundingRect().center());
+            QPointF currentCenter = item->mapToScene(item->boundingRect().center());
             QLineF line(groupCenter, currentCenter);
             line.setAngle(line.angle() + angleDelta);
             QPointF orbitedCenter = line.p2();
@@ -2453,8 +2317,8 @@ void MainWindow::rotateSelectedItems(qreal angleDelta)
 
         // 公转位移变更作为一个命令
         if (!moveItems.isEmpty()) {
-            m_undoStack->push(new MoveItemsCommand(
-                moveItems, oldPositions, newPositions, m_pView->scene()));
+            m_undoStack->push(
+                new MoveItemsCommand(moveItems, oldPositions, newPositions, m_pView->scene()));
         }
 
         m_undoStack->endMacro();
@@ -2517,8 +2381,8 @@ QList<QGraphicsItem *> MainWindow::pasteItemsFromClipboard()
     int version = 0;
     in >> version;
     if (version < 1 || version > IGraphicsItem::kSerializationVersion) {
-        qWarning("Unsupported clipboard format version: %d (current: %d)",
-                 version, IGraphicsItem::kSerializationVersion);
+        qWarning("Unsupported clipboard format version: %d (current: %d)", version,
+                 IGraphicsItem::kSerializationVersion);
         return result;
     }
 
@@ -2542,17 +2406,13 @@ QList<QGraphicsItem *> MainWindow::pasteItemsFromClipboard()
             QDataStream itemIn(&itemData, QIODevice::ReadOnly);
             int typeInt = 0;
             itemIn >> typeInt;
-            auto *gi =
-                createItemByType(static_cast<IGraphicsItem::ItemType>(typeInt));
+            auto *gi = createItemByType(static_cast<IGraphicsItem::ItemType>(typeInt));
             if (!gi) {
-                qWarning("Clipboard: unknown item type %d at index %d", typeInt,
-                         i);
+                qWarning("Clipboard: unknown item type %d at index %d", typeInt, i);
                 continue;
             }
             if (!gi->deserialize(itemIn)) {
-                qWarning(
-                    "Clipboard: failed to deserialize item type %d at index %d",
-                    typeInt, i);
+                qWarning("Clipboard: failed to deserialize item type %d at index %d", typeInt, i);
                 delete gi;
                 continue;
             }
@@ -2561,11 +2421,9 @@ QList<QGraphicsItem *> MainWindow::pasteItemsFromClipboard()
             // v1: 旧格式，直接从流中读取
             int typeInt = 0;
             in >> typeInt;
-            auto *gi =
-                createItemByType(static_cast<IGraphicsItem::ItemType>(typeInt));
+            auto *gi = createItemByType(static_cast<IGraphicsItem::ItemType>(typeInt));
             if (!gi) {
-                qWarning("Clipboard: unknown item type %d at index %d", typeInt,
-                         i);
+                qWarning("Clipboard: unknown item type %d at index %d", typeInt, i);
                 continue;
             }
             if (!gi->deserialize(in)) {
@@ -2643,16 +2501,13 @@ void MainWindow::loadWindowState()
     QToolBar *alignToolBar = findChild<QToolBar *>("AlignToolBar");
 
     if (fileEditBar && settings.contains("toolbar/FileEditToolBar_visible")) {
-        fileEditBar->setVisible(
-            settings.value("toolbar/FileEditToolBar_visible").toBool());
+        fileEditBar->setVisible(settings.value("toolbar/FileEditToolBar_visible").toBool());
     }
     if (drawBar && settings.contains("toolbar/DrawingToolBar_visible")) {
-        drawBar->setVisible(
-            settings.value("toolbar/DrawingToolBar_visible").toBool());
+        drawBar->setVisible(settings.value("toolbar/DrawingToolBar_visible").toBool());
     }
     if (alignToolBar && settings.contains("toolbar/AlignToolBar_visible")) {
-        alignToolBar->setVisible(
-            settings.value("toolbar/AlignToolBar_visible").toBool());
+        alignToolBar->setVisible(settings.value("toolbar/AlignToolBar_visible").toBool());
     }
 
     // 恢复其他设置
@@ -2683,16 +2538,13 @@ void MainWindow::saveWindowState()
     QToolBar *alignToolBar = findChild<QToolBar *>("AlignToolBar");
 
     if (fileEditBar) {
-        settings.setValue("toolbar/FileEditToolBar_visible",
-                          fileEditBar->isVisible());
+        settings.setValue("toolbar/FileEditToolBar_visible", fileEditBar->isVisible());
     }
     if (drawBar) {
-        settings.setValue("toolbar/DrawingToolBar_visible",
-                          drawBar->isVisible());
+        settings.setValue("toolbar/DrawingToolBar_visible", drawBar->isVisible());
     }
     if (alignToolBar) {
-        settings.setValue("toolbar/AlignToolBar_visible",
-                          alignToolBar->isVisible());
+        settings.setValue("toolbar/AlignToolBar_visible", alignToolBar->isVisible());
     }
 
     // 保存其他设置
@@ -2720,6 +2572,12 @@ void MainWindow::closeEvent(QCloseEvent *event)
     if (m_undoStack)
         m_undoStack->clear();
 
+    if (m_pProgressMgr)
+        m_pProgressMgr->resetAll();
+
+    if (m_pProcessGuard)
+        m_pProcessGuard->stopAll();
+
     QMainWindow::closeEvent(event);
 }
 
@@ -2731,8 +2589,7 @@ void MainWindow::_toggleHistoryPopup()
         m_taskHistoryPopup->hide();
         return;
     }
-    m_taskHistoryPopup->showAbove(m_taskHistoryBtn,
-                                  m_pProgressMgr->activeTaskList(),
+    m_taskHistoryPopup->showAbove(m_taskHistoryBtn, m_pProgressMgr->activeTaskList(),
                                   m_pProgressMgr->finishedTaskList());
     m_taskHistoryBtn->setChecked(true);
 }

@@ -4,14 +4,14 @@
 #include <QGraphicsScene>
 #include <QPainter>
 
-GraphicsItemGroup::GraphicsItemGroup(QGraphicsItem *parent)
-    : QGraphicsItemGroup(parent)
+GraphicsItemGroup::GraphicsItemGroup(QGraphicsItem *parent) : QGraphicsItemGroup(parent)
 {
     setFlag(ItemIsSelectable, true);
     setFlag(ItemIsMovable, true);
 }
 
-void GraphicsItemGroup::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+void GraphicsItemGroup::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
+                              QWidget *widget)
 {
     // 去掉 State_Selected 以禁用 Qt 内置的选中虚线框
     // 选中框由 ResizeHandleItem 统一绘制，避免两层叠加及残影
@@ -72,9 +72,8 @@ void GraphicsItemGroup::setGeometryRect(const QRectF &newRect)
     for (auto *child : childItems()) {
         auto *igi = dynamic_cast<IGraphicsItem *>(child);
         QPointF childPos = child->pos();
-        QRectF childRect = (igi && igi->supportsGeometryRect())
-                               ? igi->geometryRect()
-                               : child->boundingRect();
+        QRectF childRect =
+            (igi && igi->supportsGeometryRect()) ? igi->geometryRect() : child->boundingRect();
 
         // 相对于 oldRect 左上角的位置，按比例缩放
         qreal relX = childPos.x() + childRect.left() - oldRect.left();
@@ -86,8 +85,7 @@ void GraphicsItemGroup::setGeometryRect(const QRectF &newRect)
             QSizeF newSize(childRect.width() * sx, childRect.height() * sy);
             QRectF scaledRect(childRect.topLeft(), newSize);
             igi->setGeometryRect(scaledRect);
-            child->setPos(QPointF(newLeft - childRect.left(),
-                                  newTop - childRect.top()));
+            child->setPos(QPointF(newLeft - childRect.left(), newTop - childRect.top()));
         } else {
             QSizeF newSize(childRect.width() * sx, childRect.height() * sy);
             QSizeF origSize = childRect.size();
@@ -119,7 +117,7 @@ void GraphicsItemGroup::serialize(QDataStream &out) const
 {
     // 写入子图元数量
     QList<QGraphicsItem *> children = childItems();
-    out << children.size();
+    out << (int)children.size();
 
     for (auto *child : children) {
         auto *gi = dynamic_cast<IGraphicsItem *>(child);
@@ -142,6 +140,10 @@ bool GraphicsItemGroup::deserialize(QDataStream &in)
     if (in.status() != QDataStream::Ok)
         return false;
 
+    // ---- 第一阶段：反序列化所有子图元，暂存到临时列表 ----
+    // 不能立即 addToGroup，因为组的 pos/rotation 尚未读取，
+    // addToGroup 内部的 mapFromScene 依赖组的 transform，会算错坐标。
+    QList<QGraphicsItem *> pendingChildren;
     for (int i = 0; i < childCount; ++i) {
         int typeInt = 0;
         in >> typeInt;
@@ -150,12 +152,10 @@ bool GraphicsItemGroup::deserialize(QDataStream &in)
             continue;
         }
 
-        // 对于嵌套组，需要递归创建
         auto type = static_cast<IGraphicsItem::ItemType>(typeInt);
         auto *gi = createItemByType(type);
-        if (!gi) {
+        if (!gi)
             return false;
-        }
 
         if (!gi->deserialize(in)) {
             delete gi;
@@ -164,19 +164,31 @@ bool GraphicsItemGroup::deserialize(QDataStream &in)
 
         auto *item = dynamic_cast<QGraphicsItem *>(gi);
         if (item)
-            addToGroup(item);
+            pendingChildren.append(item);
         else
             delete gi;
     }
 
+    // ---- 读取组的位置和旋转 ----
     QPointF p;
     qreal rot = 0;
     in >> p >> rot;
     if (in.status() != QDataStream::Ok)
         return false;
 
+    // ---- 第二阶段：先设置组的 transform，再将子图元加入组 ----
+    // addToGroup 假设子图元的 pos 是场景坐标，执行 mapFromScene 转换为组本地坐标。
+    // 子图元 deserialize 设置的 pos 是组本地坐标，需先用 mapToScene 转为场景坐标。
     setPos(p);
     setRotation(rot);
+
+    for (auto *item : pendingChildren) {
+        QPointF localPos = item->pos();
+        QPointF scenePos = mapToScene(localPos);
+        item->setPos(scenePos);
+        addToGroup(item);
+    }
+
     return true;
 }
 

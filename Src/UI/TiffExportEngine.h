@@ -17,7 +17,6 @@ class QGraphicsScene;
 class QGraphicsView;
 class QGraphicsItem;
 class ImageItem;
-class NetWorkUtils;
 
 // ============================================================================
 // TiffExportEngine — 将 TIFF 导出流程从 MainWindow 中解耦为独立模块
@@ -33,12 +32,6 @@ class TiffExportEngine : public QObject
 public:
     explicit TiffExportEngine(QObject *parent = nullptr);
     ~TiffExportEngine() override;
-
-    // ---- 配置（在 startExport 之前设置） ----
-
-    void setNetWorkUtils(NetWorkUtils *utils) { m_pNetWorkUtils = utils; }
-
-    void setRipConfig(bool enabled, int xRes, int yRes);
 
     // ---- 状态查询 ----
 
@@ -60,16 +53,15 @@ public:
     //
     // 返回 false 表示同步校验失败（调用方应读取 lastError() 展示错误对话框）。
     // 返回 true  表示后台导出已启动，结果通过 exportFinished 信号异步通知。
-    bool startExport(QGraphicsScene *scene, QGraphicsView *view,
-                     const QString &outputPath, int dpiOverride = 0);
+    bool startExport(QGraphicsScene *scene, QGraphicsView *view, const QString &outputPath,
+                     int dpiOverride = 0);
 
 signals:
     // 后台线程中的进度回调，0–100，通过 QueuedConnection 跨线程投递
     void progressChanged(int percent);
 
     // 导出完成（成功或失败），通过 QueuedConnection 跨线程投递
-    void exportFinished(bool success, const QString &filePath,
-                        const QString &errorMessage);
+    void exportFinished(bool success, const QString &filePath, const QString &errorMessage);
 
 private:
     // ================================================================
@@ -85,51 +77,47 @@ private:
     static QRectF determineExportRect(QGraphicsScene *scene);
 
     // 确定目标 DPI
-    static int determineTargetDpi(QGraphicsScene *scene,
-                                  const QList<ImageItem *> &imageItems,
+    static int determineTargetDpi(QGraphicsScene *scene, const QList<ImageItem *> &imageItems,
                                   int dpiOverride);
 
     // ================================================================
     //  源 TIFF 输入构建
     // ================================================================
 
-    QList<ImageUtils::SourceTiffInput>
-    buildSources(const QList<ImageItem *> &imageItems,
-                 const QRectF &exportRect) const;
+    QList<ImageUtils::SourceTiffInput> buildSources(const QList<ImageItem *> &imageItems,
+                                                    const QRectF &exportRect) const;
 
     // ================================================================
     //  Overlay 渲染
     // ================================================================
 
-    QList<ImageUtils::CmykOverlay> renderOverlays(
-        QGraphicsScene *scene, const QList<QGraphicsItem *> &nonImageItems,
-        const QRectF &exportRect, const QList<QGraphicsItem *> &allSceneItems,
-        const QBrush &oldSceneBg, cmsHTRANSFORM sharedXform,
-        bool hasSharedXform);
+    QList<ImageUtils::CmykOverlay>
+    renderOverlays(QGraphicsScene *scene, const QList<QGraphicsItem *> &nonImageItems,
+                   const QRectF &exportRect, const QList<QGraphicsItem *> &allSceneItems,
+                   const QBrush &oldSceneBg, cmsHTRANSFORM sharedXform, bool hasSharedXform);
 
     // 使用存储的精确 CMYK 值渲染（跳过 QPainter + LCMS2）
-    ImageUtils::CmykOverlay renderCmykOverlay(
-        QGraphicsScene *scene, class IGraphicsItem *gi, const QRectF &sceneRect,
-        const QRectF &exportRect, const QRectF &outRect, int w, int h,
-        const QList<QGraphicsItem *> &allSceneItems, const QBrush &oldSceneBg,
-        bool hasBrush, bool hasPen, double brushC, double brushM, double brushY,
-        double brushK, double penC, double penM, double penY, double penK);
+    ImageUtils::CmykOverlay
+    renderCmykOverlay(QGraphicsScene *scene, class IGraphicsItem *gi, const QRectF &sceneRect,
+                      const QRectF &exportRect, const QRectF &outRect, int w, int h,
+                      const QList<QGraphicsItem *> &allSceneItems, const QBrush &oldSceneBg,
+                      bool hasBrush, bool hasPen, double brushC, double brushM, double brushY,
+                      double brushK, double penC, double penM, double penY, double penK);
 
     // 通过 QPainter 渲染 → BGRA → CMYK
-    ImageUtils::CmykOverlay renderBgraOverlay(
-        QGraphicsScene *scene, QGraphicsItem *target, const QRectF &sceneRect,
-        const QRectF &exportRect, const QRectF &outRect, int w, int h,
-        const QList<QGraphicsItem *> &allSceneItems, const QBrush &oldSceneBg,
-        cmsHTRANSFORM sharedXform, bool hasSharedXform);
+    ImageUtils::CmykOverlay renderBgraOverlay(QGraphicsScene *scene, QGraphicsItem *target,
+                                              const QRectF &sceneRect, const QRectF &exportRect,
+                                              const QRectF &outRect, int w, int h,
+                                              const QList<QGraphicsItem *> &allSceneItems,
+                                              const QBrush &oldSceneBg, cmsHTRANSFORM sharedXform,
+                                              bool hasSharedXform);
 
     // ================================================================
     //  后台线程
     // ================================================================
 
-    void launchExport(const QString &outputPath,
-                      QList<ImageUtils::SourceTiffInput> &&sources,
-                      QList<ImageUtils::CmykOverlay> &&overlays,
-                      const QSize &outputSize,
+    void launchExport(const QString &outputPath, QList<ImageUtils::SourceTiffInput> &&sources,
+                      QList<ImageUtils::CmykOverlay> &&overlays, const QSize &outputSize,
                       const ImageUtils::TiffExportSettings &settings);
 
     // ================================================================
@@ -137,8 +125,7 @@ private:
     // ================================================================
 
     // 收集 item 及其所有后代（处理分组）
-    static void collectDescendants(QGraphicsItem *root,
-                                   QSet<QGraphicsItem *> &keepVisible);
+    static void collectDescendants(QGraphicsItem *root, QSet<QGraphicsItem *> &keepVisible);
 
     // 在渲染单个图元时保存/恢复其他图元的可见性
     struct VisibilityScope
@@ -150,8 +137,8 @@ private:
         QBrush oldBackground;
 
         // 进入：隐藏非目标图元、清除背景
-        void enter(QGraphicsScene *s, QGraphicsItem *target,
-                   const QList<QGraphicsItem *> &all, const QBrush &oldBg);
+        void enter(QGraphicsScene *s, QGraphicsItem *target, const QList<QGraphicsItem *> &all,
+                   const QBrush &oldBg);
         // 退出：恢复所有可见性和背景
         void exit();
     };
@@ -163,15 +150,7 @@ private:
     bool m_running = false;
     QString m_lastError;
 
-    struct RipConfig
-    {
-        bool enabled = false;
-        int xRes = 0;
-        int yRes = 0;
-    };
-    RipConfig m_ripConfig;
     std::shared_ptr<std::atomic<bool>> m_cancelFlag;
-    NetWorkUtils *m_pNetWorkUtils = nullptr;
 };
 
 #endif // TIFFEXPORTENGINE_H

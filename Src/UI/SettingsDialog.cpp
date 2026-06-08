@@ -96,25 +96,23 @@ void SettingsDialog::setupUI()
 
     // ---- 按钮 ----
     auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok);
-    buttonBox->button(QDialogButtonBox::Ok)
-        ->setToolTip(tr("Save settings and close"));
+    buttonBox->button(QDialogButtonBox::Ok)->setToolTip(tr("Save settings and close"));
     mainLayout->addWidget(buttonBox);
 
     connect(dotCurveBtn, &QPushButton::clicked, this, [this]() {
-        QString path = QFileDialog::getOpenFileName(
-            this, tr("选择网点曲线文件"), { }, tr("曲线文件 (*.p)"));
+        QString path =
+            QFileDialog::getOpenFileName(this, tr("选择网点曲线文件"), { }, tr("曲线文件 (*.p)"));
         if (!path.isEmpty())
             m_dotCurveEdit->setText(path);
     });
     connect(colorCurveBtn, &QPushButton::clicked, this, [this]() {
-        QString path = QFileDialog::getOpenFileName(
-            this, tr("选择色彩曲线文件"), { }, tr("色彩曲线文件 (*.icm)"));
+        QString path = QFileDialog::getOpenFileName(this, tr("选择色彩曲线文件"), { },
+                                                    tr("色彩曲线文件 (*.icm)"));
         if (!path.isEmpty())
             m_colorCurveEdit->setText(path);
     });
     connect(outputBtn, &QPushButton::clicked, this, [this]() {
-        QString path =
-            QFileDialog::getExistingDirectory(this, tr("选择输出路径"));
+        QString path = QFileDialog::getExistingDirectory(this, tr("选择输出路径"));
         if (!path.isEmpty())
             m_outputPathEdit->setText(path);
     });
@@ -212,17 +210,14 @@ void SettingsDialog::saveConfig()
 
     QDomDocument doc;
     doc.appendChild(doc.createProcessingInstruction(
-        QStringLiteral("xml"),
-        QStringLiteral("version=\"1.0\" encoding=\"UTF-8\"")));
+        QStringLiteral("xml"), QStringLiteral("version=\"1.0\" encoding=\"UTF-8\"")));
     QDomElement root = doc.createElement(QStringLiteral("RIPInfo"));
     doc.appendChild(root);
 
     // <DPI X="..." Y="..."/>
     QDomElement dpiEl = doc.createElement(QStringLiteral("DPI"));
-    dpiEl.setAttribute(QStringLiteral("X"),
-                       m_resolutionXCombo->currentData().toInt());
-    dpiEl.setAttribute(QStringLiteral("Y"),
-                       m_resolutionYCombo->currentData().toInt());
+    dpiEl.setAttribute(QStringLiteral("X"), m_resolutionXCombo->currentData().toInt());
+    dpiEl.setAttribute(QStringLiteral("Y"), m_resolutionYCombo->currentData().toInt());
     root.appendChild(dpiEl);
 
     // <ICC ProofFile="..." ICCFile="..."/>

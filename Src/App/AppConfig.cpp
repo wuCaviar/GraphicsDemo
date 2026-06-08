@@ -14,8 +14,7 @@ AppConfig &AppConfig::instance()
 
 void AppConfig::loadConfig()
 {
-    const QString cfgPath =
-        QCoreApplication::applicationDirPath() + "/config.xml";
+    const QString cfgPath = QCoreApplication::applicationDirPath() + "/config.xml";
     QFile file(cfgPath);
     if (!file.open(QIODevice::ReadOnly)) {
         qInfo() << "[AppConfig] No config.xml found, using defaults";
@@ -26,8 +25,8 @@ void AppConfig::loadConfig()
     QString errMsg;
     int errLine, errCol;
     if (!doc.setContent(&file, &errMsg, &errLine, &errCol)) {
-        qWarning() << "[AppConfig] XML parse error at line" << errLine
-                   << "column" << errCol << ":" << errMsg;
+        qWarning() << "[AppConfig] XML parse error at line" << errLine << "column" << errCol << ":"
+                   << errMsg;
         file.close();
         return;
     }
@@ -46,8 +45,7 @@ void AppConfig::loadConfig()
         if (!exeEl.isNull())
             m_ripExePath = exeEl.text();
 
-        QDomElement cfgEl =
-            ripEl.firstChildElement(QStringLiteral("ConfigPath"));
+        QDomElement cfgEl = ripEl.firstChildElement(QStringLiteral("ConfigPath"));
         if (!cfgEl.isNull())
             m_ripConfigPath = cfgEl.text();
     }
@@ -77,20 +75,17 @@ void AppConfig::loadConfig()
     }
 
     qInfo() << "[AppConfig] Loaded from config.xml"
-            << "\n  ripExe:" << m_ripExePath
-            << "\n  ripConfig:" << m_ripConfigPath
+            << "\n  ripExe:" << m_ripExePath << "\n  ripConfig:" << m_ripConfigPath
             << "\n  iccBase:" << iccProfileBasePath();
 }
 
 void AppConfig::saveConfig() const
 {
-    const QString cfgPath =
-        QCoreApplication::applicationDirPath() + "/config.xml";
+    const QString cfgPath = QCoreApplication::applicationDirPath() + "/config.xml";
 
     QDomDocument doc;
     doc.appendChild(doc.createProcessingInstruction(
-        QStringLiteral("xml"),
-        QStringLiteral("version=\"1.0\" encoding=\"UTF-8\"")));
+        QStringLiteral("xml"), QStringLiteral("version=\"1.0\" encoding=\"UTF-8\"")));
 
     QDomElement root = doc.createElement(QStringLiteral("Config"));
     doc.appendChild(root);
@@ -143,9 +138,7 @@ QString AppConfig::iccProfileBasePath() const
     if (!m_iccProfileBasePath.isEmpty())
         return m_iccProfileBasePath;
 
-#if defined(Q_OS_WIN)
-    return QCoreApplication::applicationDirPath();
-#elif defined(Q_OS_MACOS)
+#if defined(Q_OS_MACOS)
     return QStringLiteral("/Volumes/Caviar/Test/GraphicsDemo/Bin");
 #else
     return QCoreApplication::applicationDirPath();
@@ -159,6 +152,5 @@ QString AppConfig::srgbIccPath() const
 
 QString AppConfig::cmykIccPath() const
 {
-    return iccProfileBasePath()
-           + QStringLiteral("/CMYK/JapanColor2001Coated.icc");
+    return iccProfileBasePath() + QStringLiteral("/CMYK/JapanColor2001Coated.icc");
 }

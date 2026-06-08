@@ -163,7 +163,7 @@ void ColorDialog::setCmykColor(const QColor &color, double c, double m,
     p->ui.preview->setComparisonColor(color);
     p->ui.edit_hex->setModified(false);
     // Block signals during setColorInternal to prevent it from emitting
-    // colorSelectedCmyk(-1,...) which would clear stored CMYK on the item.
+    // intermediate CMYK values; set_cmyk() below handles the final emit.
     bool blocked = signalsBlocked();
     blockSignals(true);
     setColorInternal(color);
@@ -285,8 +285,8 @@ void ColorDialog::setColorInternal(const QColor &col)
     p->ui.slide_value->setLastColor(
         QColor::fromHsvF(p->ui.wheel->hue(), p->ui.wheel->saturation(), 1));
 
-    // RGB → CMYK
-    double c, m, y, k;
+    // RGB → CMYK（基于 ICC 配置文件的精确转换）
+    double c = 0, m = 0, y = 0, k = 0;
     rgb_to_cmyk(col, c, m, y, k);
     p->ui.spin_cyan->setValue(c);
     p->ui.spin_magenta->setValue(m);
@@ -310,7 +310,10 @@ void ColorDialog::setColorInternal(const QColor &col)
     for (QWidget *w : findChildren<QWidget *>())
         w->blockSignals(false);
 
-    Q_EMIT colorSelectedCmyk(col, -1, -1, -1, -1); // 非 CMYK 来源
+    // 无论通过何种方式编辑颜色（RGB/HSV/Hex/Alpha），都将 ICC 转换后的 CMYK 值
+    // 保存到 pendingCmyk，确保导出时有精确的 CMYK 数据可用。
+    p->pendingCmyk = { c, m, y, k, true };
+    Q_EMIT colorSelectedCmyk(col, c, m, y, k);
     Q_EMIT colorChanged(col);
 }
 

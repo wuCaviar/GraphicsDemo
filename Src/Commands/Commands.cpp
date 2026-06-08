@@ -8,8 +8,7 @@
 // ============================================================
 // AddItemCommand
 // ============================================================
-AddItemCommand::AddItemCommand(QGraphicsScene *scene, QGraphicsItem *item,
-                               QUndoCommand *parent)
+AddItemCommand::AddItemCommand(QGraphicsScene *scene, QGraphicsItem *item, QUndoCommand *parent)
     : QUndoCommand(parent), m_scene(scene), m_item(item)
 {
     setText(QObject::tr("Add Item"));
@@ -44,8 +43,7 @@ void AddItemCommand::redo()
 // ============================================================
 // RemoveItemsCommand
 // ============================================================
-RemoveItemsCommand::RemoveItemsCommand(QGraphicsScene *scene,
-                                       const QList<QGraphicsItem *> &items,
+RemoveItemsCommand::RemoveItemsCommand(QGraphicsScene *scene, const QList<QGraphicsItem *> &items,
                                        QUndoCommand *parent)
     : QUndoCommand(parent), m_scene(scene), m_items(items)
 {
@@ -93,8 +91,8 @@ void RemoveItemsCommand::redo()
 // ============================================================
 MoveItemsCommand::MoveItemsCommand(const QList<QGraphicsItem *> &items,
                                    const QList<QPointF> &oldPositions,
-                                   const QList<QPointF> &newPositions,
-                                   QGraphicsScene *scene, QUndoCommand *parent)
+                                   const QList<QPointF> &newPositions, QGraphicsScene *scene,
+                                   QUndoCommand *parent)
     : QUndoCommand(parent)
     , m_items(items)
     , m_oldPos(oldPositions)
@@ -129,9 +127,9 @@ void MoveItemsCommand::redo()
 // ============================================================
 // PropertyChangeCommand
 // ============================================================
-PropertyChangeCommand::PropertyChangeCommand(
-    QGraphicsItem *item, PropType propType, const QVariant &oldValue,
-    const QVariant &newValue, QGraphicsScene *scene, QUndoCommand *parent)
+PropertyChangeCommand::PropertyChangeCommand(QGraphicsItem *item, PropType propType,
+                                             const QVariant &oldValue, const QVariant &newValue,
+                                             QGraphicsScene *scene, QUndoCommand *parent)
     : QUndoCommand(parent)
     , m_item(item)
     , m_propType(propType)
@@ -232,8 +230,7 @@ void PropertyChangeCommand::redo()
 // ============================================================
 // PasteItemsCommand
 // ============================================================
-PasteItemsCommand::PasteItemsCommand(QGraphicsScene *scene,
-                                     const QList<QGraphicsItem *> &items,
+PasteItemsCommand::PasteItemsCommand(QGraphicsScene *scene, const QList<QGraphicsItem *> &items,
                                      QUndoCommand *parent)
     : QUndoCommand(parent), m_scene(scene), m_items(items)
 {
@@ -280,15 +277,9 @@ void PasteItemsCommand::redo()
 // ZValueChangeCommand
 // ============================================================
 ZValueChangeCommand::ZValueChangeCommand(const QList<QGraphicsItem *> &items,
-                                         const QList<qreal> &oldZ,
-                                         const QList<qreal> &newZ,
-                                         QGraphicsScene *scene,
-                                         QUndoCommand *parent)
-    : QUndoCommand(parent)
-    , m_items(items)
-    , m_oldZ(oldZ)
-    , m_newZ(newZ)
-    , m_scene(scene)
+                                         const QList<qreal> &oldZ, const QList<qreal> &newZ,
+                                         QGraphicsScene *scene, QUndoCommand *parent)
+    : QUndoCommand(parent), m_items(items), m_oldZ(oldZ), m_newZ(newZ), m_scene(scene)
 {
     setText(QObject::tr("Change Z-Order"));
 }
@@ -318,10 +309,8 @@ void ZValueChangeCommand::redo()
 // ============================================================
 AlignItemsCommand::AlignItemsCommand(const QList<QGraphicsItem *> &items,
                                      const QList<QPointF> &oldPositions,
-                                     const QList<QPointF> &newPositions,
-                                     const QString &description,
-                                     QGraphicsScene *scene,
-                                     QUndoCommand *parent)
+                                     const QList<QPointF> &newPositions, const QString &description,
+                                     QGraphicsScene *scene, QUndoCommand *parent)
     : QUndoCommand(parent)
     , m_items(items)
     , m_oldPos(oldPositions)
@@ -354,11 +343,13 @@ void AlignItemsCommand::redo()
 // ============================================================
 // StretchAlignItemsCommand（拉伸对齐：位置 + 几何同时变更）
 // ============================================================
-StretchAlignItemsCommand::StretchAlignItemsCommand(
-    const QList<QGraphicsItem *> &items, const QList<QPointF> &oldPositions,
-    const QList<QPointF> &newPositions, const QList<QRectF> &oldGeometries,
-    const QList<QRectF> &newGeometries, const QString &description,
-    QGraphicsScene *scene, QUndoCommand *parent)
+StretchAlignItemsCommand::StretchAlignItemsCommand(const QList<QGraphicsItem *> &items,
+                                                   const QList<QPointF> &oldPositions,
+                                                   const QList<QPointF> &newPositions,
+                                                   const QList<QRectF> &oldGeometries,
+                                                   const QList<QRectF> &newGeometries,
+                                                   const QString &description,
+                                                   QGraphicsScene *scene, QUndoCommand *parent)
     : QUndoCommand(parent)
     , m_items(items)
     , m_oldPos(oldPositions)
@@ -367,8 +358,7 @@ StretchAlignItemsCommand::StretchAlignItemsCommand(
     , m_newGeom(newGeometries)
     , m_scene(scene)
 {
-    setText(description.isEmpty() ? QObject::tr("Stretch Align Items")
-                                  : description);
+    setText(description.isEmpty() ? QObject::tr("Stretch Align Items") : description);
 }
 
 void StretchAlignItemsCommand::undo()
@@ -415,16 +405,10 @@ void StretchAlignItemsCommand::redo()
 // ============================================================
 // PositionChangeCommand（单图元位置变更，由属性面板触发）
 // ============================================================
-PositionChangeCommand::PositionChangeCommand(QGraphicsItem *item,
-                                             const QPointF &oldPos,
-                                             const QPointF &newPos,
-                                             QGraphicsScene *scene,
+PositionChangeCommand::PositionChangeCommand(QGraphicsItem *item, const QPointF &oldPos,
+                                             const QPointF &newPos, QGraphicsScene *scene,
                                              QUndoCommand *parent)
-    : QUndoCommand(parent)
-    , m_item(item)
-    , m_oldPos(oldPos)
-    , m_newPos(newPos)
-    , m_scene(scene)
+    : QUndoCommand(parent), m_item(item), m_oldPos(oldPos), m_newPos(newPos), m_scene(scene)
 {
     setText(QObject::tr("Change Position"));
 }
@@ -446,10 +430,8 @@ void PositionChangeCommand::redo()
 // ============================================================
 // RotationChangeCommand（单图元绕中心旋转变更）
 // ============================================================
-RotationChangeCommand::RotationChangeCommand(QGraphicsItem *item,
-                                             qreal oldRotation,
-                                             qreal newRotation,
-                                             QGraphicsScene *scene,
+RotationChangeCommand::RotationChangeCommand(QGraphicsItem *item, qreal oldRotation,
+                                             qreal newRotation, QGraphicsScene *scene,
                                              QUndoCommand *parent)
     : QUndoCommand(parent)
     , m_item(item)
@@ -496,8 +478,7 @@ void RotationChangeCommand::redo()
 // ============================================================
 // GroupItemsCommand
 // ============================================================
-GroupItemsCommand::GroupItemsCommand(QGraphicsScene *scene,
-                                     const QList<QGraphicsItem *> &items,
+GroupItemsCommand::GroupItemsCommand(QGraphicsScene *scene, const QList<QGraphicsItem *> &items,
                                      QUndoCommand *parent)
     : QUndoCommand(parent), m_scene(scene), m_children(items)
 {
@@ -564,8 +545,7 @@ void GroupItemsCommand::redo()
 // ============================================================
 // UngroupItemsCommand
 // ============================================================
-UngroupItemsCommand::UngroupItemsCommand(QGraphicsScene *scene,
-                                         QGraphicsItem *groupItem,
+UngroupItemsCommand::UngroupItemsCommand(QGraphicsScene *scene, QGraphicsItem *groupItem,
                                          QUndoCommand *parent)
     : QUndoCommand(parent), m_scene(scene), m_group(groupItem)
 {
@@ -631,16 +611,10 @@ void UngroupItemsCommand::redo()
 // ============================================================
 // CanvasResizeCommand
 // ============================================================
-CanvasResizeCommand::CanvasResizeCommand(CanvasItem *canvas,
-                                         const QSizeF &oldSize,
-                                         const QSizeF &newSize,
-                                         QGraphicsScene *scene,
+CanvasResizeCommand::CanvasResizeCommand(CanvasItem *canvas, const QSizeF &oldSize,
+                                         const QSizeF &newSize, QGraphicsScene *scene,
                                          QUndoCommand *parent)
-    : QUndoCommand(parent)
-    , m_canvas(canvas)
-    , m_oldSize(oldSize)
-    , m_newSize(newSize)
-    , m_scene(scene)
+    : QUndoCommand(parent), m_canvas(canvas), m_oldSize(oldSize), m_newSize(newSize), m_scene(scene)
 {
     setText(QObject::tr("Fit Canvas"));
 }
@@ -650,8 +624,7 @@ void CanvasResizeCommand::undo()
     if (m_canvas) {
         m_canvas->setCanvasSize(m_oldSize);
         if (m_scene)
-            m_scene->setSceneRect(-500, -500, m_oldSize.width() + 1000,
-                                  m_oldSize.height() + 1000);
+            m_scene->setSceneRect(-500, -500, m_oldSize.width() + 1000, m_oldSize.height() + 1000);
     }
 }
 
@@ -660,7 +633,6 @@ void CanvasResizeCommand::redo()
     if (m_canvas) {
         m_canvas->setCanvasSize(m_newSize);
         if (m_scene)
-            m_scene->setSceneRect(-500, -500, m_newSize.width() + 1000,
-                                  m_newSize.height() + 1000);
+            m_scene->setSceneRect(-500, -500, m_newSize.width() + 1000, m_newSize.height() + 1000);
     }
 }

@@ -42,21 +42,14 @@ public:
 
 signals:
     // 属性变更信号，由 MainWindow 接收并创建撤销命令
-    void penChanged(QGraphicsItem *item, const QPen &oldPen,
-                    const QPen &newPen);
-    void brushChanged(QGraphicsItem *item, const QBrush &oldBrush,
-                      const QBrush &newBrush);
-    void fontChanged(QGraphicsItem *item, const QFont &oldFont,
-                     const QFont &newFont);
-    void textChanged(QGraphicsItem *item, const QString &oldText,
-                     const QString &newText);
-    void geometryChanged(QGraphicsItem *item, const QRectF &oldRect,
-                         const QRectF &newRect);
+    void penChanged(QGraphicsItem *item, const QPen &oldPen, const QPen &newPen);
+    void brushChanged(QGraphicsItem *item, const QBrush &oldBrush, const QBrush &newBrush);
+    void fontChanged(QGraphicsItem *item, const QFont &oldFont, const QFont &newFont);
+    void textChanged(QGraphicsItem *item, const QString &oldText, const QString &newText);
+    void geometryChanged(QGraphicsItem *item, const QRectF &oldRect, const QRectF &newRect);
     void cornerRadiusChanged(QGraphicsItem *item, qreal oldR, qreal newR);
-    void positionChanged(QGraphicsItem *item, const QPointF &oldPos,
-                         const QPointF &newPos);
-    void rotationChanged(QGraphicsItem *item, qreal oldRotation,
-                         qreal newRotation);
+    void positionChanged(QGraphicsItem *item, const QPointF &oldPos, const QPointF &newPos);
+    void rotationChanged(QGraphicsItem *item, qreal oldRotation, qreal newRotation);
 
 private slots:
     void onPenColorSelected(const QColor &color);

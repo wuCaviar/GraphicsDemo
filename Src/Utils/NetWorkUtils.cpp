@@ -1,15 +1,13 @@
 #include "NetWorkUtils.h"
 
-#define GET_AND_EMIT(url, type)                                    \
-    Http::Get(Http::URL(url),                                      \
-              Http::ResponseFunc([&](Http::QResponsePtr ptrResp) { \
-                  Q_EMIT requestRecv(ptrResp, type);               \
+#define GET_AND_EMIT(url, type)                                                    \
+    Http::Get(Http::URL(url), Http::ResponseFunc([&](Http::QResponsePtr ptrResp) { \
+                  Q_EMIT requestRecv(ptrResp, type);                               \
               }));
 
 NetWorkUtils::NetWorkUtils(QObject *parent) : QObject(parent)
 {
-    connect(this, &NetWorkUtils::requestRecv, this,
-            &NetWorkUtils::onReplyFinished);
+    connect(this, &NetWorkUtils::requestRecv, this, &NetWorkUtils::onReplyFinished);
 }
 
 NetWorkUtils::~NetWorkUtils()
@@ -32,7 +30,6 @@ void NetWorkUtils::doAddRip(int x, int y, const QString &path)
     // 转换为 QJsonDocument 并输出紧凑格式的字符串
     QJsonDocument doc(jsonObj);
     QByteArray jsonString = doc.toJson(QJsonDocument::Compact);
-    qDebug() << jsonString;
 
     Http::Get(Http::URL(NETWORK_ROOT_ADDRIP),
               Http::Parameters({ Http::Parameter("param", jsonString) }),
@@ -77,13 +74,10 @@ void NetWorkUtils::timerEvent(QTimerEvent *event)
     }
 }
 
-void NetWorkUtils::onReplyFinished(Http::QResponsePtr ptrResponse,
-                                   NetworkRequestType type)
+void NetWorkUtils::onReplyFinished(Http::QResponsePtr ptrResponse, NetworkRequestType type)
 {
     if (!ptrResponse)
         return;
-
-    qDebug() << ptrResponse;
 
     QString strError = "";
     if (ptrResponse->success(strError)) {

@@ -38,18 +38,18 @@ enum class HttpMethod
     hmPatch
 };
 
-#define ClassWrapper(cls, type)                    \
-    Q_CLASS_TYPEDEFS(cls)                          \
-    class cls                                      \
-    {                                              \
-    public:                                        \
-        cls() = default;                           \
-        cls(const type &value) : m_value(value){}; \
-        ~cls(){};                                  \
-        type value() const { return m_value; }     \
-                                                   \
-    private:                                       \
-        type m_value;                              \
+#define ClassWrapper(cls, type)                      \
+    Q_CLASS_TYPEDEFS(cls)                            \
+    class cls                                        \
+    {                                                \
+    public:                                          \
+        cls() = default;                             \
+        cls(const type &value) : m_value(value) { }; \
+        ~cls() { };                                  \
+        type value() const { return m_value; }       \
+                                                     \
+    private:                                         \
+        type m_value;                                \
     };
 
 #define FieldWrapper(cls)                                     \
@@ -63,7 +63,7 @@ enum class HttpMethod
             m_strKey = strKey;                                \
             m_value = QVariant(t);                            \
         }                                                     \
-        ~cls(){};                                             \
+        ~cls() { };                                           \
         QString key() const { return m_strKey; };             \
         QString valueString() { return m_value.toString(); }; \
         QVariant value() const { return m_value; };           \
@@ -73,19 +73,25 @@ enum class HttpMethod
         QVariant m_value;                                     \
     };
 
-#define LIST_INITIALIZER_SUPPORT(clss, cls)           \
-public:                                               \
-    clss(const std::initializer_list<cls> &values)    \
-    {                                                 \
-        for (const auto &value : values) {            \
-            m_lstValues.append(value);                \
-        }                                             \
-    }                                                 \
-    QList<cls> values() const { return m_lstValues; } \
-                                                      \
-    void clear() { m_lstValues.clear(); }             \
-                                                      \
-private:                                              \
+#define LIST_INITIALIZER_SUPPORT(clss, cls)        \
+public:                                            \
+    clss(const std::initializer_list<cls> &values) \
+    {                                              \
+        for (const auto &value : values) {         \
+            m_lstValues.append(value);             \
+        }                                          \
+    }                                              \
+    QList<cls> values() const                      \
+    {                                              \
+        return m_lstValues;                        \
+    }                                              \
+                                                   \
+    void clear()                                   \
+    {                                              \
+        m_lstValues.clear();                       \
+    }                                              \
+                                                   \
+private:                                           \
     QList<cls> m_lstValues;
 
 ClassWrapper(Async, bool);
@@ -114,10 +120,7 @@ public:
     Part() : m_bIsFile(false), m_nOffset(0) { }
 
     Part(QString strPath, QString strName = "", int nOffset = 0)
-        : m_bIsFile{ true }
-        , m_nOffset(nOffset)
-        , m_strData(strPath)
-        , m_strName(strName){};
+        : m_bIsFile{ true }, m_nOffset(nOffset), m_strData(strPath), m_strName(strName) { };
 
 public:
     QString type_;
@@ -238,10 +241,7 @@ public:
     UseFileHeader useFileHeader() { return m_useFileHeader; }
     URL url() { return m_url; }
     UploadProgressFunc uploadProgressFunc() { return m_uploadProgressFunc; }
-    DownloadProgressFunc downloadProgressFunc()
-    {
-        return m_downloadProgressFunc;
-    }
+    DownloadProgressFunc downloadProgressFunc() { return m_downloadProgressFunc; }
     ResponseFunc responseFunc() { return m_responseFunc; }
     Headers headers() { return m_headers; }
     Parameters parameters() { return m_parameters; }

@@ -3,14 +3,11 @@
 #include <QDebug>
 #include <QVariant>
 
-ProcessGuard::ProcessGuard(QObject *parent)
-    : QObject(parent)
-{
-}
+ProcessGuard::ProcessGuard(QObject *parent) : QObject(parent) { }
 
 bool ProcessGuard::isProcessRunning(const QString &program) const
 {
-    const auto procs = findChildren<QProcess*>();
+    const auto procs = findChildren<QProcess *>();
     for (const QProcess *proc : procs) {
         if (proc->property("program").toString() == program) {
             if (proc->state() == QProcess::Running)
@@ -29,10 +26,9 @@ void ProcessGuard::addProcess(const QString &program, const QStringList &argumen
     proc->setProperty("stopping", false);
 
     // 连接信号
-    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, &ProcessGuard::onProcessFinished);
-    connect(proc, &QProcess::errorOccurred,
-            this, &ProcessGuard::onProcessError);
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+            &ProcessGuard::onProcessFinished);
+    connect(proc, &QProcess::errorOccurred, this, &ProcessGuard::onProcessError);
 
     proc->start(program, arguments);
     qDebug() << "ProcessGuard: started" << program;
@@ -41,7 +37,7 @@ void ProcessGuard::addProcess(const QString &program, const QStringList &argumen
 void ProcessGuard::stopAll()
 {
     // 找到所有子QProcess，标记为主动停止
-    const auto procs = findChildren<QProcess*>();
+    const auto procs = findChildren<QProcess *>();
     for (auto *proc : procs) {
         proc->setProperty("stopping", true);
         proc->terminate(); // 尝试优雅退出
@@ -62,14 +58,14 @@ void ProcessGuard::setRestartDelay(int msec)
 
 void ProcessGuard::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    auto *proc = qobject_cast<QProcess*>(sender());
+    auto *proc = qobject_cast<QProcess *>(sender());
     if (!proc)
         return;
 
     const bool stopping = proc->property("stopping").toBool();
     if (stopping) {
         qDebug() << "ProcessGuard: process" << proc->property("program").toString()
-        << "stopped intentionally, won't restart";
+                 << "stopped intentionally, won't restart";
         return;
     }
 
@@ -82,7 +78,7 @@ void ProcessGuard::onProcessFinished(int exitCode, QProcess::ExitStatus exitStat
 
 void ProcessGuard::onProcessError(QProcess::ProcessError error)
 {
-    auto *proc = qobject_cast<QProcess*>(sender());
+    auto *proc = qobject_cast<QProcess *>(sender());
     if (!proc)
         return;
 
@@ -102,7 +98,7 @@ void ProcessGuard::scheduleRestart(QProcess *process)
     int restartCount = process->property("restartCount").toInt();
     if (m_maxRestarts >= 0 && restartCount >= m_maxRestarts) {
         qWarning() << "ProcessGuard: process" << process->property("program").toString()
-        << "reached max restarts, giving up";
+                   << "reached max restarts, giving up";
         emit processGiveUp(process->property("program").toString());
         return;
     }

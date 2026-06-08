@@ -33,8 +33,7 @@ bool SourceReader::open(const QString &filePath)
     uint16_t bitsPerSample = 8;
     uint16_t sampleFormat = SAMPLEFORMAT_UINT;
     TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
-    TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_SAMPLESPERPIXEL,
-                          &m_samplesPerPixel);
+    TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_SAMPLESPERPIXEL, &m_samplesPerPixel);
     TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_PHOTOMETRIC, &m_photometric);
     TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_PLANARCONFIG, &m_planarConfig);
     TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_SAMPLEFORMAT, &sampleFormat);
@@ -55,11 +54,10 @@ bool SourceReader::open(const QString &filePath)
                && m_samplesPerPixel == 1) {
         m_colorType = ColorType::GRAY;
     } else {
-        m_error =
-            QString("Unsupported TIFF format (photometric=%1, samples=%2): %3")
-                .arg(m_photometric)
-                .arg(m_samplesPerPixel)
-                .arg(filePath);
+        m_error = QString("Unsupported TIFF format (photometric=%1, samples=%2): %3")
+                      .arg(m_photometric)
+                      .arg(m_samplesPerPixel)
+                      .arg(filePath);
         return false;
     }
 
@@ -74,8 +72,7 @@ bool SourceReader::open(const QString &filePath)
         m_rowCache1.resize(static_cast<size_t>(w) * 4);
         m_scanBuf.resize(static_cast<size_t>(m_scanlineSize));
     } catch (const std::bad_alloc &) {
-        m_error =
-            QString("Not enough memory for %1x%2 source buffer").arg(w).arg(h);
+        m_error = QString("Not enough memory for %1x%2 source buffer").arg(w).arg(h);
         return false;
     }
 
@@ -83,23 +80,21 @@ bool SourceReader::open(const QString &filePath)
     if (m_colorType == ColorType::RGB) {
         QATColorManager &cm = QATColorManager::instance();
         if (cm.isValid()) {
-            m_rgbToCmyk = cm.createBgraToCmyk8(INTENT_PERCEPTUAL,
-                                               cmsFLAGS_BLACKPOINTCOMPENSATION
-                                                   | cmsFLAGS_HIGHRESPRECALC);
+            m_rgbToCmyk = cm.createBgraToCmyk8(
+                INTENT_PERCEPTUAL,
+                cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
         }
     }
 
     // SEPARATE 模式：预分配平面缓冲区
     if (m_planarConfig == PLANARCONFIG_SEPARATE) {
-        int effectivePlanes =
-            (m_colorType == ColorType::CMYK) ? 4 : m_samplesPerPixel;
+        int effectivePlanes = (m_colorType == ColorType::CMYK) ? 4 : m_samplesPerPixel;
         m_planeBufs.resize(effectivePlanes);
         try {
             for (auto &plane : m_planeBufs)
-                plane.resize(static_cast<size_t>(w)); // 每行一个临时平面缓冲区
+                plane.resize(static_cast<size_t>(w));  // 每行一个临时平面缓冲区
         } catch (const std::bad_alloc &) {
-            m_error = QString("Not enough memory for plane buffers: %1")
-                          .arg(filePath);
+            m_error = QString("Not enough memory for plane buffers: %1").arg(filePath);
             return false;
         }
     }
@@ -124,22 +119,17 @@ void SourceReader::close()
     m_cachedRow1 = -1;
 }
 
-bool SourceReader::readAndConvertRow(int sourceRow,
-                                     std::vector<uint8_t> &outCmyk)
+bool SourceReader::readAndConvertRow(int sourceRow, std::vector<uint8_t> &outCmyk)
 {
     if (!m_valid || sourceRow < 0 || sourceRow >= static_cast<int>(m_height)) {
-        m_error = QString("Invalid row access: row=%1, height=%2")
-                      .arg(sourceRow)
-                      .arg(m_height);
+        m_error = QString("Invalid row access: row=%1, height=%2").arg(sourceRow).arg(m_height);
         return false;
     }
 
     const uint32_t w = m_width;
 
     if (m_planarConfig == PLANARCONFIG_CONTIG) {
-        if (TIFFReadScanline(m_tif.get(), m_scanBuf.data(),
-                             static_cast<uint32_t>(sourceRow), 0)
-            < 0) {
+        if (TIFFReadScanline(m_tif.get(), m_scanBuf.data(), static_cast<uint32_t>(sourceRow), 0) < 0) {
             m_error = QString("Read error at row %1").arg(sourceRow);
             return false;
         }
@@ -170,8 +160,8 @@ bool SourceReader::readAndConvertRow(int sourceRow,
                 }
             }
             if (m_rgbToCmyk) {
-                QATColorManager::convertBgra8ToCmyk8(
-                    m_rgbToCmyk, bgraLine.data(), dst, static_cast<int>(w));
+                QATColorManager::convertBgra8ToCmyk8(m_rgbToCmyk, bgraLine.data(),
+                                                      dst, static_cast<int>(w));
             } else {
                 bgraToCmykFallback(bgraLine.data(), dst, static_cast<int>(w));
             }
@@ -193,18 +183,15 @@ bool SourceReader::readAndConvertRow(int sourceRow,
         }
     } else {
         // SEPARATE 模式：按平面读取 → interleave
-        int effectivePlanes = (m_colorType == ColorType::CMYK)
-                                  ? 4
-                                  : static_cast<int>(m_samplesPerPixel);
+        int effectivePlanes = (m_colorType == ColorType::CMYK) ? 4
+                             : static_cast<int>(m_samplesPerPixel);
 
         for (int s = 0; s < effectivePlanes; ++s) {
             if (TIFFReadScanline(m_tif.get(), m_scanBuf.data(),
                                  static_cast<uint32_t>(sourceRow),
-                                 static_cast<uint16_t>(s))
-                < 0) {
+                                 static_cast<uint16_t>(s)) < 0) {
                 m_error = QString("Read error at row %1 plane %2")
-                              .arg(sourceRow)
-                              .arg(s);
+                              .arg(sourceRow).arg(s);
                 return false;
             }
             uint8_t *plane = m_planeBufs[s].data();
@@ -232,8 +219,8 @@ bool SourceReader::readAndConvertRow(int sourceRow,
                 bgraLine[x * 4 + 3] = 255;
             }
             if (m_rgbToCmyk) {
-                QATColorManager::convertBgra8ToCmyk8(
-                    m_rgbToCmyk, bgraLine.data(), dst, static_cast<int>(w));
+                QATColorManager::convertBgra8ToCmyk8(m_rgbToCmyk, bgraLine.data(),
+                                                      dst, static_cast<int>(w));
             } else {
                 bgraToCmykFallback(bgraLine.data(), dst, static_cast<int>(w));
             }
@@ -242,10 +229,9 @@ bool SourceReader::readAndConvertRow(int sourceRow,
 
         case ColorType::GRAY:
             for (uint32_t x = 0; x < w; ++x) {
-                uint8_t gray =
-                    m_isMiniswhite
-                        ? static_cast<uint8_t>(255 - m_planeBufs[0][x])
-                        : m_planeBufs[0][x];
+                uint8_t gray = m_isMiniswhite
+                                   ? static_cast<uint8_t>(255 - m_planeBufs[0][x])
+                                   : m_planeBufs[0][x];
                 int off = static_cast<int>(x) * 4;
                 dst[off + 0] = 0;
                 dst[off + 1] = 0;

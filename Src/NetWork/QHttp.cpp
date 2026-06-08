@@ -54,11 +54,9 @@ bool QResponse::success(QString &strError)
 }
 
 QRequest::QRequest(QObject *parent)
-    : QObject(parent)
-    , m_a(false)
-    , m_useFileHeader(false)
-    , m_pDownloadFile(nullptr)
-{ }
+    : QObject(parent), m_a(false), m_useFileHeader(false), m_pDownloadFile(nullptr)
+{
+}
 
 QRequest::~QRequest()
 {
@@ -148,8 +146,7 @@ QGlobalPtr QGlobalManager::get(const QString &strUrl)
     return nullptr;
 }
 
-void QGlobalManager::updateAuthHeaders(
-    const QMap<QString, QString> &mapAuthHeaders)
+void QGlobalManager::updateAuthHeaders(const QMap<QString, QString> &mapAuthHeaders)
 {
     m_mapAuthHeaders = mapAuthHeaders;
 }
@@ -164,7 +161,8 @@ QHttp::QHttp(QObject *parent)
     , m_pManager(new QNetworkAccessManager(this))
     , m_pReply(nullptr)
     , m_multiPart(nullptr)
-{ }
+{
+}
 
 QHttp::~QHttp()
 {
@@ -228,22 +226,18 @@ void QHttp::_post()
                 m_lstMultiPartFiles.append(file);
                 httpPart.setBodyDevice(file);
 
-                QString disposition =
-                    QString("form-data; name=\"%1\"; filename=\"%2\"")
-                        .arg(part.m_strName)
-                        .arg(QFileInfo(part.m_strData).fileName());
-                httpPart.setHeader(QNetworkRequest::ContentDispositionHeader,
-                                   disposition);
+                QString disposition = QString("form-data; name=\"%1\"; filename=\"%2\"")
+                                          .arg(part.m_strName)
+                                          .arg(QFileInfo(part.m_strData).fileName());
+                httpPart.setHeader(QNetworkRequest::ContentDispositionHeader, disposition);
             } else {
                 httpPart.setBody(part.m_strData.toUtf8());
                 httpPart.setHeader(QNetworkRequest::ContentDispositionHeader,
-                                   "form-data; name=\"" + part.m_strName
-                                       + "\"");
+                                   "form-data; name=\"" + part.m_strName + "\"");
             }
 
             if (!part.type_.isEmpty()) {
-                httpPart.setHeader(QNetworkRequest::ContentTypeHeader,
-                                   part.type_);
+                httpPart.setHeader(QNetworkRequest::ContentTypeHeader, part.type_);
             }
 
             m_multiPart->append(httpPart);
@@ -252,20 +246,16 @@ void QHttp::_post()
         m_pReply = m_pManager->post(request, m_multiPart);
         m_multiPart->setParent(m_pReply);
     } else if (!ptrReq->payload().value().isEmpty()) {
-        request.setHeader(QNetworkRequest::ContentTypeHeader,
-                          "application/json");
-        m_pReply =
-            m_pManager->post(request, ptrReq->payload().value().toUtf8());
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+        m_pReply = m_pManager->post(request, ptrReq->payload().value().toUtf8());
     } else if (!ptrReq->rawData().value().empty()) {
-        m_pReply = m_pManager->post(
-            request, QByteArray::fromStdString(ptrReq->rawData().value()));
+        m_pReply = m_pManager->post(request, QByteArray::fromStdString(ptrReq->rawData().value()));
     } else {
         QUrlQuery query;
         for (auto &param : ptrReq->parameters().values()) {
             query.addQueryItem(param.key(), param.valueString());
         }
-        m_pReply = m_pManager->post(
-            request, query.toString(QUrl::FullyEncoded).toUtf8());
+        m_pReply = m_pManager->post(request, query.toString(QUrl::FullyEncoded).toUtf8());
     }
 
     _afterRequest(HttpMethod::hmPost);
@@ -284,12 +274,10 @@ void QHttp::_put()
     _beforeRequest(&request, HttpMethod::hmPut);
 
     if (!ptrReq->payload().value().isEmpty()) {
-        request.setHeader(QNetworkRequest::ContentTypeHeader,
-                          "application/json");
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         m_pReply = m_pManager->put(request, ptrReq->payload().value().toUtf8());
     } else if (!ptrReq->rawData().value().empty()) {
-        m_pReply = m_pManager->put(
-            request, QByteArray::fromStdString(ptrReq->rawData().value()));
+        m_pReply = m_pManager->put(request, QByteArray::fromStdString(ptrReq->rawData().value()));
     } else {
         m_pReply = m_pManager->put(request, QByteArray());
     }
@@ -310,8 +298,7 @@ void QHttp::_delete()
     _beforeRequest(&request, HttpMethod::hmDelete);
 
     if (!ptrReq->payload().value().isEmpty()) {
-        request.setHeader(QNetworkRequest::ContentTypeHeader,
-                          "application/json");
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         auto *buffer = new QBuffer();
         buffer->setData(ptrReq->payload().value().toUtf8());
         buffer->open(QIODevice::ReadOnly);
@@ -338,8 +325,7 @@ void QHttp::_patch()
 
     QByteArray body;
     if (!ptrReq->payload().value().isEmpty()) {
-        request.setHeader(QNetworkRequest::ContentTypeHeader,
-                          "application/json");
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         body = ptrReq->payload().value().toUtf8();
     } else if (!ptrReq->rawData().value().empty()) {
         body = QByteArray::fromStdString(ptrReq->rawData().value());
@@ -359,8 +345,7 @@ void QHttp::_beforeRequest(QNetworkRequest *pReq, HttpMethod method)
     auto global = QGlobalManager::shared()->get(ptrReq->url().value());
     if (global) {
         for (auto &header : global->headers().values()) {
-            pReq->setRawHeader(header.key().toUtf8(),
-                               header.valueString().toUtf8());
+            pReq->setRawHeader(header.key().toUtf8(), header.valueString().toUtf8());
         }
     }
 
@@ -372,8 +357,7 @@ void QHttp::_beforeRequest(QNetworkRequest *pReq, HttpMethod method)
 
     // 添加请求特定头
     for (auto &header : ptrReq->headers().values()) {
-        pReq->setRawHeader(header.key().toUtf8(),
-                           header.valueString().toUtf8());
+        pReq->setRawHeader(header.key().toUtf8(), header.valueString().toUtf8());
     }
 
     // 特殊文件头处理
@@ -388,16 +372,14 @@ void QHttp::_afterRequest(HttpMethod method)
     if (ptrReq->downloadProgressFunc().value()) {
         QObject::connect(m_pReply, &QNetworkReply::downloadProgress,
                          [this](qint64 bytesReceived, qint64 bytesTotal) {
-                             ptrReq->downloadProgressFunc().value()(
-                                 bytesReceived, bytesTotal);
+                             ptrReq->downloadProgressFunc().value()(bytesReceived, bytesTotal);
                          });
     }
 
     if (ptrReq->uploadProgressFunc().value()) {
         QObject::connect(m_pReply, &QNetworkReply::uploadProgress,
                          [this](qint64 bytesSent, qint64 bytesTotal) {
-                             ptrReq->uploadProgressFunc().value()(bytesSent,
-                                                                  bytesTotal);
+                             ptrReq->uploadProgressFunc().value()(bytesSent, bytesTotal);
                          });
     }
 
@@ -410,8 +392,7 @@ void QHttp::_afterRequest(HttpMethod method)
     } else {
         // 同步请求处理
         QEventLoop loop;
-        QObject::connect(m_pReply, &QNetworkReply::finished,
-                         [&loop]() { loop.quit(); });
+        QObject::connect(m_pReply, &QNetworkReply::finished, [&loop]() { loop.quit(); });
         loop.exec();
         _handleResponse();
         deleteLater();
@@ -433,8 +414,7 @@ void QHttp::_handleResponse()
     // 处理错误
     if (m_pReply->error() != QNetworkReply::NoError) {
         ptrResp->setStatusCode(
-            m_pReply->attribute(QNetworkRequest::HttpStatusCodeAttribute)
-                .toInt());
+            m_pReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
         ptrResp->setBody(m_pReply->errorString().toUtf8());
         if (ptrReq->responseFunc().value()) {
             ptrReq->responseFunc().value()(ptrResp);
@@ -443,8 +423,7 @@ void QHttp::_handleResponse()
     }
 
     // 处理成功响应
-    ptrResp->setStatusCode(
-        m_pReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
+    ptrResp->setStatusCode(m_pReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
 
     // 处理下载文件
     if (ptrReq->file()) {
@@ -475,8 +454,8 @@ QDebug operator<<(QDebug debug, const Part &part)
     QDebugStateSaver saver(debug);
     debug.nospace() << "Part("
                     << "type=" << part.type_ << ", isFile" << part.m_bIsFile
-                    << ", data=" << part.m_strData << ", name" << part.m_strName
-                    << ", offset" << part.m_nOffset << ")";
+                    << ", data=" << part.m_strData << ", name" << part.m_strName << ", offset"
+                    << part.m_nOffset << ")";
     return debug;
 }
 
@@ -492,8 +471,7 @@ QDebug operator<<(QDebug debug, const Parameter &parameter)
 {
     QDebugStateSaver saver(debug);
     debug.nospace() << "Parameter("
-                    << "key=" << parameter.key()
-                    << ", value=" << parameter.value() << ")";
+                    << "key=" << parameter.key() << ", value=" << parameter.value() << ")";
     return debug;
 }
 
@@ -509,8 +487,7 @@ QDebug operator<<(QDebug debug, const Header &header)
 {
     QDebugStateSaver saver(debug);
     debug.nospace() << "Header("
-                    << "key=" << header.key() << ", value=" << header.value()
-                    << ")";
+                    << "key=" << header.key() << ", value=" << header.value() << ")";
     return debug;
 }
 
@@ -526,8 +503,7 @@ QDebug operator<<(QDebug debug, const QResponsePtr response)
 {
     QDebugStateSaver saver(debug);
     debug.nospace() << "QResponse("
-                    << "statusCode=" << response->statusCode()
-                    << ", body=" << response->body()
+                    << "statusCode=" << response->statusCode() << ", body=" << response->body()
                     << ", headers=" << response->headers() << ")";
     return debug;
 }

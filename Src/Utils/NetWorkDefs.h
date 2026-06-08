@@ -5,17 +5,7 @@
 #include <QString>
 #include <QCoreApplication>
 
-#define USE_NEW_RIP
-
-#if defined(Q_OS_MACOS)
-#    define RIP_PROGRESS_MAX 100
-#elif defined(Q_OS_WIN)
-#    if defined(USE_NEW_RIP)
-#        define RIP_PROGRESS_MAX 10000
-#    else
-#        define RIP_PROGRESS_MAX 100
-#    endif
-#endif
+#define RIP_PROGRESS_MAX 10000 // 进度值上限，表示 100%，允许更细粒度的进度更新
 
 #define NETWORK_ROOT "http://127.0.0.1:9201"
 

@@ -26,9 +26,8 @@ int main(int argc, char *argv[])
 
         // Qt 基础翻译（标准按钮等）
         auto *qtTranslator = new QTranslator(&a);
-        if (qtTranslator->load(
-                "qt_" + localeName,
-                QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+        if (qtTranslator->load("qt_" + localeName,
+                               QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
             a.installTranslator(qtTranslator);
         }
 
@@ -52,8 +51,7 @@ int main(int argc, char *argv[])
 
     // 初始化颜色管理器并注册到 UI 组件
     QATColorManager &cm = QATColorManager::instance();
-    cm.initialize(AppConfig::instance().srgbIccPath(),
-                  AppConfig::instance().cmykIccPath());
+    cm.initialize(AppConfig::instance().srgbIccPath(), AppConfig::instance().cmykIccPath());
     color_widgets::ColorDialog::setColorTransform(&cm);
 
     QString name = "com.athc.atgraphics";

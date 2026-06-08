@@ -36,8 +36,7 @@ public:
     // 双线性插值所需的源行窗口
     struct RowWindow
     {
-        const uint8_t *row0 =
-            nullptr; // 指向内部缓存的 CMYK 行 (width × 4 bytes)
+        const uint8_t *row0 = nullptr; // 指向内部缓存的 CMYK 行 (width × 4 bytes)
         const uint8_t *row1 = nullptr; // 同上。row0 == row1 表示无需 Y 方向插值
     };
 

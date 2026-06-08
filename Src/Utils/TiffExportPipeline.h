@@ -40,16 +40,13 @@ struct StripSlot
     // ---- Producer 产出：每个源的 strip 级数据 ----
     struct SourceStripData
     {
-        std::vector<uint8_t>
-            cmykRows; // sourcePixelWidth × numSourceRows × 4 bytes
+        std::vector<uint8_t> cmykRows; // sourcePixelWidth × numSourceRows × 4 bytes
         int startSourceRow = 0; // 该数据在源图像中的起始行
         int numSourceRows = 0; // 行数
         bool hasData = false; // 该源是否覆盖本 strip
         QString error;
-        QRectF
-            outputRect; // 该源在输出图像中的 pixel rect（宽高 = 源像素尺寸，1:1 映射）
-        int sourcePixelWidth =
-            0; // 源 TIFF 的实际像素宽度（= reader.width()），用于行步长
+        QRectF outputRect; // 该源在输出图像中的 pixel rect（宽高 = 源像素尺寸，1:1 映射）
+        int sourcePixelWidth = 0; // 源 TIFF 的实际像素宽度（= reader.width()），用于行步长
         int zOrder = 0; // z-order 排序键
     };
     std::vector<SourceStripData> sourcesData;
@@ -102,10 +99,8 @@ public:
     explicit StripPipeline(Config cfg = { }) : m_config(cfg) { }
 
     // 同步执行流水线导出。阻塞直到完成或出错或取消。
-    ExportWorkerResult execute(const QString &outputPath,
-                               const QList<SourceTiffInput> &sources,
-                               QList<CmykOverlay> &&overlays,
-                               const QSize &outputSize,
+    ExportWorkerResult execute(const QString &outputPath, const QList<SourceTiffInput> &sources,
+                               QList<CmykOverlay> &&overlays, const QSize &outputSize,
                                const TiffExportSettings &settings,
                                ProgressCallback progress = nullptr,
                                std::atomic<bool> *cancelFlag = nullptr);
@@ -120,30 +115,27 @@ private:
 
     // ---- 阶段函数 ----
     // readers: execute() 生命周期内持久化的 SourceReader 数组，避免每 strip 重复 open
-    void producerStage(StripSlot &slot, const QList<SourceTiffInput> &sources,
-                       const QSize &outSize, std::vector<SourceReader> &readers,
-                       std::atomic<bool> *cancelFlag,
+    void producerStage(StripSlot &slot, const QList<SourceTiffInput> &sources, const QSize &outSize,
+                       std::vector<SourceReader> &readers, std::atomic<bool> *cancelFlag,
                        std::atomic<bool> &pipelineError, std::mutex &errorMutex,
                        std::string &errorMsg);
 
-    void organizerStage(StripSlot &slot, const QList<CmykOverlay> &overlays,
-                        int outWidth, int outHeight,
-                        std::atomic<bool> *cancelFlag);
+    void organizerStage(StripSlot &slot, const QList<CmykOverlay> &overlays, int outWidth,
+                        int outHeight, std::atomic<bool> *cancelFlag);
 
     void consumerStage(StripSlot &slot, TIFF *tif, int outWidth, int outH,
                        std::atomic<int> &writtenStrips, int totalStrips,
-                       std::atomic<bool> *cancelFlag,
-                       std::atomic<bool> &pipelineError, std::mutex &errorMutex,
-                       std::string &errorMsg, ProgressCallback progress);
+                       std::atomic<bool> *cancelFlag, std::atomic<bool> &pipelineError,
+                       std::mutex &errorMutex, std::string &errorMsg, ProgressCallback progress);
 
     // 像素级验证：与 Legacy exportTiff 全缓冲实现对比
     // pipeline 输出写入 outputPath，legacy 输出写入 outputPath + ".legacy.tif"
     // 然后逐像素比较两个文件的 CMYK 通道值
-    static ExportVerificationResult validateAgainstLegacy(
-        const QString &outputPath, const QList<SourceTiffInput> &sources,
-        QList<CmykOverlay> overlays, // 传值，不会消费原数据
-        const QSize &outputSize, const TiffExportSettings &settings,
-        ProgressCallback progress = nullptr);
+    static ExportVerificationResult
+    validateAgainstLegacy(const QString &outputPath, const QList<SourceTiffInput> &sources,
+                          QList<CmykOverlay> overlays, // 传值，不会消费原数据
+                          const QSize &outputSize, const TiffExportSettings &settings,
+                          ProgressCallback progress = nullptr);
 };
 
 // ============================================================================
@@ -159,8 +151,7 @@ struct CompositorParticipant
     };
 
     Type type;
-    const StripSlot::SourceStripData *sourceData =
-        nullptr; // type==SourceReader
+    const StripSlot::SourceStripData *sourceData = nullptr; // type==SourceReader
     const CmykOverlay *overlay = nullptr; // type==Overlay
     int zOrder = 0;
     int readerIndex = -1;

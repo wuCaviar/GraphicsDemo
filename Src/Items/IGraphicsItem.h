@@ -20,23 +20,35 @@ public:
     // v2: 添加 CMYK 颜色数据序列化
     static constexpr int kSerializationVersion = 2;
 
-    enum ItemType {
-        RectItemType       = 1,
-        EllipseItemType    = 2,
-        LineItemType       = 3,
+    /*
+        序列化格式
+        [Version (qint32)]
+        [Count of items (qint32)]
+        For each item:
+            [Length of item data (quint32)]
+            [Item type (qint32)]
+            [Item data (variable length, QDataStream format)]
+    */
+
+    enum ItemType
+    {
+        RectItemType = 1,
+        EllipseItemType = 2,
+        LineItemType = 3,
         BezierCurveItemType = 4,
-        TextItemType       = 5,
-        ImageItemType      = 6,
-        FreehandItemType   = 7,
-        GroupItemType      = 8,
+        TextItemType = 5,
+        ImageItemType = 6,
+        FreehandItemType = 7,
+        GroupItemType = 8,
     };
 
-    enum PropertyFlag {
-        HasPen      = 0x0001,
-        HasBrush    = 0x0002,
-        HasFont     = 0x0004,
-        HasText     = 0x0008,
-        HasImage    = 0x0010,
+    enum PropertyFlag
+    {
+        HasPen = 0x0001,
+        HasBrush = 0x0002,
+        HasFont = 0x0004,
+        HasText = 0x0008,
+        HasImage = 0x0010,
         HasRotation = 0x0020,
     };
     Q_DECLARE_FLAGS(PropertyFlags, PropertyFlag)
@@ -54,45 +66,75 @@ public:
     virtual void setItemBrush(const QBrush &brush) = 0;
 
     // 文字属性
-    virtual QString text() const { return {}; }
-    virtual void setText(const QString &) {}
-    virtual QFont itemFont() const { return {}; }
-    virtual void setItemFont(const QFont &) {}
+    virtual QString text() const { return { }; }
+    virtual void setText(const QString &) { }
+    virtual QFont itemFont() const { return { }; }
+    virtual void setItemFont(const QFont &) { }
 
     // 图像属性
-    virtual QString filePath() const { return {}; }
-    virtual void setFilePath(const QString &) {}
+    virtual QString filePath() const { return { }; }
+    virtual void setFilePath(const QString &) { }
 
     // CMYK 颜色存储（可选，用于 TIFF 导出精确 CMYK 值）
-    virtual void setItemPenCmyk(double c, double m, double y, double k) { Q_UNUSED(c); Q_UNUSED(m); Q_UNUSED(y); Q_UNUSED(k); }
+    virtual void setItemPenCmyk(double c, double m, double y, double k)
+    {
+        Q_UNUSED(c);
+        Q_UNUSED(m);
+        Q_UNUSED(y);
+        Q_UNUSED(k);
+    }
     virtual bool hasPenCmyk() const { return false; }
     virtual void penCmyk(double &c, double &m, double &y, double &k) const { c = m = y = k = 100; }
-    virtual void clearPenCmyk() {}
+    virtual void clearPenCmyk() { }
 
-    virtual void setItemBrushCmyk(double c, double m, double y, double k) { Q_UNUSED(c); Q_UNUSED(m); Q_UNUSED(y); Q_UNUSED(k); }
+    virtual void setItemBrushCmyk(double c, double m, double y, double k)
+    {
+        Q_UNUSED(c);
+        Q_UNUSED(m);
+        Q_UNUSED(y);
+        Q_UNUSED(k);
+    }
     virtual bool hasBrushCmyk() const { return false; }
-    virtual void brushCmyk(double &c, double &m, double &y, double &k) const { c = m = y = k = 100; }
-    virtual void clearBrushCmyk() {}
+    virtual void brushCmyk(double &c, double &m, double &y, double &k) const
+    {
+        c = m = y = k = 100;
+    }
+    virtual void clearBrushCmyk() { }
 
     // 渐变 CMYK 颜色存储（按停止点位置索引，用于 TIFF 导出精确 CMYK 渐变）
-    virtual void setGradientStopCmyk(double position, double c, double m, double y, double k) { Q_UNUSED(position); Q_UNUSED(c); Q_UNUSED(m); Q_UNUSED(y); Q_UNUSED(k); }
-    virtual bool hasGradientStopCmyk(double position) const { Q_UNUSED(position); return false; }
-    virtual void gradientStopCmyk(double position, double &c, double &m, double &y, double &k) const { Q_UNUSED(position); c = m = y = k = 0; }
-    virtual void clearGradientCmyk() {}
-    virtual QMap<double, CmykColor> gradientStopCmykMap() const { return {}; }
-    virtual void setGradientStopCmykMap(const QMap<double, CmykColor> &) {}
+    virtual void setGradientStopCmyk(double position, double c, double m, double y, double k)
+    {
+        Q_UNUSED(position);
+        Q_UNUSED(c);
+        Q_UNUSED(m);
+        Q_UNUSED(y);
+        Q_UNUSED(k);
+    }
+    virtual bool hasGradientStopCmyk(double position) const
+    {
+        Q_UNUSED(position);
+        return false;
+    }
+    virtual void gradientStopCmyk(double position, double &c, double &m, double &y, double &k) const
+    {
+        Q_UNUSED(position);
+        c = m = y = k = 0;
+    }
+    virtual void clearGradientCmyk() { }
+    virtual QMap<double, CmykColor> gradientStopCmykMap() const { return { }; }
+    virtual void setGradientStopCmykMap(const QMap<double, CmykColor> &) { }
 
     // 是否允许缩放手柄调整大小
     virtual bool isResizable() const { return true; }
 
     // 精确几何矩形（不含画笔边距），用于对齐/分布等精确计算
     // 默认实现返回空 QRectF 并报告不支持；子类应按需重写
-    virtual QRectF geometryRect() const { return {}; }
+    virtual QRectF geometryRect() const { return { }; }
     virtual bool supportsGeometryRect() const { return false; }
 
     // 设置几何矩形（用于属性面板的尺寸调整和 PropertyChangeCommand）
     // 默认空实现；支持 Geometry 属性的子类应重写
-    virtual void setGeometryRect(const QRectF &) {}
+    virtual void setGeometryRect(const QRectF &) { }
     virtual bool supportsSetGeometryRect() const { return false; }
 
     // 序列化（剪贴板）
@@ -103,16 +145,21 @@ public:
 Q_DECLARE_OPERATORS_FOR_FLAGS(IGraphicsItem::PropertyFlags)
 
 // CMYK 序列化辅助函数
-// 写入标记字节 + CMYK 数据（仅当 valid 时写入）
+// 始终写入标记字节：0x00 = 无 CMYK 数据，0x01 = 有 CMYK 数据
+// 注意：组（GraphicsItemGroup）的子图元序列化时，子图元之后还跟着兄弟图元和组自身的
+// pos/rot 数据，因此不能依赖 device->atEnd() 判断是否有 CMYK 数据。
+// 必须始终写入标记字节，使读取端能确定性地知道后续是否有数据。
 inline void writeCmykIfValid(QDataStream &out, const CmykColor &cmyk)
 {
     if (cmyk.valid) {
         out << static_cast<quint8>(1) << cmyk.c << cmyk.m << cmyk.y << cmyk.k;
+    } else {
+        out << static_cast<quint8>(0);
     }
 }
 
-// 读取 CMYK 数据（尝试读取标记字节，流末尾则跳过）
-// 返回 true 表示成功读取或无需读取（旧格式），false 表示读取错误
+// 读取 CMYK 数据
+// 兼容旧格式（流末尾时无标记字节）和新格式（始终有标记字节）
 inline bool readCmykIfAvailable(QDataStream &in, QIODevice *device, CmykColor &cmyk)
 {
     if (device->atEnd())
@@ -127,14 +174,18 @@ inline bool readCmykIfAvailable(QDataStream &in, QIODevice *device, CmykColor &c
             return false;
         cmyk.valid = true;
     }
+    // marker == 0: 无 CMYK 数据（新格式显式标记）
     return true;
 }
 
 // 写入渐变停止点 CMYK 数据
+// 始终写入标记字节：0x00 = 无数据，0x01 = 有数据
 inline void writeGradientCmykIfValid(QDataStream &out, const QMap<double, CmykColor> &map)
 {
-    if (map.isEmpty())
+    if (map.isEmpty()) {
+        out << static_cast<quint8>(0);
         return;
+    }
     out << static_cast<quint8>(1);
     out << static_cast<quint32>(map.size());
     for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
@@ -143,10 +194,12 @@ inline void writeGradientCmykIfValid(QDataStream &out, const QMap<double, CmykCo
 }
 
 // 读取渐变停止点 CMYK 数据
-inline bool readGradientCmykIfAvailable(QDataStream &in, QIODevice *device, QMap<double, CmykColor> &map)
+// 兼容旧格式（流末尾时无标记字节）和新格式（始终有标记字节）
+inline bool readGradientCmykIfAvailable(QDataStream &in, QIODevice *device,
+                                        QMap<double, CmykColor> &map)
 {
     if (device->atEnd())
-        return true;
+        return true; // 旧格式，无数据
     quint8 marker;
     in >> marker;
     if (in.status() != QDataStream::Ok)
@@ -159,9 +212,10 @@ inline bool readGradientCmykIfAvailable(QDataStream &in, QIODevice *device, QMap
             in >> pos >> c >> m >> y >> k;
             if (in.status() != QDataStream::Ok)
                 return false;
-            map[pos] = {c, m, y, k, true};
+            map[pos] = { c, m, y, k, true };
         }
     }
+    // marker == 0: 无渐变 CMYK 数据（新格式显式标记）
     return true;
 }
 

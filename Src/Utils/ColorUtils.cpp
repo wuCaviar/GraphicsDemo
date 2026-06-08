@@ -12,8 +12,7 @@ namespace ColorUtils {
 namespace {
 QPointF mapPointToRect(const QPointF &point, const QRectF &rect)
 {
-    return QPointF(rect.left() + point.x() * rect.width(),
-                   rect.top() + point.y() * rect.height());
+    return QPointF(rect.left() + point.x() * rect.width(), rect.top() + point.y() * rect.height());
 }
 
 void copyGradientProperties(QGradient *target, const QGradient *source)
@@ -40,10 +39,11 @@ void updateColorButton(QPushButton *btn, const QColor &color, bool transparent)
         return;
 
     if (transparent && !color.isValid()) {
-        btn->setStyleSheet(QStringLiteral("background-color: transparent; border: 1px solid gray;"));
-    } else {
         btn->setStyleSheet(
-                QStringLiteral("background-color: %1").arg(color.isValid() ? color.name() : "transparent"));
+            QStringLiteral("background-color: transparent; border: 1px solid gray;"));
+    } else {
+        btn->setStyleSheet(QStringLiteral("background-color: %1")
+                               .arg(color.isValid() ? color.name() : "transparent"));
     }
 }
 
@@ -65,9 +65,9 @@ QBrush mapGradientBrushToRect(const QBrush &brush, const QRectF &rect)
     }
     case QGradient::RadialGradient: {
         const auto *radial = static_cast<const QRadialGradient *>(gradient);
-        const qreal radius = qMax(radial->radius() * qMax(qAbs(rect.width()), qAbs(rect.height())), 0.001);
-        QRadialGradient mapped(mapPointToRect(radial->center(), rect),
-                               radius,
+        const qreal radius =
+            qMax(radial->radius() * qMax(qAbs(rect.width()), qAbs(rect.height())), 0.001);
+        QRadialGradient mapped(mapPointToRect(radial->center(), rect), radius,
                                mapPointToRect(radial->focalPoint(), rect));
         copyGradientProperties(&mapped, gradient);
         mappedBrush = QBrush(mapped);

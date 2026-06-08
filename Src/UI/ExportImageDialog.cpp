@@ -13,8 +13,7 @@
 
 namespace ImageUtils {
 
-ExportImageDialog::ExportImageDialog(QWidget *parent,
-                                     const ExportParameters &params,
+ExportImageDialog::ExportImageDialog(QWidget *parent, const ExportParameters &params,
                                      const QString &format)
     : QDialog(parent)
     , m_tiffCompressionCombo(nullptr)
@@ -47,29 +46,23 @@ ExportImageDialog::ExportImageDialog(QWidget *parent,
 
     m_colorCombo = new QComboBox(this);
     m_colorCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    m_colorCombo->addItem(
-        tr("Keep Original"),
-        static_cast<int>(ExportParameters::ColorSpace::KeepOriginal));
-    m_colorCombo->addItem(
-        tr("Convert to sRGB"),
-        static_cast<int>(ExportParameters::ColorSpace::ConvertToSRGB));
-    m_colorCombo->addItem(
-        tr("Convert to Adobe RGB"),
-        static_cast<int>(ExportParameters::ColorSpace::ConvertToAdobeRGB));
-    m_colorCombo->addItem(
-        tr("Convert to CMYK (TIFF only)"),
-        static_cast<int>(ExportParameters::ColorSpace::ConvertToCMYK));
+    m_colorCombo->addItem(tr("Keep Original"),
+                          static_cast<int>(ExportParameters::ColorSpace::KeepOriginal));
+    m_colorCombo->addItem(tr("Convert to sRGB"),
+                          static_cast<int>(ExportParameters::ColorSpace::ConvertToSRGB));
+    m_colorCombo->addItem(tr("Convert to Adobe RGB"),
+                          static_cast<int>(ExportParameters::ColorSpace::ConvertToAdobeRGB));
+    m_colorCombo->addItem(tr("Convert to CMYK (TIFF only)"),
+                          static_cast<int>(ExportParameters::ColorSpace::ConvertToCMYK));
     mainLayout->addRow(tr("Color Space:"), m_colorCombo);
 
     m_transparencyCombo = new QComboBox(this);
     m_transparencyCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-    m_transparencyCombo->addItem(
-        tr("Keep Transparency"),
-        static_cast<int>(ExportParameters::TransparencyHandling::Keep));
+    m_transparencyCombo->addItem(tr("Keep Transparency"),
+                                 static_cast<int>(ExportParameters::TransparencyHandling::Keep));
     m_transparencyCombo->addItem(
         tr("Flatten on White"),
-        static_cast<int>(
-            ExportParameters::TransparencyHandling::FlattenOnWhite));
+        static_cast<int>(ExportParameters::TransparencyHandling::FlattenOnWhite));
     mainLayout->addRow(tr("Transparency:"), m_transparencyCombo);
 
     // ===== 格式专属参数区域 =====
@@ -81,8 +74,7 @@ ExportImageDialog::ExportImageDialog(QWidget *parent,
     rebuildFormatGroup(format);
 
     // ===== 按钮 =====
-    auto *buttonBox = new QDialogButtonBox(
-        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     buttonBox->button(QDialogButtonBox::Ok)
         ->setToolTip(tr("Export the image with the selected settings"));
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -122,8 +114,7 @@ void ExportImageDialog::rebuildFormatGroup(const QString &format)
     m_currentFormat = format.toLower();
     bool isTiff = m_currentFormat.contains("tif");
     bool isPng = m_currentFormat.contains("png");
-    bool isJpeg =
-        m_currentFormat.contains("jpg") || m_currentFormat.contains("jpeg");
+    bool isJpeg = m_currentFormat.contains("jpg") || m_currentFormat.contains("jpeg");
 
     if (isTiff) {
         m_formatGroup->setTitle(tr("TIFF Professional Options"));
@@ -131,86 +122,71 @@ void ExportImageDialog::rebuildFormatGroup(const QString &format)
 
         // 压缩方式
         m_tiffCompressionCombo = new QComboBox(m_formatGroup);
-        m_tiffCompressionCombo->setSizeAdjustPolicy(
-            QComboBox::AdjustToContents);
+        m_tiffCompressionCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+        m_tiffCompressionCombo->addItem(tr("None"),
+                                        static_cast<int>(ExportParameters::CompressionType::None));
+        m_tiffCompressionCombo->addItem(tr("LZW"),
+                                        static_cast<int>(ExportParameters::CompressionType::LZW));
+        m_tiffCompressionCombo->addItem(tr("ZIP/Deflate"),
+                                        static_cast<int>(ExportParameters::CompressionType::ZIP));
+        m_tiffCompressionCombo->addItem(tr("JPEG"),
+                                        static_cast<int>(ExportParameters::CompressionType::JPEG));
         m_tiffCompressionCombo->addItem(
-            tr("None"),
-            static_cast<int>(ExportParameters::CompressionType::None));
-        m_tiffCompressionCombo->addItem(
-            tr("LZW"),
-            static_cast<int>(ExportParameters::CompressionType::LZW));
-        m_tiffCompressionCombo->addItem(
-            tr("ZIP/Deflate"),
-            static_cast<int>(ExportParameters::CompressionType::ZIP));
-        m_tiffCompressionCombo->addItem(
-            tr("JPEG"),
-            static_cast<int>(ExportParameters::CompressionType::JPEG));
-        m_tiffCompressionCombo->addItem(
-            tr("PackBits"),
-            static_cast<int>(ExportParameters::CompressionType::PackBits));
-        connect(m_tiffCompressionCombo,
-                QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            tr("PackBits"), static_cast<int>(ExportParameters::CompressionType::PackBits));
+        connect(m_tiffCompressionCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
                 &ExportImageDialog::onTiffCompressionChanged);
         m_formatLayout->addRow(tr("Compression:"), m_tiffCompressionCombo);
 
         // 字节序
         m_tiffByteOrderCombo = new QComboBox(m_formatGroup);
         m_tiffByteOrderCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-        m_tiffByteOrderCombo->addItem(
-            tr("Little Endian (PC)"),
-            static_cast<int>(ExportParameters::ByteOrder::LittleEndian));
-        m_tiffByteOrderCombo->addItem(
-            tr("Big Endian (Mac)"),
-            static_cast<int>(ExportParameters::ByteOrder::BigEndian));
+        m_tiffByteOrderCombo->addItem(tr("Little Endian (PC)"),
+                                      static_cast<int>(ExportParameters::ByteOrder::LittleEndian));
+        m_tiffByteOrderCombo->addItem(tr("Big Endian (Mac)"),
+                                      static_cast<int>(ExportParameters::ByteOrder::BigEndian));
         m_formatLayout->addRow(tr("Byte Order:"), m_tiffByteOrderCombo);
 
         // 位深度
         m_tiffBitDepthCombo = new QComboBox(m_formatGroup);
         m_tiffBitDepthCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-        m_tiffBitDepthCombo->addItem(
-            tr("8-bit"), static_cast<int>(ExportParameters::BitDepth::Bits8));
-        m_tiffBitDepthCombo->addItem(
-            tr("16-bit"), static_cast<int>(ExportParameters::BitDepth::Bits16));
+        m_tiffBitDepthCombo->addItem(tr("8-bit"),
+                                     static_cast<int>(ExportParameters::BitDepth::Bits8));
+        m_tiffBitDepthCombo->addItem(tr("16-bit"),
+                                     static_cast<int>(ExportParameters::BitDepth::Bits16));
         m_formatLayout->addRow(tr("Bit Depth:"), m_tiffBitDepthCombo);
 
         // 平面配置
         m_tiffPlanarConfigCombo = new QComboBox(m_formatGroup);
-        m_tiffPlanarConfigCombo->setSizeAdjustPolicy(
-            QComboBox::AdjustToContents);
+        m_tiffPlanarConfigCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+        m_tiffPlanarConfigCombo->addItem(tr("Interleaved (RGBRGB)"),
+                                         static_cast<int>(ExportParameters::PlanarConfig::Contig));
         m_tiffPlanarConfigCombo->addItem(
-            tr("Interleaved (RGBRGB)"),
-            static_cast<int>(ExportParameters::PlanarConfig::Contig));
-        m_tiffPlanarConfigCombo->addItem(
-            tr("Per-channel (RRGGBB)"),
-            static_cast<int>(ExportParameters::PlanarConfig::Separate));
+            tr("Per-channel (RRGGBB)"), static_cast<int>(ExportParameters::PlanarConfig::Separate));
         m_formatLayout->addRow(tr("Pixel Order:"), m_tiffPlanarConfigCombo);
 
         // 预测器
         m_tiffPredictorCombo = new QComboBox(m_formatGroup);
         m_tiffPredictorCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-        m_tiffPredictorCombo->addItem(
-            tr("None"), static_cast<int>(ExportParameters::Predictor::None));
-        m_tiffPredictorCombo->addItem(
-            tr("Horizontal Differencing"),
-            static_cast<int>(ExportParameters::Predictor::Horizontal));
+        m_tiffPredictorCombo->addItem(tr("None"),
+                                      static_cast<int>(ExportParameters::Predictor::None));
+        m_tiffPredictorCombo->addItem(tr("Horizontal Differencing"),
+                                      static_cast<int>(ExportParameters::Predictor::Horizontal));
         m_formatLayout->addRow(tr("Predictor:"), m_tiffPredictorCombo);
 
         // JPEG 质量（仅 JPEG 压缩时有效）
         m_tiffJpegQualitySpin = new QSpinBox(m_formatGroup);
         m_tiffJpegQualitySpin->setRange(1, 100);
         m_tiffJpegQualitySpin->setValue(95);
-        connect(m_tiffJpegQualitySpin,
-                QOverload<int>::of(&QSpinBox::valueChanged), this,
+        connect(m_tiffJpegQualitySpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
                 &ExportImageDialog::onQualityChanged);
         m_formatLayout->addRow(tr("JPEG Quality:"), m_tiffJpegQualitySpin);
 
         m_tiffJpegQualitySlider = new QSlider(Qt::Horizontal, m_formatGroup);
         m_tiffJpegQualitySlider->setRange(1, 100);
         m_tiffJpegQualitySlider->setValue(95);
-        connect(m_tiffJpegQualitySlider, &QSlider::valueChanged,
-                m_tiffJpegQualitySpin, &QSpinBox::setValue);
-        connect(m_tiffJpegQualitySpin,
-                QOverload<int>::of(&QSpinBox::valueChanged),
+        connect(m_tiffJpegQualitySlider, &QSlider::valueChanged, m_tiffJpegQualitySpin,
+                &QSpinBox::setValue);
+        connect(m_tiffJpegQualitySpin, QOverload<int>::of(&QSpinBox::valueChanged),
                 m_tiffJpegQualitySlider, &QSlider::setValue);
         m_formatLayout->addRow(QString(), m_tiffJpegQualitySlider);
 
@@ -222,8 +198,7 @@ void ExportImageDialog::rebuildFormatGroup(const QString &format)
         m_tiffICCCheck->setChecked(true);
         m_formatLayout->addRow(QString(), m_tiffICCCheck);
 
-        m_tiffMetadataCheck =
-            new QCheckBox(tr("Preserve Metadata"), m_formatGroup);
+        m_tiffMetadataCheck = new QCheckBox(tr("Preserve Metadata"), m_formatGroup);
         m_tiffMetadataCheck->setChecked(true);
         m_formatLayout->addRow(QString(), m_tiffMetadataCheck);
 
@@ -246,8 +221,8 @@ void ExportImageDialog::rebuildFormatGroup(const QString &format)
         m_jpegQualitySpin = new QSpinBox(m_formatGroup);
         m_jpegQualitySpin->setRange(1, 100);
         m_jpegQualitySpin->setValue(95);
-        connect(m_jpegQualitySpin, QOverload<int>::of(&QSpinBox::valueChanged),
-                this, &ExportImageDialog::onQualityChanged);
+        connect(m_jpegQualitySpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
+                &ExportImageDialog::onQualityChanged);
         m_formatLayout->addRow(tr("Quality:"), m_jpegQualitySpin);
 
         m_jpegQualitySlider = new QSlider(Qt::Horizontal, m_formatGroup);
@@ -255,8 +230,8 @@ void ExportImageDialog::rebuildFormatGroup(const QString &format)
         m_jpegQualitySlider->setValue(95);
         connect(m_jpegQualitySlider, &QSlider::valueChanged, m_jpegQualitySpin,
                 &QSpinBox::setValue);
-        connect(m_jpegQualitySpin, QOverload<int>::of(&QSpinBox::valueChanged),
-                m_jpegQualitySlider, &QSlider::setValue);
+        connect(m_jpegQualitySpin, QOverload<int>::of(&QSpinBox::valueChanged), m_jpegQualitySlider,
+                &QSlider::setValue);
         m_formatLayout->addRow(QString(), m_jpegQualitySlider);
 
         m_jpegQualityLabel = new QLabel("95%", m_formatGroup);
@@ -272,24 +247,23 @@ ExportParameters ExportImageDialog::getParameters() const
 {
     ExportParameters params;
     params.dpi = m_dpiCombo->currentData().toInt();
-    params.colorSpace = static_cast<ExportParameters::ColorSpace>(
-        m_colorCombo->currentData().toInt());
+    params.colorSpace =
+        static_cast<ExportParameters::ColorSpace>(m_colorCombo->currentData().toInt());
     params.transparency = static_cast<ExportParameters::TransparencyHandling>(
         m_transparencyCombo->currentData().toInt());
 
     // TIFF 选项
     if (m_tiffCompressionCombo) {
-        params.tiff.compression =
-            static_cast<ExportParameters::CompressionType>(
-                m_tiffCompressionCombo->currentData().toInt());
-        params.tiff.byteOrder = static_cast<ExportParameters::ByteOrder>(
-            m_tiffByteOrderCombo->currentData().toInt());
-        params.tiff.bitDepth = static_cast<ExportParameters::BitDepth>(
-            m_tiffBitDepthCombo->currentData().toInt());
+        params.tiff.compression = static_cast<ExportParameters::CompressionType>(
+            m_tiffCompressionCombo->currentData().toInt());
+        params.tiff.byteOrder =
+            static_cast<ExportParameters::ByteOrder>(m_tiffByteOrderCombo->currentData().toInt());
+        params.tiff.bitDepth =
+            static_cast<ExportParameters::BitDepth>(m_tiffBitDepthCombo->currentData().toInt());
         params.tiff.planarConfig = static_cast<ExportParameters::PlanarConfig>(
             m_tiffPlanarConfigCombo->currentData().toInt());
-        params.tiff.predictor = static_cast<ExportParameters::Predictor>(
-            m_tiffPredictorCombo->currentData().toInt());
+        params.tiff.predictor =
+            static_cast<ExportParameters::Predictor>(m_tiffPredictorCombo->currentData().toInt());
         params.tiff.jpegQuality = m_tiffJpegQualitySpin->value();
         params.tiff.embedICCProfile = m_tiffICCCheck->isChecked();
         params.tiff.preserveMetadata = m_tiffMetadataCheck->isChecked();
@@ -311,34 +285,27 @@ void ExportImageDialog::setParameters(const ExportParameters &params)
     int dpiIdx = m_dpiCombo->findData(params.dpi);
     m_dpiCombo->setCurrentIndex(qMax(0, dpiIdx));
 
-    int colorIndex =
-        m_colorCombo->findData(static_cast<int>(params.colorSpace));
+    int colorIndex = m_colorCombo->findData(static_cast<int>(params.colorSpace));
     m_colorCombo->setCurrentIndex(qMax(0, colorIndex));
 
-    int transIndex =
-        m_transparencyCombo->findData(static_cast<int>(params.transparency));
+    int transIndex = m_transparencyCombo->findData(static_cast<int>(params.transparency));
     m_transparencyCombo->setCurrentIndex(qMax(0, transIndex));
 
     // TIFF 选项
     if (m_tiffCompressionCombo) {
-        int compIndex = m_tiffCompressionCombo->findData(
-            static_cast<int>(params.tiff.compression));
+        int compIndex = m_tiffCompressionCombo->findData(static_cast<int>(params.tiff.compression));
         m_tiffCompressionCombo->setCurrentIndex(qMax(0, compIndex));
 
-        int boIndex = m_tiffByteOrderCombo->findData(
-            static_cast<int>(params.tiff.byteOrder));
+        int boIndex = m_tiffByteOrderCombo->findData(static_cast<int>(params.tiff.byteOrder));
         m_tiffByteOrderCombo->setCurrentIndex(qMax(0, boIndex));
 
-        int bdIndex = m_tiffBitDepthCombo->findData(
-            static_cast<int>(params.tiff.bitDepth));
+        int bdIndex = m_tiffBitDepthCombo->findData(static_cast<int>(params.tiff.bitDepth));
         m_tiffBitDepthCombo->setCurrentIndex(qMax(0, bdIndex));
 
-        int pcIndex = m_tiffPlanarConfigCombo->findData(
-            static_cast<int>(params.tiff.planarConfig));
+        int pcIndex = m_tiffPlanarConfigCombo->findData(static_cast<int>(params.tiff.planarConfig));
         m_tiffPlanarConfigCombo->setCurrentIndex(qMax(0, pcIndex));
 
-        int predIndex = m_tiffPredictorCombo->findData(
-            static_cast<int>(params.tiff.predictor));
+        int predIndex = m_tiffPredictorCombo->findData(static_cast<int>(params.tiff.predictor));
         m_tiffPredictorCombo->setCurrentIndex(qMax(0, predIndex));
 
         m_tiffJpegQualitySpin->setValue(params.tiff.jpegQuality);
@@ -360,9 +327,8 @@ void ExportImageDialog::onTiffCompressionChanged(int index)
     if (!m_tiffCompressionCombo)
         return;
 
-    ExportParameters::CompressionType type =
-        static_cast<ExportParameters::CompressionType>(
-            m_tiffCompressionCombo->itemData(index).toInt());
+    ExportParameters::CompressionType type = static_cast<ExportParameters::CompressionType>(
+        m_tiffCompressionCombo->itemData(index).toInt());
 
     bool isJpeg = (type == ExportParameters::CompressionType::JPEG);
     bool isLzwOrZip = (type == ExportParameters::CompressionType::LZW
@@ -380,11 +346,9 @@ void ExportImageDialog::onTiffCompressionChanged(int index)
 void ExportImageDialog::onQualityChanged(int value)
 {
     // 更新最近活跃的质量标签
-    if (m_tiffJpegQualityLabel && m_tiffJpegQualitySpin
-        && m_tiffJpegQualitySpin->hasFocus())
+    if (m_tiffJpegQualityLabel && m_tiffJpegQualitySpin && m_tiffJpegQualitySpin->hasFocus())
         m_tiffJpegQualityLabel->setText(QString("%1%").arg(value));
-    if (m_jpegQualityLabel && m_jpegQualitySpin
-        && m_jpegQualitySpin->hasFocus())
+    if (m_jpegQualityLabel && m_jpegQualitySpin && m_jpegQualitySpin->hasFocus())
         m_jpegQualityLabel->setText(QString("%1%").arg(value));
 }
 

@@ -21,7 +21,8 @@ public:
     ScopedTiffHandle(const ScopedTiffHandle &) = delete;
     ScopedTiffHandle &operator=(const ScopedTiffHandle &) = delete;
 
-    ScopedTiffHandle(ScopedTiffHandle &&other) noexcept : m_tif(other.m_tif)
+    ScopedTiffHandle(ScopedTiffHandle &&other) noexcept
+        : m_tif(other.m_tif)
     {
         other.m_tif = nullptr;
     }

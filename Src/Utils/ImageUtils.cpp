@@ -154,8 +154,7 @@ QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)
                         for (uint32_t col = 0; col < width; ++col)
                             rowPixels[col * 4 + sample] = src[col];
                     }
-                    memcpy(cmykData.data() + row * width * 4, rowPixels.data(),
-                           width * 4);
+                    memcpy(cmykData.data() + row * width * 4, rowPixels.data(), width * 4);
                 }
                 _TIFFfree(channelBuf);
             }
@@ -167,19 +166,17 @@ QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)
         result = QImage(width, height, QImage::Format_ARGB32);
         if (cm.isValid()) {
             cmsHTRANSFORM xform = cm.createCmyk8ToBgra(
-                INTENT_PERCEPTUAL,
-                cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
+                INTENT_PERCEPTUAL, cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
             QATColorManager::convertCmyk8ToBgra8(
-                xform, reinterpret_cast<const uint8_t *>(cmykData.constData()),
-                result.bits(), width, height);
+                xform, reinterpret_cast<const uint8_t *>(cmykData.constData()), result.bits(),
+                width, height);
             cmsDeleteTransform(xform);
         } else {
             // 无 LCMS2：简单数学逆转换 CMYK→RGB
             for (uint32_t y = 0; y < height; ++y) {
                 QRgb *scanLine = reinterpret_cast<QRgb *>(result.scanLine(y));
                 const uint8_t *src =
-                    reinterpret_cast<const uint8_t *>(cmykData.constData())
-                    + y * width * 4;
+                    reinterpret_cast<const uint8_t *>(cmykData.constData()) + y * width * 4;
                 for (uint32_t x = 0; x < width; ++x) {
                     int off = x * 4;
                     double c = src[off + 0] / 2.55, m = src[off + 1] / 2.55,
@@ -194,8 +191,7 @@ QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)
         }
     } else {
         // 非 CMYK TIFF：TIFFReadRGBAImage 统一处理
-        uint32_t *raster = static_cast<uint32_t *>(
-            _TIFFmalloc(width * height * sizeof(uint32_t)));
+        uint32_t *raster = static_cast<uint32_t *>(_TIFFmalloc(width * height * sizeof(uint32_t)));
         if (!raster) {
             TIFFClose(tif);
             return { };

@@ -12,7 +12,7 @@ BasedOnStyle: WebKit
 Standard: c++17
 
 # ── 列宽 ──────────────────────────────────────────────
-ColumnLimit: 80
+ColumnLimit: 100
 
 # ── 缩进 ──────────────────────────────────────────────
 IndentWidth: 4

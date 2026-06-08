@@ -50,16 +50,6 @@ typedef shared_ptr<void> VoidPtr;
 typedef long long int64;
 typedef unsigned long long uint64;
 
-// #define VENDOR_NAME "Caviar"
-
-// #define BEGIN_SEVEN_NAMESPACE \
-//     namespace Caviar {        \
-//         namespace Seven {
-// #define END_SEVEN_NAMESPACE \
-//     }                       \
-//     }
-// #define USING_NAMESPACE_SEVEN using namespace Caviar::Seven;
-
 #define CLASS_TYPEDEFS(_name_) \
     class _name_;              \
     typedef shared_ptr<_name_> _name_##Ptr;

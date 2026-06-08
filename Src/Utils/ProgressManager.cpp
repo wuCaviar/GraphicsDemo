@@ -54,10 +54,9 @@ void ProgressManager::updateTask(const QString &taskId, int value)
     task.value = value;
 
     // 仅当前显示的任务才更新进度条
-    const QString displayedId =
-        m_focusTaskId.isEmpty()
-            ? (m_taskStack.isEmpty() ? QString() : m_taskStack.last())
-            : m_focusTaskId;
+    const QString displayedId = m_focusTaskId.isEmpty()
+                                    ? (m_taskStack.isEmpty() ? QString() : m_taskStack.last())
+                                    : m_focusTaskId;
     if (displayedId == taskId) {
         m_bar->setValue(value);
         _updateDisplay();

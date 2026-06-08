@@ -6,7 +6,6 @@
 #include "IGraphicsItem.h"
 #include "ImageItem.h"
 #include "colortransform.h"
-#include "NetWorkUtils.h"
 
 #include <QGraphicsScene>
 #include <QGraphicsView>
@@ -27,8 +26,7 @@
 //  VisibilityScope — RAII 管理单图元渲染时的场景可见性状态
 // ============================================================================
 
-void TiffExportEngine::VisibilityScope::enter(QGraphicsScene *s,
-                                              QGraphicsItem *target,
+void TiffExportEngine::VisibilityScope::enter(QGraphicsScene *s, QGraphicsItem *target,
                                               const QList<QGraphicsItem *> &all,
                                               const QBrush &oldBg)
 {
@@ -37,6 +35,11 @@ void TiffExportEngine::VisibilityScope::enter(QGraphicsScene *s,
     oldBackground = oldBg;
 
     collectDescendants(target, keepVisible);
+
+    // Qt 渲染规则：父图元不可见时，子图元即使 setVisible(true) 也不会被绘制。
+    // 因此需要将目标图元的所有祖先也加入 keepVisible，确保渲染链完整。
+    for (QGraphicsItem *p = target->parentItem(); p; p = p->parentItem())
+        keepVisible.insert(p);
 
     scene->setBackgroundBrush(Qt::NoBrush);
     for (auto *other : allItems) {
@@ -60,8 +63,7 @@ void TiffExportEngine::VisibilityScope::exit()
 //  静态辅助
 // ============================================================================
 
-void TiffExportEngine::collectDescendants(QGraphicsItem *root,
-                                          QSet<QGraphicsItem *> &keepVisible)
+void TiffExportEngine::collectDescendants(QGraphicsItem *root, QSet<QGraphicsItem *> &keepVisible)
 {
     keepVisible.insert(root);
     const auto &children = root->childItems();
@@ -102,8 +104,7 @@ QRectF TiffExportEngine::determineExportRect(QGraphicsScene *scene)
 }
 
 int TiffExportEngine::determineTargetDpi(QGraphicsScene *scene,
-                                         const QList<ImageItem *> &imageItems,
-                                         int dpiOverride)
+                                         const QList<ImageItem *> &imageItems, int dpiOverride)
 {
     if (dpiOverride > 0)
         return dpiOverride;
@@ -134,13 +135,6 @@ TiffExportEngine::TiffExportEngine(QObject *parent) : QObject(parent) { }
 
 TiffExportEngine::~TiffExportEngine() = default;
 
-void TiffExportEngine::setRipConfig(bool enabled, int xRes, int yRes)
-{
-    m_ripConfig.enabled = enabled;
-    m_ripConfig.xRes = xRes;
-    m_ripConfig.yRes = yRes;
-}
-
 void TiffExportEngine::cancelExport()
 {
     if (m_cancelFlag)
@@ -152,8 +146,7 @@ void TiffExportEngine::cancelExport()
 // ============================================================================
 
 QList<ImageUtils::SourceTiffInput>
-TiffExportEngine::buildSources(const QList<ImageItem *> &imageItems,
-                               const QRectF &exportRect) const
+TiffExportEngine::buildSources(const QList<ImageItem *> &imageItems, const QRectF &exportRect) const
 {
     QList<ImageUtils::SourceTiffInput> sources;
     sources.reserve(imageItems.size());
@@ -162,9 +155,9 @@ TiffExportEngine::buildSources(const QList<ImageItem *> &imageItems,
         ImageUtils::SourceTiffInput src;
         src.filePath = imgItem->filePath();
         QRectF sceneRect = imgItem->sceneBoundingRect();
-        src.outputRect = QRectF(sceneRect.left() - exportRect.left(),
-                                sceneRect.top() - exportRect.top(),
-                                sceneRect.width(), sceneRect.height());
+        src.outputRect =
+            QRectF(sceneRect.left() - exportRect.left(), sceneRect.top() - exportRect.top(),
+                   sceneRect.width(), sceneRect.height());
         src.zOrder = static_cast<int>(imgItem->zValue());
         sources.append(src);
     }
@@ -177,11 +170,10 @@ TiffExportEngine::buildSources(const QList<ImageItem *> &imageItems,
 // ============================================================================
 
 ImageUtils::CmykOverlay TiffExportEngine::renderCmykOverlay(
-    QGraphicsScene *scene, IGraphicsItem *gi, const QRectF &sceneRect,
-    const QRectF &exportRect, const QRectF &outRect, int w, int h,
-    const QList<QGraphicsItem *> &allSceneItems, const QBrush &oldSceneBg,
-    bool hasBrush, bool hasPen, double brushC, double brushM, double brushY,
-    double brushK, double penC, double penM, double penY, double penK)
+    QGraphicsScene *scene, IGraphicsItem *gi, const QRectF &sceneRect, const QRectF &exportRect,
+    const QRectF &outRect, int w, int h, const QList<QGraphicsItem *> &allSceneItems,
+    const QBrush &oldSceneBg, bool hasBrush, bool hasPen, double brushC, double brushM,
+    double brushY, double brushK, double penC, double penM, double penY, double penK)
 {
     ImageUtils::CmykOverlay overlay;
     overlay.width = static_cast<uint32_t>(w);
@@ -191,15 +183,13 @@ ImageUtils::CmykOverlay TiffExportEngine::renderCmykOverlay(
 
     // 保存/恢复可见性
     VisibilityScope scope;
-    scope.enter(scene, dynamic_cast<QGraphicsItem *>(gi), allSceneItems,
-                oldSceneBg);
+    scope.enter(scene, dynamic_cast<QGraphicsItem *>(gi), allSceneItems, oldSceneBg);
 
     // 用 sceneRect 计算渲染区域，保留亚像素偏移使内容在 overlay 中精确定位
     QRectF renderSrcRect = sceneRect.intersected(exportRect);
     double offX = renderSrcRect.left() - (outRect.left() + exportRect.left());
     double offY = renderSrcRect.top() - (outRect.top() + exportRect.top());
-    QRectF renderDstRect(offX, offY, renderSrcRect.width(),
-                         renderSrcRect.height());
+    QRectF renderDstRect(offX, offY, renderSrcRect.width(), renderSrcRect.height());
 
     if (hasBrush && hasPen) {
         // 两者都有 CMYK：分别渲染填充蒙版和边框蒙版，各自使用精确 CMYK 值
@@ -232,14 +222,10 @@ ImageUtils::CmykOverlay TiffExportEngine::renderCmykOverlay(
 
         auto toCmyk = [](double c, double m, double y, double k) {
             return std::array<uint8_t, 4>{
-                { static_cast<uint8_t>(
-                      qBound(0.0, std::round(c * 2.55), 255.0)),
-                  static_cast<uint8_t>(
-                      qBound(0.0, std::round(m * 2.55), 255.0)),
-                  static_cast<uint8_t>(
-                      qBound(0.0, std::round(y * 2.55), 255.0)),
-                  static_cast<uint8_t>(
-                      qBound(0.0, std::round(k * 2.55), 255.0)) }
+                { static_cast<uint8_t>(qBound(0.0, std::round(c * 2.55), 255.0)),
+                  static_cast<uint8_t>(qBound(0.0, std::round(m * 2.55), 255.0)),
+                  static_cast<uint8_t>(qBound(0.0, std::round(y * 2.55), 255.0)),
+                  static_cast<uint8_t>(qBound(0.0, std::round(k * 2.55), 255.0)) }
             };
         };
         auto brushCmyk = toCmyk(brushC, brushM, brushY, brushK);
@@ -268,12 +254,10 @@ ImageUtils::CmykOverlay TiffExportEngine::renderCmykOverlay(
         double dY = hasBrush ? brushY : penY;
         double dK = hasBrush ? brushK : penK;
 
-        uint8_t cmyk[4] = {
-            static_cast<uint8_t>(qBound(0.0, std::round(dC * 2.55), 255.0)),
-            static_cast<uint8_t>(qBound(0.0, std::round(dM * 2.55), 255.0)),
-            static_cast<uint8_t>(qBound(0.0, std::round(dY * 2.55), 255.0)),
-            static_cast<uint8_t>(qBound(0.0, std::round(dK * 2.55), 255.0))
-        };
+        uint8_t cmyk[4] = { static_cast<uint8_t>(qBound(0.0, std::round(dC * 2.55), 255.0)),
+                            static_cast<uint8_t>(qBound(0.0, std::round(dM * 2.55), 255.0)),
+                            static_cast<uint8_t>(qBound(0.0, std::round(dY * 2.55), 255.0)),
+                            static_cast<uint8_t>(qBound(0.0, std::round(dK * 2.55), 255.0)) };
 
         size_t totalPixels = static_cast<size_t>(w) * h;
         uint8_t *dst = overlay.data.data();
@@ -312,10 +296,9 @@ ImageUtils::CmykOverlay TiffExportEngine::renderCmykOverlay(
 // ============================================================================
 
 ImageUtils::CmykOverlay TiffExportEngine::renderBgraOverlay(
-    QGraphicsScene *scene, QGraphicsItem *target, const QRectF &sceneRect,
-    const QRectF &exportRect, const QRectF &outRect, int w, int h,
-    const QList<QGraphicsItem *> &allSceneItems, const QBrush &oldSceneBg,
-    cmsHTRANSFORM sharedXform, bool hasSharedXform)
+    QGraphicsScene *scene, QGraphicsItem *target, const QRectF &sceneRect, const QRectF &exportRect,
+    const QRectF &outRect, int w, int h, const QList<QGraphicsItem *> &allSceneItems,
+    const QBrush &oldSceneBg, cmsHTRANSFORM sharedXform, bool hasSharedXform)
 {
     ImageUtils::CmykOverlay overlay;
     overlay.width = static_cast<uint32_t>(w);
@@ -330,8 +313,7 @@ ImageUtils::CmykOverlay TiffExportEngine::renderBgraOverlay(
     QRectF renderSrcRect = sceneRect.intersected(exportRect);
     double offX = renderSrcRect.left() - (outRect.left() + exportRect.left());
     double offY = renderSrcRect.top() - (outRect.top() + exportRect.top());
-    QRectF renderDstRect(offX, offY, renderSrcRect.width(),
-                         renderSrcRect.height());
+    QRectF renderDstRect(offX, offY, renderSrcRect.width(), renderSrcRect.height());
     QImage img(w, h, QImage::Format_ARGB32);
     img.fill(Qt::transparent);
     {
@@ -346,11 +328,10 @@ ImageUtils::CmykOverlay TiffExportEngine::renderBgraOverlay(
     // BGRA → CMYK
     overlay.data.resize(static_cast<size_t>(w) * h * 4);
     if (hasSharedXform) {
-        QATColorManager::convertBgra8ToCmyk8(sharedXform, img.constBits(),
-                                             overlay.data.data(), w, h);
+        QATColorManager::convertBgra8ToCmyk8(sharedXform, img.constBits(), overlay.data.data(), w,
+                                             h);
     } else {
-        ImageUtils::bgraToCmykFallback(img.constBits(), overlay.data.data(),
-                                       w * h);
+        ImageUtils::bgraToCmykFallback(img.constBits(), overlay.data.data(), w * h);
     }
 
     // 清零透明像素
@@ -371,9 +352,9 @@ ImageUtils::CmykOverlay TiffExportEngine::renderBgraOverlay(
 // ============================================================================
 
 QList<ImageUtils::CmykOverlay> TiffExportEngine::renderOverlays(
-    QGraphicsScene *scene, const QList<QGraphicsItem *> &nonImageItems,
-    const QRectF &exportRect, const QList<QGraphicsItem *> &allSceneItems,
-    const QBrush &oldSceneBg, cmsHTRANSFORM sharedXform, bool hasSharedXform)
+    QGraphicsScene *scene, const QList<QGraphicsItem *> &nonImageItems, const QRectF &exportRect,
+    const QList<QGraphicsItem *> &allSceneItems, const QBrush &oldSceneBg,
+    cmsHTRANSFORM sharedXform, bool hasSharedXform)
 {
     QList<ImageUtils::CmykOverlay> overlays;
     if (nonImageItems.isEmpty())
@@ -383,17 +364,15 @@ QList<ImageUtils::CmykOverlay> TiffExportEngine::renderOverlays(
         // 使用不含画笔的几何矩形确定 overlay 位置和尺寸，
         // 再按画笔宽度扩展渲染源，确保 1:1 映射且画笔完整包含
         auto *gi = dynamic_cast<IGraphicsItem *>(item);
-        QRectF localRect = (gi && gi->supportsGeometryRect())
-                               ? gi->geometryRect()
-                               : item->boundingRect();
+        QRectF localRect =
+            (gi && gi->supportsGeometryRect()) ? gi->geometryRect() : item->boundingRect();
         QRectF sceneRect = item->mapToScene(localRect).boundingRect();
 
         // 按画笔宽度扩展渲染区域，包含完整的画笔像素
         qreal penExpand = 0.0;
         if (gi && gi->itemPen().style() != Qt::NoPen)
             penExpand = gi->itemPen().widthF() / 2.0;
-        QRectF expandedRect =
-            sceneRect.adjusted(-penExpand, -penExpand, penExpand, penExpand);
+        QRectF expandedRect = sceneRect.adjusted(-penExpand, -penExpand, penExpand, penExpand);
 
         // overlay 位置和尺寸基于扩展后的矩形（含画笔）
         QRectF clipped = expandedRect.intersected(exportRect);
@@ -406,8 +385,7 @@ QList<ImageUtils::CmykOverlay> TiffExportEngine::renderOverlays(
         int olBottom = static_cast<int>(std::ceil(clipped.bottom()));
         int w = std::max(1, olRight - olLeft);
         int h = std::max(1, olBottom - olTop);
-        QRectF outRect(olLeft - exportRect.left(), olTop - exportRect.top(), w,
-                       h);
+        QRectF outRect(olLeft - exportRect.left(), olTop - exportRect.top(), w, h);
 
         ImageUtils::CmykOverlay overlay;
         overlay.zOrder = static_cast<int>(item->zValue());
@@ -435,14 +413,12 @@ QList<ImageUtils::CmykOverlay> TiffExportEngine::renderOverlays(
         }
 
         if (hasBrushCmyk || hasPenCmyk) {
-            overlay = renderCmykOverlay(
-                scene, gi, expandedRect, exportRect, outRect, w, h,
-                allSceneItems, oldSceneBg, hasBrushCmyk, hasPenCmyk, brushC,
-                brushM, brushY, brushK, penC, penM, penY, penK);
+            overlay = renderCmykOverlay(scene, gi, expandedRect, exportRect, outRect, w, h,
+                                        allSceneItems, oldSceneBg, hasBrushCmyk, hasPenCmyk, brushC,
+                                        brushM, brushY, brushK, penC, penM, penY, penK);
         } else {
-            overlay = renderBgraOverlay(
-                scene, item, expandedRect, exportRect, outRect, w, h,
-                allSceneItems, oldSceneBg, sharedXform, hasSharedXform);
+            overlay = renderBgraOverlay(scene, item, expandedRect, exportRect, outRect, w, h,
+                                        allSceneItems, oldSceneBg, sharedXform, hasSharedXform);
         }
 
         overlays.append(std::move(overlay));
@@ -455,16 +431,13 @@ QList<ImageUtils::CmykOverlay> TiffExportEngine::renderOverlays(
 //  后台线程导出
 // ============================================================================
 
-void TiffExportEngine::launchExport(
-    const QString &outputPath, QList<ImageUtils::SourceTiffInput> &&sources,
-    QList<ImageUtils::CmykOverlay> &&overlays, const QSize &outputSize,
-    const ImageUtils::TiffExportSettings &settings)
+void TiffExportEngine::launchExport(const QString &outputPath,
+                                    QList<ImageUtils::SourceTiffInput> &&sources,
+                                    QList<ImageUtils::CmykOverlay> &&overlays,
+                                    const QSize &outputSize,
+                                    const ImageUtils::TiffExportSettings &settings)
 {
     QPointer<TiffExportEngine> guard(this);
-    bool ripEnabled = m_ripConfig.enabled;
-    int ripXRes = m_ripConfig.xRes;
-    int ripYRes = m_ripConfig.yRes;
-    NetWorkUtils *netUtils = m_pNetWorkUtils;
 
     // 创建取消标志
     m_cancelFlag = std::make_shared<std::atomic<bool>>(false);
@@ -479,67 +452,57 @@ void TiffExportEngine::launchExport(
             Qt::QueuedConnection);
     };
 
-    auto *thread =
-        QThread::create([guard, outputPath, sources = std::move(sources),
-                         overlays = std::move(overlays), outputSize, settings,
-                         progress, ripEnabled, ripXRes, ripYRes, netUtils,
-                         cancelFlag = m_cancelFlag]() mutable {
-            try {
-                // ---- 使用 StripPipeline 执行流水线导出 ----
-                ImageUtils::StripPipeline::Config pipelineCfg;
-                pipelineCfg.stripHeight = 256;
-                pipelineCfg.pipelineDepth = 3;
-                pipelineCfg.maxReaderThreads = 4;
+    auto *thread = QThread::create([guard, outputPath, sources = std::move(sources),
+                                    overlays = std::move(overlays), outputSize, settings, progress,
+                                    cancelFlag = m_cancelFlag]() mutable {
+        try {
+            // ---- 使用 StripPipeline 执行流水线导出 ----
+            ImageUtils::StripPipeline::Config pipelineCfg;
+            pipelineCfg.stripHeight = 256;
+            pipelineCfg.pipelineDepth = 3;
+            pipelineCfg.maxReaderThreads = 4;
 
-                ImageUtils::StripPipeline pipeline(pipelineCfg);
-                auto result = pipeline.execute(
-                    outputPath, sources, std::move(overlays), outputSize,
-                    settings, progress, cancelFlag.get());
+            ImageUtils::StripPipeline pipeline(pipelineCfg);
+            auto result = pipeline.execute(outputPath, sources, std::move(overlays), outputSize,
+                                           settings, progress, cancelFlag.get());
 
-                QMetaObject::invokeMethod(
-                    guard.data(),
-                    [guard, result, ripEnabled, ripXRes, ripYRes, netUtils]() {
-                        if (!guard)
-                            return;
-                        guard->m_running = false;
+            QMetaObject::invokeMethod(
+                guard.data(),
+                [guard, result]() {
+                    if (!guard)
+                        return;
+                    guard->m_running = false;
 
-                        if (result.success) {
-                            if (ripEnabled && netUtils) {
-                                netUtils->doAddRip(ripXRes, ripYRes,
-                                                   result.filePath);
-                            }
-                            emit guard->exportFinished(true, result.filePath,
-                                                       QString());
-                        } else {
-                            emit guard->exportFinished(false, result.filePath,
-                                                       result.errorMessage);
-                        }
-                    },
-                    Qt::QueuedConnection);
-            } catch (const std::exception &ex) {
-                QMetaObject::invokeMethod(
-                    guard.data(),
-                    [guard, msg = QString::fromUtf8(ex.what())]() {
-                        if (!guard)
-                            return;
-                        guard->m_running = false;
-                        emit guard->exportFinished(false, QString(), msg);
-                    },
-                    Qt::QueuedConnection);
-            } catch (...) {
-                QMetaObject::invokeMethod(
-                    guard.data(),
-                    [guard]() {
-                        if (!guard)
-                            return;
-                        guard->m_running = false;
-                        emit guard->exportFinished(
-                            false, QString(),
-                            QStringLiteral("Export failed: unknown error"));
-                    },
-                    Qt::QueuedConnection);
-            }
-        });
+                    if (result.success) {
+                        emit guard->exportFinished(true, result.filePath, QString());
+                    } else {
+                        emit guard->exportFinished(false, result.filePath, result.errorMessage);
+                    }
+                },
+                Qt::QueuedConnection);
+        } catch (const std::exception &ex) {
+            QMetaObject::invokeMethod(
+                guard.data(),
+                [guard, msg = QString::fromUtf8(ex.what())]() {
+                    if (!guard)
+                        return;
+                    guard->m_running = false;
+                    emit guard->exportFinished(false, QString(), msg);
+                },
+                Qt::QueuedConnection);
+        } catch (...) {
+            QMetaObject::invokeMethod(
+                guard.data(),
+                [guard]() {
+                    if (!guard)
+                        return;
+                    guard->m_running = false;
+                    emit guard->exportFinished(false, QString(),
+                                               tr("Export failed: unknown error"));
+                },
+                Qt::QueuedConnection);
+        }
+    });
 
     connect(thread, &QThread::finished, thread, &QObject::deleteLater);
     thread->start();
@@ -555,12 +518,12 @@ bool TiffExportEngine::startExport(QGraphicsScene *scene, QGraphicsView *view,
     m_lastError.clear();
 
     if (m_running) {
-        m_lastError = QStringLiteral("An export is already in progress.");
+        m_lastError = tr("An export is already in progress.");
         return false;
     }
 
     if (!scene) {
-        m_lastError = QStringLiteral("No scene to export.");
+        m_lastError = tr("No scene to export.");
         return false;
     }
 
@@ -579,9 +542,8 @@ bool TiffExportEngine::startExport(QGraphicsScene *scene, QGraphicsView *view,
     QRectF exportRect = determineExportRect(scene);
     int targetDpi = determineTargetDpi(scene, imageItems, dpiOverride);
     if (targetDpi <= 0) {
-        m_lastError =
-            QStringLiteral("Export DPI has not been set. "
-                           "Please specify a DPI value for the export.");
+        m_lastError = QStringLiteral("Export DPI has not been set. "
+                                     "Please specify a DPI value for the export.");
         return false;
     }
 
@@ -600,20 +562,17 @@ bool TiffExportEngine::startExport(QGraphicsScene *scene, QGraphicsView *view,
     }
 
     // ---- 3. 构建源 TIFF 输入 ----
-    QList<ImageUtils::SourceTiffInput> sources =
-        buildSources(imageItems, exportRect);
+    QList<ImageUtils::SourceTiffInput> sources = buildSources(imageItems, exportRect);
 
     // 校验源文件
     for (const auto &src : sources) {
         if (src.filePath.isEmpty()) {
-            m_lastError =
-                QStringLiteral("An image on the canvas has no source file "
-                               "and cannot be exported.");
+            m_lastError = QStringLiteral("An image on the canvas has no source file "
+                                         "and cannot be exported.");
             return false;
         }
         if (!QFile::exists(src.filePath)) {
-            m_lastError =
-                QStringLiteral("Source file not found:\n%1").arg(src.filePath);
+            m_lastError = QStringLiteral("Source file not found:\n%1").arg(src.filePath);
             return false;
         }
     }
@@ -630,14 +589,13 @@ bool TiffExportEngine::startExport(QGraphicsScene *scene, QGraphicsView *view,
     QATColorManager &cm = QATColorManager::instance();
     cmsHTRANSFORM sharedXform = nullptr;
     if (cm.isValid()) {
-        sharedXform = cm.createBgraToCmyk8(INTENT_PERCEPTUAL,
-                                           cmsFLAGS_BLACKPOINTCOMPENSATION
-                                               | cmsFLAGS_HIGHRESPRECALC);
+        sharedXform = cm.createBgraToCmyk8(INTENT_PERCEPTUAL, cmsFLAGS_BLACKPOINTCOMPENSATION
+                                                                  | cmsFLAGS_HIGHRESPRECALC);
     }
 
     QList<ImageUtils::CmykOverlay> overlays =
-        renderOverlays(scene, nonImageItems, exportRect, allSceneItems,
-                       oldSceneBg, sharedXform, sharedXform != nullptr);
+        renderOverlays(scene, nonImageItems, exportRect, allSceneItems, oldSceneBg, sharedXform,
+                       sharedXform != nullptr);
 
     if (sharedXform)
         cmsDeleteTransform(sharedXform);
@@ -652,12 +610,10 @@ bool TiffExportEngine::startExport(QGraphicsScene *scene, QGraphicsView *view,
     // ---- 6. 启动后台线程 ----
     // exportRect 已对齐到整数像素边界，直接取整即可。
     // 不能使用 toSize()（内部 qRound 四舍五入），必须保证尺寸 >= 浮点宽高。
-    QSize outSize(static_cast<int>(exportRect.width()),
-                  static_cast<int>(exportRect.height()));
+    QSize outSize(static_cast<int>(exportRect.width()), static_cast<int>(exportRect.height()));
     m_running = true;
 
-    launchExport(outputPath, std::move(sources), std::move(overlays), outSize,
-                 settings);
+    launchExport(outputPath, std::move(sources), std::move(overlays), outSize, settings);
 
     return true;
 }
