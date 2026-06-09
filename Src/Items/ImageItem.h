@@ -18,8 +18,8 @@ public:
     int type() const override { return Type; }
 
     ItemType itemType() const override { return ImageItemType; }
-    PropertyFlags propertyFlags() const override { return HasImage; }
-    bool isResizable() const override { return false; }
+    PropertyFlags propertyFlags() const override { return HasImage | HasRotation; }
+    bool isResizable() const override { return true; }
     QGraphicsItem *cloneItem() const override;
 
     QPen itemPen() const override { return m_pen; }
@@ -48,6 +48,9 @@ public:
 
     // 精确几何矩形 — 返回 m_rect 或原始图片包围
     QRectF geometryRect() const override;
+    bool supportsGeometryRect() const override { return true; }
+    bool supportsSetGeometryRect() const override { return true; }
+    void setGeometryRect(const QRectF &r) override;
 
     // CMYK 源标志（导入 CMYK TIFF 时设置，导出时用于延迟加载原始数据）
     bool isCmykSource() const { return m_isCmykSource; }
@@ -63,6 +66,18 @@ public:
     int dpiX() const { return m_dpiX; }
     int dpiY() const { return m_dpiY; }
     void setDpi(int x, int y) { m_dpiX = x; m_dpiY = y; }
+
+    // 缩放比例追踪
+    qreal scaleX() const { return m_scaleX; }
+    qreal scaleY() const { return m_scaleY; }
+    void setScale(qreal sx, qreal sy);
+
+    // 导入时的原始物理尺寸 (mm)
+    QSizeF originalPhysicalMm() const { return m_originalPhysicalMm; }
+    void setOriginalPhysicalMm(const QSizeF &mm) { m_originalPhysicalMm = mm; }
+
+    // 计算在给定导出 DPI 下的目标输出像素尺寸（考虑缩放）
+    QSize targetOutputPixels(int exportDpi) const;
 
     void serialize(QDataStream &out) const override;
     bool deserialize(QDataStream &in) override;
@@ -81,6 +96,9 @@ private:
     int m_dpiY = 72;
     bool m_isCmykSource = false;
     bool m_isMultiPage = false;
+    qreal m_scaleX = 1.0;
+    qreal m_scaleY = 1.0;
+    QSizeF m_originalPhysicalMm; // 导入时计算的原始物理尺寸 (mm)
 
 };
 

@@ -11,26 +11,27 @@ public:
     enum { Type = UserType + 100 }; // 特殊类型，不参与 IGraphicsItem 枚举
 
     explicit CanvasItem(QGraphicsItem *parent = nullptr);
-    CanvasItem(const QSizeF &size, QGraphicsItem *parent = nullptr);
+    CanvasItem(const QSizeF &sizePx, QGraphicsItem *parent = nullptr);
+    // 以物理 mm 构造画布
+    CanvasItem(qreal widthMm, qreal heightMm, qreal displayPpi = 300.0,
+               QGraphicsItem *parent = nullptr);
 
     int type() const override { return Type; }
 
-    void setCanvasSize(const QSizeF &size);
+    void setCanvasSize(const QSizeF &sizePx);
     QSizeF canvasSize() const;
 
-    // 画布 DPI（由导入图片确定）
-    void setCanvasDpi(int dpiX, int dpiY);
-    int canvasDpiX() const { return m_canvasDpiX; }
-    int canvasDpiY() const { return m_canvasDpiY; }
-    bool isDpiLocked() const { return m_dpiLocked; }
-    void lockDpi();
-    void unlockDpi();
+    // 画布物理尺寸 (mm)
+    void setCanvasSizeMm(qreal wMm, qreal hMm);
+    qreal canvasWidthMm() const { return m_physicalWidthMm; }
+    qreal canvasHeightMm() const { return m_physicalHeightMm; }
 
-    // 兼容旧接口：设置显示用 PPI（内部用于标尺/状态栏换算）
+    // 显示 PPI（用于 mm↔px 换算，仅供参考，不锁定）
+    qreal displayPpi() const { return m_ppi; }
+    void setDisplayPpi(qreal ppi);
     void setPpi(qreal ppi);
-    qreal ppi() const { return m_ppi; }
 
-    // 1mm 对应的场景像素数（基于当前有效 PPI）
+    // 1mm 对应的场景像素数（基于当前显示 PPI）
     qreal pixelsPerMm() const;
 
 protected:
@@ -38,12 +39,11 @@ protected:
                QWidget *widget) override;
 
 private:
-    void updateEffectivePpi();
+    void updatePixelRect();
 
-    qreal m_ppi = 300.0;      // 有效显示 PPI（用于 mm↔px 换算）
-    int m_canvasDpiX = 0;      // 画布 X 方向 DPI，0 = 未确定
-    int m_canvasDpiY = 0;      // 画布 Y 方向 DPI，0 = 未确定
-    bool m_dpiLocked = false;  // DPI 是否锁定
+    qreal m_ppi = 300.0;              // 显示 PPI（mm↔px 换算）
+    qreal m_physicalWidthMm = 210.0;  // 画布物理宽 (mm)
+    qreal m_physicalHeightMm = 297.0; // 画布物理高 (mm)
 };
 
 #endif // CANVASITEM_H

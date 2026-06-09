@@ -100,6 +100,8 @@ struct SourceTiffInput
     QString filePath;
     QRectF outputRect; // 在输出图像中的像素坐标
     int zOrder = 0;
+    QSize targetPixelSize;      // 重采样目标像素尺寸（0x0 表示无需重采样）
+    bool needsResample = false; // 是否需要从原始分辨率重采样
 };
 
 // ========== 预渲染 CMYK 图层 ==========

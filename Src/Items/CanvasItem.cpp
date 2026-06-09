@@ -12,8 +12,8 @@ CanvasItem::CanvasItem(QGraphicsItem *parent)
     setZValue(-9999); // 始终在最底层
 }
 
-CanvasItem::CanvasItem(const QSizeF &size, QGraphicsItem *parent)
-    : QGraphicsRectItem(QRectF(0, 0, size.width(), size.height()), parent)
+CanvasItem::CanvasItem(const QSizeF &sizePx, QGraphicsItem *parent)
+    : QGraphicsRectItem(QRectF(0, 0, sizePx.width(), sizePx.height()), parent)
 {
     setFlag(ItemIsSelectable, false);
     setFlag(ItemIsMovable, false);
@@ -23,46 +23,59 @@ CanvasItem::CanvasItem(const QSizeF &size, QGraphicsItem *parent)
     setZValue(-9999);
 }
 
-void CanvasItem::setCanvasSize(const QSizeF &size)
+CanvasItem::CanvasItem(qreal widthMm, qreal heightMm, qreal displayPpi,
+                       QGraphicsItem *parent)
+    : QGraphicsRectItem(QRectF(0, 0, widthMm * displayPpi / 25.4,
+                               heightMm * displayPpi / 25.4), parent)
+    , m_ppi(displayPpi)
+    , m_physicalWidthMm(widthMm)
+    , m_physicalHeightMm(heightMm)
 {
-    setRect(QRectF(0, 0, size.width(), size.height()));
+    setFlag(ItemIsSelectable, false);
+    setFlag(ItemIsMovable, false);
+    setFlag(ItemIsFocusable, false);
+    setBrush(QBrush(Qt::transparent));
+    setPen(QPen(Qt::NoPen));
+    setZValue(-9999);
+}
+
+void CanvasItem::setCanvasSize(const QSizeF &sizePx)
+{
+    setRect(QRectF(0, 0, sizePx.width(), sizePx.height()));
+}
+
+void CanvasItem::setCanvasSizeMm(qreal wMm, qreal hMm)
+{
+    m_physicalWidthMm = wMm;
+    m_physicalHeightMm = hMm;
+    updatePixelRect();
 }
 
 void CanvasItem::setPpi(qreal ppi)
 {
+    setDisplayPpi(ppi);
+}
+
+void CanvasItem::setDisplayPpi(qreal ppi)
+{
+    if (qFuzzyCompare(m_ppi, ppi))
+        return;
+    qreal oldPpi = m_ppi;
     m_ppi = qBound(1.0, ppi, 9999.0);
+    updatePixelRect();
+    // 像素尺寸变化比例 = m_ppi / oldPpi
+    // 调用方需用此比例缩放所有图元
 }
 
-void CanvasItem::setCanvasDpi(int dpiX, int dpiY)
+void CanvasItem::updatePixelRect()
 {
-    m_canvasDpiX = dpiX;
-    m_canvasDpiY = dpiY;
-    updateEffectivePpi();
-}
-
-void CanvasItem::lockDpi()
-{
-    m_dpiLocked = true;
-}
-
-void CanvasItem::unlockDpi()
-{
-    m_dpiLocked = false;
-    m_canvasDpiX = 0;
-    m_canvasDpiY = 0;
-}
-
-void CanvasItem::updateEffectivePpi()
-{
-    if (m_canvasDpiX > 0) {
-        m_ppi = static_cast<qreal>(m_canvasDpiX);
-    }
-    // m_canvasDpiX = 0 时保持 m_ppi 不变（使用默认 300 或已设置的值）
+    qreal pxW = m_physicalWidthMm * m_ppi / 25.4;
+    qreal pxH = m_physicalHeightMm * m_ppi / 25.4;
+    setRect(QRectF(0, 0, pxW, pxH));
 }
 
 qreal CanvasItem::pixelsPerMm() const
 {
-    // 始终基于有效 PPI 返回换算因子
     return m_ppi / 25.4;
 }
 
