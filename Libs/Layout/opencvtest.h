@@ -1,12 +1,16 @@
 #pragma once
 
 #include <string>
-#include <windows.h>
 
+#ifdef _WIN32
+#include <windows.h>
 #ifdef LAYOUT_LIBRARY
 #define LAYOUT_API __declspec(dllexport)
 #else
 #define LAYOUT_API __declspec(dllimport)
+#endif
+#else
+#define LAYOUT_API __attribute__((visibility("default")))
 #endif
 
 struct LayoutInfo

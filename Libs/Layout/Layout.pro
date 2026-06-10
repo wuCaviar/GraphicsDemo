@@ -21,15 +21,24 @@ SOURCES += \
     opencvtest.cpp \
     exif.cpp
 
-# OpenCV（Debug/Release 自动选择）
-LIBS += -L$$OPENCV_ROOT/x64/vc16/lib
-CONFIG(debug, debug|release) {
-    LIBS += -lopencv_world4100d
-} else {
-    LIBS += -lopencv_world4100
+# OpenCV
+INCLUDEPATH += $$OPENCV_ROOT/include/opencv4
+win32 {
+    LIBS += -L$$OPENCV_ROOT/x64/vc16/lib
+    CONFIG(debug, debug|release) {
+        LIBS += -lopencv_world4100d
+    } else {
+        LIBS += -lopencv_world4100
+    }
+} else:macx {
+    LIBS += -lopencv_core -lopencv_imgproc -lopencv_imgcodecs -lopencv_highgui
 }
 
-# libjpeg-turbo（静态库）+ GDI+
+# libjpeg-turbo（静态库）
 # libtiff 已在 Common.pri 中统一链接
 LIBS += -L$$PROJECT_PATH/3rdParty
-LIBS += -llibjpeg-turbo -lgdiplus
+win32 {
+    LIBS += -llibjpeg-turbo -lgdiplus
+} else:macx {
+    LIBS += -ljpeg
+}

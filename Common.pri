@@ -9,7 +9,7 @@ PROJECT_PATH = $$PWD
 CONFIG(debug, debug|release) {
     OUT_SUBDIR = Debug
 } else {
-    OUT_SUBDIR = Release∑
+    OUT_SUBDIR = Release
 }
 
 DESTDIR     = $$PROJECT_PATH/Bin/$$OUT_SUBDIR
@@ -31,7 +31,8 @@ win32 {
     INCLUDEPATH += $$TIFF_ROOT/include $$LCMS2_ROOT/include
     LIBS += -L$$TIFF_ROOT/lib -L$$LCMS2_ROOT/bin
 } else:macx {
-    INCLUDEPATH += /opt/homebrew/include
+    OPENCV_ROOT = /opt/homebrew
+    INCLUDEPATH += /opt/homebrew/include /opt/homebrew/include/opencv4
     LIBS += -L/opt/homebrew/lib
 } else:unix {
     INCLUDEPATH += /usr/include /usr/local/include

@@ -1,6 +1,15 @@
 //#define EVALDLL_EXPORTS // 需要放在#include "eval.h"前面
 #include <iostream>
+#ifdef _WIN32
 #include <Windows.h>
+#include <io.h>
+#include <gdiplus.h>
+#else
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <pthread.h>
+#endif
 #include<algorithm>
 #include <stdio.h>
 #include<opencv2/opencv.hpp>
@@ -16,13 +25,10 @@ using namespace std;
 extern int picType;
 #include "exif.h"
 #include "opencvtest.h"
-#include<io.h>
-#include<Windows.h>	
-#include<gdiplus.h>
 #include<fstream>
 #include <filesystem>
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 double distance(const cv::Point& p1, const cv::Point& p2) {
 	return std::sqrt(std::pow(p2.x - p1.x, 2) + std::pow(p2.y - p1.y, 2));
@@ -193,6 +199,7 @@ std::vector<cv::Point> expandContour(const std::vector<cv::Point>& contour, floa
 }
 
 
+#ifdef _WIN32
 bool GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 {
 	UINT num, size;
@@ -262,7 +269,9 @@ std::wstring Utf8ToWstring(const std::string& utf8Str) {
 	MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, wbuf.data(), wlen);
 	return std::wstring(wbuf.data());
 }
+#endif // _WIN32
 
+#ifdef _WIN32
 void DrawTitle(std::string context_string, int width, int start_index) {
 	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 	ULONG_PTR gdiplusToken;
@@ -296,6 +305,21 @@ void DrawTitle(std::string context_string, int width, int start_index) {
 	pbmp->Save(wideStr, &encoder, NULL);
 	delete		pbmp;
 }
+#endif // _WIN32
+
+#ifndef _WIN32
+void DrawTitle(std::string context_string, int width, int start_index) {
+	// macOS stub: GDI+ not available, use OpenCV text rendering as fallback
+	cv::Mat img(230, width, CV_8UC3, cv::Scalar(255, 255, 255));
+	int baseline = 0;
+	double fontScale = 3.0;
+	cv::Size textSize = cv::getTextSize(context_string, cv::FONT_HERSHEY_SIMPLEX, fontScale, 3, &baseline);
+	cv::Point textOrg((width - textSize.width) / 2, (230 + textSize.height) / 2);
+	cv::putText(img, context_string, textOrg, cv::FONT_HERSHEY_SIMPLEX, fontScale, cv::Scalar(0, 0, 0), 3);
+	std::string path = "./title_imp/" + std::to_string(start_index) + ".bmp";
+	cv::imwrite(path, img);
+}
+#endif
 
 ////写入标题
 //cv::Mat DrawTitle(string text, int width) {
@@ -586,9 +610,13 @@ cv::Mat resize(cv::Mat src, double scale) {
 }
 
 void EnsureFoldExistA(string fold_path, bool bool_hide) {
+#ifdef _WIN32
 	if (CreateDirectoryA(fold_path.c_str(), NULL)) //判断是否存在，否则创建
 	{
 	}
+#else
+	mkdir(fold_path.c_str(), 0755);
+#endif
 }
 
 // 自然排序比较函数：1_1 < 2_1 < 10_1 < 11_1
@@ -619,13 +647,13 @@ bool naturalCompare(const string& a, const string& b) {
 }
 
 vector<std::string> listFiles(std::string dirPath) {
+	vector<std::string> path_vector;
+#ifdef _WIN32
 	WIN32_FIND_DATAA FindFileData;
 	HANDLE hFind = INVALID_HANDLE_VALUE;
 	DWORD dwError = 0;
-	vector<std::string> path_vector;
 	string dirPath_temp = dirPath;
 	dirPath_temp += "*.jpg";
-	// 指定要搜索的目录和文件名模式，例如 "*.*" 表示所有文件"C:\\path\\to\\directory\\*.*"
 	hFind = FindFirstFileA(dirPath_temp.c_str(), &FindFileData);
 	if (hFind == INVALID_HANDLE_VALUE) {
 		printf("FindFirstFile failed (%d)\n", GetLastError());
@@ -634,8 +662,6 @@ vector<std::string> listFiles(std::string dirPath) {
 	else {
 		do {
 			path_vector.push_back(FindFileData.cFileName);
-			// 打印文件名
-			//printf("%s\n", FindFileData.cFileName);
 		} while (FindNextFileA(hFind, &FindFileData) != 0);
 		dwError = GetLastError();
 		if (dwError != ERROR_NO_MORE_FILES) {
@@ -643,7 +669,18 @@ vector<std::string> listFiles(std::string dirPath) {
 		}
 	}
 	FindClose(hFind);
-	// 关键：自然数字排序
+#else
+	DIR* dir = opendir(dirPath.c_str());
+	if (!dir) return path_vector;
+	struct dirent* entry;
+	while ((entry = readdir(dir)) != nullptr) {
+		std::string name = entry->d_name;
+		if (name.size() > 4 && name.substr(name.size() - 4) == ".jpg") {
+			path_vector.push_back(name);
+		}
+	}
+	closedir(dir);
+#endif
 	sort(path_vector.begin(), path_vector.end(), naturalCompare);
 	for (std::string &Str : path_vector) {
 		Str = dirPath + Str;
@@ -652,13 +689,13 @@ vector<std::string> listFiles(std::string dirPath) {
 }
 
 vector<std::string> listTiffFiles(std::string dirPath) {
+	vector<std::string> path_vector;
+#ifdef _WIN32
 	WIN32_FIND_DATAA FindFileData;
 	HANDLE hFind = INVALID_HANDLE_VALUE;
 	DWORD dwError = 0;
-	vector<std::string> path_vector;
 	string dirPath_temp = dirPath;
 	dirPath_temp += "*.tif";
-	// 指定要搜索的目录和文件名模式，例如 "*.*" 表示所有文件"C:\\path\\to\\directory\\*.*"
 	hFind = FindFirstFileA(dirPath_temp.c_str(), &FindFileData);
 	if (hFind == INVALID_HANDLE_VALUE) {
 		printf("FindFirstFile failed (%d)\n", GetLastError());
@@ -667,8 +704,6 @@ vector<std::string> listTiffFiles(std::string dirPath) {
 	else {
 		do {
 			path_vector.push_back(dirPath + FindFileData.cFileName);
-			// 打印文件名
-			//printf("%s\n", FindFileData.cFileName);
 		} while (FindNextFileA(hFind, &FindFileData) != 0);
 		dwError = GetLastError();
 		if (dwError != ERROR_NO_MORE_FILES) {
@@ -676,6 +711,18 @@ vector<std::string> listTiffFiles(std::string dirPath) {
 		}
 	}
 	FindClose(hFind);
+#else
+	DIR* dir = opendir(dirPath.c_str());
+	if (!dir) return path_vector;
+	struct dirent* entry;
+	while ((entry = readdir(dir)) != nullptr) {
+		std::string name = entry->d_name;
+		if (name.size() > 4 && name.substr(name.size() - 4) == ".tif") {
+			path_vector.push_back(dirPath + name);
+		}
+	}
+	closedir(dir);
+#endif
 	return path_vector;
 }
 
@@ -2753,8 +2800,13 @@ bool PatrolBorder(Mat & img, Mat & dst, int & y_start, int & index, cv::Mat & fo
 void JpgProcess(string output_path, string output_path_Child, vector<std::string> path_vector, int start_index, int count, 
 		int jpg_index, bool * bool_end_status,double * total_height, double * total_end, double * progress, bool *bool_run, int * XResolution, int element_interval,
 		int paper_width ,string *error_info, double * save_height, int Ratio_less, vector<bool> bool_Selest, vector<int> colors) {
-	// 获取当前线程 TID（Windows 平台，格式为 0xXXXX）
+	// 获取当前线程 TID
+#ifdef _WIN32
 	DWORD tid = GetCurrentThreadId();
+#else
+	uint64_t tid;
+	pthread_threadid_np(NULL, &tid);
+#endif
 	// 打印线程信息（控制台 + VS 输出窗口）
 	std::cout << ("[%s] 线程启动，TID: 0x%X\n", to_string(start_index), tid);
 	std::vector<cv::Mat> img;
@@ -2909,7 +2961,11 @@ void JpgProcess(string output_path, string output_path_Child, vector<std::string
 		// 打开模式：ios::app（追加）+ ios::out（写入），二进制模式避免换行符转换（可选）
 		// 检查文件是否成功打开（避免路径错误、权限问题等）
 		// 使用宽字符路径打开，解决 Windows 上中文文件名乱码问题
+#ifdef _WIN32
 		std::ofstream file(Utf8ToWstring(jpg_name + "省料统计.txt"), std::ios::out | std::ios::app);
+#else
+		std::ofstream file(jpg_name + "省料统计.txt", std::ios::out | std::ios::app);
+#endif
 		if (!file.is_open()) {
 			std::cerr << "错误：无法打开文件！路径：" << jpg_name + "省料统计.txt" << std::endl;
 		}
@@ -2942,26 +2998,23 @@ void JpgProcess(string output_path, string output_path_Child, vector<std::string
 
 // 新函数，用于获取所有文件夹中的 JPG 文件并生成 map
 void getAllJpgFilesInFolders(const std::string& rootDir, std::map<std::string, std::vector<std::string>>& folderJpgMap, string& cFileName) {
+#ifdef _WIN32
 	vector<string> files;
-	//文件句柄
 	intptr_t hFile = 0;
-	//文件信息
 	_finddata_t fileinfo;
 	std::vector<std::string> jpgFiles;
 	string p = rootDir + "\\*.*";
 	if ((hFile = _findfirst(p.c_str(), &fileinfo)) != -1) {
 		do {
-			if ((fileinfo.attrib & _A_SUBDIR)) { //比较文件类型是否是文件夹
+			if ((fileinfo.attrib & _A_SUBDIR)) {
 				if (strcmp(fileinfo.name, ".") != 0 && strcmp(fileinfo.name, "..") != 0) {
 					files.push_back(p.assign(rootDir).append(fileinfo.name).append("\\"));
 					cFileName = p.assign(cFileName).append(fileinfo.name).append("\\");
-					//递归搜索
 					getAllJpgFilesInFolders(p.assign(rootDir).append(fileinfo.name).append("\\"), folderJpgMap, cFileName);
 				}
 			}
 			else {
-				//files.push_back(p.assign(rootDir).append("\\").append(fileinfo.name));
-				string folderPath = rootDir;// +"\\";
+				string folderPath = rootDir;
 				if (picType != 2)
 				{
 					jpgFiles = listFiles(folderPath);
@@ -2980,13 +3033,8 @@ void getAllJpgFilesInFolders(const std::string& rootDir, std::map<std::string, s
 				}
 				if (!jpgFiles.empty())
 					break;
-				//jpgFiles.push_back(p.assign(rootDir).append("\\").append(fileinfo.name));
 			}
-			//if (jpgFiles.size() != 0)
-			//{
-			//	folderJpgMap[cFileName] = jpgFiles;
-			//}
-		} while (_findnext(hFile, &fileinfo) == 0); //寻找下一个，成功返回0，否则-1
+		} while (_findnext(hFile, &fileinfo) == 0);
 		int pos = cFileName.rfind("\\");
 		if (pos != -1)
 			cFileName.erase(pos);
@@ -2997,6 +3045,38 @@ void getAllJpgFilesInFolders(const std::string& rootDir, std::map<std::string, s
 			cFileName.clear();
 		_findclose(hFile);
 	}
+#else
+	DIR* dir = opendir(rootDir.c_str());
+	if (!dir) return;
+	struct dirent* entry;
+	std::vector<std::string> jpgFiles;
+	while ((entry = readdir(dir)) != nullptr) {
+		std::string name = entry->d_name;
+		if (name == "." || name == "..") continue;
+		std::string fullPath = rootDir + "/" + name;
+		struct stat st;
+		if (stat(fullPath.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+			std::string subCFileName = cFileName + name + "/";
+			getAllJpgFilesInFolders(fullPath + "/", folderJpgMap, subCFileName);
+		}
+	}
+	closedir(dir);
+	string folderPath = rootDir;
+	if (picType != 2) {
+		jpgFiles = listFiles(folderPath);
+		if (!jpgFiles.empty()) {
+			folderJpgMap[cFileName] = jpgFiles;
+			picType = 1;
+		}
+	}
+	if (picType != 1) {
+		jpgFiles = listTiffFiles(folderPath);
+		if (!jpgFiles.empty()) {
+			folderJpgMap[cFileName] = jpgFiles;
+			picType = 2;
+		}
+	}
+#endif
 }
 //#pragma comment(lib,"jpeg-static.lib")
 // 最近邻插值缩放函数
@@ -3163,6 +3243,7 @@ void RemoveAllFiles(string wstrDir)
 {
 	if (wstrDir.empty())
 		return;
+#ifdef _WIN32
 	HANDLE hFind;
 	WIN32_FIND_DATAA findData;
 	string wstrTempDir = wstrDir + ("\\*");;
@@ -3191,6 +3272,26 @@ void RemoveAllFiles(string wstrDir)
 	} while (FindNextFileA(hFind, &findData));
 	FindClose(hFind);
 	RemoveDirectoryA(wstrDir.c_str());
+#else
+	DIR* dir = opendir(wstrDir.c_str());
+	if (!dir) return;
+	struct dirent* entry;
+	while ((entry = readdir(dir)) != nullptr) {
+		std::string name = entry->d_name;
+		if (name == "." || name == "..") continue;
+		std::string fullPath = wstrDir + "/" + name;
+		struct stat st;
+		if (stat(fullPath.c_str(), &st) == 0) {
+			if (S_ISDIR(st.st_mode)) {
+				RemoveAllFiles(fullPath);
+			} else {
+				unlink(fullPath.c_str());
+			}
+		}
+	}
+	closedir(dir);
+	rmdir(wstrDir.c_str());
+#endif
 }
 #include <codecvt>  // 用于 UTF-8 编码转换
 #include <locale>   // 本地化支持
@@ -3609,7 +3710,7 @@ void LayoutDAO(LayoutInfo * layoutinfo) {
 				if (bool_sum)
 					break;
 				else
-					Sleep(100);
+					std::this_thread::sleep_for(std::chrono::milliseconds(100));
 				//layoutinfo->run_time =  layout_ac.End();
 				double progress = 1;
 				for (int i = 0; i < operate_list.size(); i++)
@@ -3635,7 +3736,7 @@ void LayoutDAO(LayoutInfo * layoutinfo) {
 		if (layoutinfo->bool_run == false)
 			break;
 	}
-	Sleep(3000);
+	std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 	//ofs.open("main.txt", ios::out);
 	//ofs << "working:0" << std::endl;
 	//ofs.close();
