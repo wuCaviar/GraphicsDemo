@@ -56,7 +56,8 @@ QGraphicsItem *createItemFromDeserialized(const DeserializedItem &data)
     if (data.cmyk.hasPen)
         igi->setItemPenCmyk(data.cmyk.penC, data.cmyk.penM, data.cmyk.penY, data.cmyk.penK);
     if (data.cmyk.hasBrush)
-        igi->setItemBrushCmyk(data.cmyk.brushC, data.cmyk.brushM, data.cmyk.brushY, data.cmyk.brushK);
+        igi->setItemBrushCmyk(data.cmyk.brushC, data.cmyk.brushM, data.cmyk.brushY,
+                              data.cmyk.brushK);
     if (!data.cmyk.gradient.isEmpty())
         igi->setGradientStopCmykMap(data.cmyk.gradient);
 
@@ -95,18 +96,15 @@ QByteArray ProjectFile::decrypt(const QByteArray &data, const QByteArray &key)
 
 // ---- save (from pre-serialized items) --------------------------------------
 
-bool ProjectFile::saveFromSerialized(const QString &filePath,
-                                     const ProjectInfo &info,
-                                     const CanvasInfo &canvas,
-                                     const QList<SerializedItem> &items)
+bool ProjectFile::saveFromSerialized(const QString &filePath, const ProjectInfo &info,
+                                     const CanvasInfo &canvas, const QList<SerializedItem> &items)
 {
     m_lastError.clear();
 
     // Build XML document
     QDomDocument doc;
-    QDomProcessingInstruction pi =
-        doc.createProcessingInstruction(QStringLiteral("xml"),
-                                        QStringLiteral("version=\"1.0\" encoding=\"UTF-8\""));
+    QDomProcessingInstruction pi = doc.createProcessingInstruction(
+        QStringLiteral("xml"), QStringLiteral("version=\"1.0\" encoding=\"UTF-8\""));
     doc.appendChild(pi);
 
     QDomElement root = doc.createElement(QStringLiteral("Project"));
@@ -135,9 +133,7 @@ bool ProjectFile::saveFromSerialized(const QString &filePath,
     };
     addCanvasProp(QStringLiteral("Width"), canvas.width);
     addCanvasProp(QStringLiteral("Height"), canvas.height);
-    addCanvasProp(QStringLiteral("DisplayPpi"), canvas.dpi);
-    addCanvasProp(QStringLiteral("WidthMm"), canvas.canvasWidthMm);
-    addCanvasProp(QStringLiteral("HeightMm"), canvas.canvasHeightMm);
+    addCanvasProp(QStringLiteral("Dpi"), canvas.dpi);
 
     // <Items>
     QDomElement itemsEl = doc.createElement(QStringLiteral("Items"));
@@ -210,9 +206,8 @@ bool ProjectFile::saveFromSerialized(const QString &filePath,
 
 // ---- parse for deserialize -------------------------------------------------
 
-bool ProjectFile::parseForDeserialize(const QString &filePath,
-                                      ProjectInfo &info, CanvasInfo &canvas,
-                                      QList<DeserialTask> &tasks)
+bool ProjectFile::parseForDeserialize(const QString &filePath, ProjectInfo &info,
+                                      CanvasInfo &canvas, QList<DeserialTask> &tasks)
 {
     m_lastError.clear();
     tasks.clear();
@@ -255,8 +250,7 @@ bool ProjectFile::parseForDeserialize(const QString &filePath,
 
     QDomElement root = doc.documentElement();
     if (root.tagName() != QStringLiteral("Project")) {
-        m_lastError =
-            QStringLiteral("Unexpected root element: %1").arg(root.tagName());
+        m_lastError = QStringLiteral("Unexpected root element: %1").arg(root.tagName());
         return false;
     }
 
@@ -266,31 +260,15 @@ bool ProjectFile::parseForDeserialize(const QString &filePath,
         info.name = infoEl.firstChildElement(QStringLiteral("Name")).text();
         info.version = infoEl.firstChildElement(QStringLiteral("Version")).text();
         info.author = infoEl.firstChildElement(QStringLiteral("Author")).text();
-        info.description =
-            infoEl.firstChildElement(QStringLiteral("Description")).text();
+        info.description = infoEl.firstChildElement(QStringLiteral("Description")).text();
     }
 
     // <Canvas>
     QDomElement canvasEl = root.firstChildElement(QStringLiteral("Canvas"));
     if (!canvasEl.isNull()) {
-        canvas.width =
-            canvasEl.firstChildElement(QStringLiteral("Width")).text().toDouble();
-        canvas.height =
-            canvasEl.firstChildElement(QStringLiteral("Height")).text().toDouble();
-
-        // 优先读取 DisplayPpi，回退到旧的 Dpi 标签
-        QDomElement dpiEl = canvasEl.firstChildElement(QStringLiteral("DisplayPpi"));
-        if (dpiEl.isNull())
-            dpiEl = canvasEl.firstChildElement(QStringLiteral("Dpi"));
-        canvas.dpi = dpiEl.text().toDouble();
-
-        // 读取物理 mm 尺寸（新字段，可空）
-        QDomElement wMmEl = canvasEl.firstChildElement(QStringLiteral("WidthMm"));
-        if (!wMmEl.isNull())
-            canvas.canvasWidthMm = wMmEl.text().toDouble();
-        QDomElement hMmEl = canvasEl.firstChildElement(QStringLiteral("HeightMm"));
-        if (!hMmEl.isNull())
-            canvas.canvasHeightMm = hMmEl.text().toDouble();
+        canvas.width = canvasEl.firstChildElement(QStringLiteral("Width")).text().toDouble();
+        canvas.height = canvasEl.firstChildElement(QStringLiteral("Height")).text().toDouble();
+        canvas.dpi = canvasEl.firstChildElement(QStringLiteral("Dpi")).text().toDouble();
     }
 
     // <Items> → extract DeserialTask list
@@ -336,7 +314,7 @@ bool ProjectFile::parseForDeserialize(const QString &filePath,
                     double m = stopEl.attribute(QStringLiteral("M")).toDouble();
                     double y = stopEl.attribute(QStringLiteral("Y")).toDouble();
                     double k = stopEl.attribute(QStringLiteral("K")).toDouble();
-                    task.cmyk.gradient[pos] = {c, m, y, k, true};
+                    task.cmyk.gradient[pos] = { c, m, y, k, true };
                 }
             }
 
@@ -349,8 +327,7 @@ bool ProjectFile::parseForDeserialize(const QString &filePath,
 
 // ---- synchronous save (fallback) -------------------------------------------
 
-bool ProjectFile::save(const QString &filePath, const ProjectInfo &info,
-                       const CanvasInfo &canvas,
+bool ProjectFile::save(const QString &filePath, const ProjectInfo &info, const CanvasInfo &canvas,
                        const QList<QGraphicsItem *> &items)
 {
     QList<SerializedItem> serialized;
@@ -377,7 +354,8 @@ bool ProjectFile::save(const QString &filePath, const ProjectInfo &info,
             }
             if (igi->hasBrushCmyk()) {
                 input.cmyk.hasBrush = true;
-                igi->brushCmyk(input.cmyk.brushC, input.cmyk.brushM, input.cmyk.brushY, input.cmyk.brushK);
+                igi->brushCmyk(input.cmyk.brushC, input.cmyk.brushM, input.cmyk.brushY,
+                               input.cmyk.brushK);
             }
             input.cmyk.gradient = igi->gradientStopCmykMap();
         }
@@ -388,8 +366,8 @@ bool ProjectFile::save(const QString &filePath, const ProjectInfo &info,
 
 // ---- synchronous load (fallback) -------------------------------------------
 
-bool ProjectFile::load(const QString &filePath, ProjectInfo &info,
-                       CanvasInfo &canvas, QList<QGraphicsItem *> &items)
+bool ProjectFile::load(const QString &filePath, ProjectInfo &info, CanvasInfo &canvas,
+                       QList<QGraphicsItem *> &items)
 {
     QList<DeserialTask> tasks;
     if (!parseForDeserialize(filePath, info, canvas, tasks))

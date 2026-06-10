@@ -177,14 +177,9 @@ void PropertyPanel::setupUI()
     m_imgOriginalSizeLabel = new QLabel;
     m_imgDpiLabel = new QLabel;
 
-    m_imgScaleLabel = new QLabel;
-    m_imgEffectiveSizeLabel = new QLabel;
-
     imgInfoLayout->addRow(tr("Path:"), m_imgPathLabel);
     imgInfoLayout->addRow(tr("Physical Size:"), m_imgOriginalSizeLabel);
     imgInfoLayout->addRow(tr("DPI:"), m_imgDpiLabel);
-    imgInfoLayout->addRow(tr("Scale:"), m_imgScaleLabel);
-    imgInfoLayout->addRow(tr("Effective Size:"), m_imgEffectiveSizeLabel);
     mainLayout->addWidget(m_imageInfoGroup);
 
     mainLayout->addStretch();
@@ -673,22 +668,6 @@ void PropertyPanel::updatePanel()
 
         // DPI
         m_imgDpiLabel->setText(tr("%1 x %2").arg(imgItem->dpiX()).arg(imgItem->dpiY()));
-
-        // 缩放比例
-        m_imgScaleLabel->setText(
-            tr("%1x / %2x").arg(imgItem->scaleX(), 0, 'f', 4)
-                            .arg(imgItem->scaleY(), 0, 'f', 4));
-
-        // 有效物理尺寸
-        QSizeF origPhys = imgItem->originalPhysicalMm();
-        if (origPhys.isValid()) {
-            qreal effW = origPhys.width() * imgItem->scaleX();
-            qreal effH = origPhys.height() * imgItem->scaleY();
-            m_imgEffectiveSizeLabel->setText(
-                tr("%1 x %2 mm").arg(effW, 0, 'f', 4).arg(effH, 0, 'f', 4));
-        } else {
-            m_imgEffectiveSizeLabel->setText(tr("Unknown"));
-        }
 
         m_imageInfoGroup->setVisible(true);
     } else {

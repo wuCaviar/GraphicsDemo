@@ -11,6 +11,6 @@ INCLUDEPATH += $$PWD $$PWD/.. $$PWD/../Qt-Color-Widgets/include $$PWD/../Qt-Colo
 include(../../Common.pri)
 
 # 依赖 QtColorWidgets（DESTDIR 由 Common.pri 设置）
-LIBS += -L$$PROJECT_PATH/Bin -lQtColorWidgets
+LIBS += -L$$DESTDIR -lQtColorWidgets
 
 include(qtgradienteditor.pri)

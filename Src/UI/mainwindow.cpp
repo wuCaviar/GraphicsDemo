@@ -2,6 +2,8 @@
 #include "ui_mainwindow.h"
 
 #include "AlignLayoutDialog.h"
+#include "AutoLayoutDialog.h"
+#include "LayoutEngine.h"
 #include "AlignmentUtils.h"
 #include "AppConfig.h"
 #include "ATHCPresets.h"
@@ -51,6 +53,7 @@
 #include <QInputDialog>
 #include <QKeyEvent>
 #include <QMessageBox>
+#include <QProgressDialog>
 #include <QLabel>
 #include <QMap>
 #include <QMimeData>
@@ -143,7 +146,8 @@ void MainWindow::_initWidget()
             [this](bool success, const QString &filePath, const QString &errorMessage) {
                 if (success) {
                     // 导出成功后，在主线程发起 RIP 添加请求
-                    if (m_ripEnabled && m_pNetWorkUtils) {
+                    if (m_ripEnabled && m_pNetWorkUtils
+                        && m_pProcessGuard->isProcessRunning(AppConfig::instance().ripExePath())) {
                         m_pNetWorkUtils->doAddRip(m_ripXRes, m_ripYRes, filePath);
                     }
                     m_pProgressMgr->finishTask(m_exportTaskId);
@@ -547,6 +551,14 @@ void MainWindow::_initToolBar()
         alignToolBar->addAction(QIcon(":/icons/icons/view-fit.svg"), tr("Fit Canvas to Selection"));
     fitCanvasAct->setToolTip(tr("Resize the canvas to fit the selected items"));
     connect(fitCanvasAct, &QAction::triggered, this, &MainWindow::onFitCanvasToItems);
+
+    alignToolBar->addSeparator();
+
+    // 智能排版
+    QAction *autoLayoutAct =
+        alignToolBar->addAction(QIcon(":/icons/icons/auto-layout.svg"), tr("Auto Layout"));
+    autoLayoutAct->setToolTip(tr("Auto arrange image items on the canvas"));
+    connect(autoLayoutAct, &QAction::triggered, this, &MainWindow::onAutoLayout);
 }
 
 void MainWindow::_initPropertyPanel()
@@ -772,7 +784,7 @@ void MainWindow::_updateUndoRedoActions()
 void MainWindow::_updatePosLabel(const QPointF &scenePos)
 {
     m_lastScenePos = scenePos;
-    qreal ppi = m_pView->canvasItem() ? m_pView->canvasItem()->displayPpi() : 300.0;
+    qreal ppi = m_pView->canvasItem() ? m_pView->canvasItem()->ppi() : 300.0;
     qreal kPxToMm = 25.4 / ppi;
     qreal xmm = scenePos.x() * kPxToMm;
     qreal ymm = scenePos.y() * kPxToMm;
@@ -791,14 +803,19 @@ void MainWindow::_updateCanvasLabel()
     }
 
     QSizeF sz = canvas->canvasSize();
-    qreal ppi = canvas->displayPpi();
+    qreal ppi = canvas->ppi();
     qreal kPxToMm = 25.4 / ppi;
-    qreal wMm = sz.width() * kPxToMm;
-    qreal hMm = sz.height() * kPxToMm;
 
-    m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm")
-                               .arg(wMm, 0, 'f', 1)
-                               .arg(hMm, 0, 'f', 1));
+    if (canvas->isDpiLocked()) {
+        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm \u00b7 %3 DPI")
+                                   .arg(sz.width() * kPxToMm, 0, 'f', 1)
+                                   .arg(sz.height() * kPxToMm, 0, 'f', 1)
+                                   .arg(canvas->canvasDpiX()));
+    } else {
+        m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm \u00b7 DPI: --")
+                                   .arg(sz.width() * kPxToMm, 0, 'f', 1)
+                                   .arg(sz.height() * kPxToMm, 0, 'f', 1));
+    }
 }
 
 void MainWindow::_updateToolLabel()
@@ -867,7 +884,7 @@ void MainWindow::setMainWindowVisibility(bool state)
 void MainWindow::getToolInfo()
 {
     // 获取Rip工具版本
-    if (m_pNetWorkUtils) {
+    if (m_pNetWorkUtils && m_pProcessGuard->isProcessRunning(AppConfig::instance().ripExePath())) {
         // 同步请求获取 Rip 版本（阻塞主线程，通常很快）
         m_pNetWorkUtils->doRipVersion();
     }
@@ -902,7 +919,7 @@ bool MainWindow::_maybeSaveProject()
             ProjectFile::CanvasInfo canvasInfo;
             canvasInfo.width = canvas->canvasSize().width();
             canvasInfo.height = canvas->canvasSize().height();
-            canvasInfo.dpi = canvas->displayPpi();
+            canvasInfo.dpi = canvas->ppi();
             auto items = ::filterSelectableItems(m_pView->scene()->items());
             ProjectFile pf;
             if (!pf.save(m_currentProjectPath, info, canvasInfo, items)) {
@@ -953,9 +970,10 @@ void MainWindow::onNew()
     m_pView->setEnabled(true); // 画板就绪，允许操作
     m_resizeCanvasBtn->setVisible(true);
 
-    // 新画布使用默认显示 PPI
+    // 新画布 DPI 未确定，使用默认显示 PPI
     if (auto *canvas = m_pView->canvasItem()) {
-        canvas->setDisplayPpi(kDefaultPpi);
+        canvas->setPpi(kDefaultPpi);
+        canvas->setCanvasDpi(0, 0); // DPI 未确定
     }
 
     // 同步刻度尺 PPI
@@ -1004,7 +1022,11 @@ void MainWindow::onOpenProject()
         m_pView->resetCanvas(QSizeF(canvasInfo.width, canvasInfo.height));
         qreal ppi = canvasInfo.dpi > 0 ? canvasInfo.dpi : 300.0;
         if (auto *canvas = m_pView->canvasItem()) {
-            canvas->setDisplayPpi(ppi);
+            canvas->setPpi(ppi);
+            if (canvasInfo.dpi > 0) {
+                canvas->setCanvasDpi(canvasInfo.dpi, canvasInfo.dpi);
+                canvas->lockDpi();
+            }
         }
         m_pView->setEnabled(true);
         m_resizeCanvasBtn->setVisible(true);
@@ -1053,7 +1075,11 @@ void MainWindow::onOpenProject()
 
                 qreal ppi = canvasInfo.dpi > 0 ? canvasInfo.dpi : 300.0;
                 if (auto *canvas = m_pView->canvasItem()) {
-                    canvas->setDisplayPpi(ppi);
+                    canvas->setPpi(ppi);
+                    if (canvasInfo.dpi > 0) {
+                        canvas->setCanvasDpi(canvasInfo.dpi, canvasInfo.dpi);
+                        canvas->lockDpi();
+                    }
                 }
 
                 for (auto *item : loadedItems)
@@ -1109,7 +1135,7 @@ void MainWindow::onSaveProject()
     canvasInfo.width = canvas->canvasSize().width();
     canvasInfo.height = canvas->canvasSize().height();
     // 存储画布实际 DPI：锁定状态用 canvasDpiX，未锁定用 0
-    canvasInfo.dpi = canvas->displayPpi();
+    canvasInfo.dpi = canvas->isDpiLocked() ? canvas->canvasDpiX() : 0.0;
 
     auto items = ::filterSelectableItems(m_pView->scene()->items());
 
@@ -1192,7 +1218,86 @@ void MainWindow::onSaveProject()
 // DPI 管理
 // ============================================================
 
-// DPI 锁定已移除 — 画布以 mm 为单位，图片按真实物理尺寸导入
+bool MainWindow::_tryLockCanvasDpi(int dpiX, int dpiY)
+{
+    auto *canvas = m_pView->canvasItem();
+    if (!canvas)
+        return true; // 无画布，允许导入
+
+    if (!canvas->isDpiLocked()) {
+        // DPI 未锁定：由当前图片确定并锁定
+        // 先算出当前物理 mm（在修改 DPI 前）
+        QSizeF oldSize = canvas->canvasSize();
+        qreal oldPpi = canvas->ppi();
+        qreal mmW = oldSize.width() / oldPpi * 25.4;
+        qreal mmH = oldSize.height() / oldPpi * 25.4;
+
+        canvas->setCanvasDpi(dpiX, dpiY);
+        canvas->setPpi(static_cast<qreal>(dpiX));
+        canvas->lockDpi();
+
+        // 从物理 mm 反算新像素尺寸，保持物理毫米尺寸不变（ceil 保证整数边界）
+        qreal mmToPx = static_cast<qreal>(dpiX) / 25.4;
+        QSizeF newSize(std::ceil(mmW * mmToPx), std::ceil(mmH * mmToPx));
+        m_pView->setCanvasSize(newSize);
+
+        // 同步缩放非图片图元的像素尺寸和位置（factor = newPpi/oldPpi）
+        qreal factor = static_cast<qreal>(dpiX) / oldPpi;
+        if (!qFuzzyCompare(factor, 1.0)) {
+            const auto selectable = ::filterSelectableItems(m_pView->scene()->items());
+            for (auto *item : selectable) {
+                if (dynamic_cast<ImageItem *>(item) || item->parentItem())
+                    continue;
+                item->setPos(item->pos() * factor);
+                item->setTransform(QTransform::fromScale(factor, factor) * item->transform());
+            }
+        }
+
+        m_hRuler->setPpi(static_cast<qreal>(dpiX));
+        m_vRuler->setPpi(static_cast<qreal>(dpiX));
+        m_pPropertyPanel->setDisplayPpi(static_cast<qreal>(dpiX));
+        m_hRuler->updateRuler();
+        m_vRuler->updateRuler();
+        _updateCanvasLabel();
+        _updatePosLabel(m_lastScenePos);
+        return true;
+    }
+
+    // DPI 已锁定：检查是否匹配
+    if (canvas->canvasDpiX() == dpiX && canvas->canvasDpiY() == dpiY)
+        return true;
+
+    QMessageBox::warning(this, tr("DPI Mismatch"),
+                         tr("The image DPI (%1×%2) does not match the canvas DPI (%3×%4).\n"
+                            "Please use images with matching DPI.")
+                             .arg(dpiX)
+                             .arg(dpiY)
+                             .arg(canvas->canvasDpiX())
+                             .arg(canvas->canvasDpiY()));
+    return false;
+}
+
+void MainWindow::_unlockCanvasDpiIfNoImages()
+{
+    auto *canvas = m_pView->canvasItem();
+    if (!canvas || !canvas->isDpiLocked())
+        return;
+
+    // 检查画布上是否还有 ImageItem
+    const auto allItems = m_pView->scene()->items();
+    bool hasImage = false;
+    for (auto *item : allItems) {
+        if (dynamic_cast<ImageItem *>(item)) {
+            hasImage = true;
+            break;
+        }
+    }
+
+    if (!hasImage) {
+        canvas->unlockDpi();
+        _updateCanvasLabel();
+    }
+}
 
 void MainWindow::onImportImage()
 {
@@ -1210,17 +1315,157 @@ void MainWindow::onImportImage()
     if (!m_pView->canvasItem())
         return;
 
-    importMultipleImages(paths);
+    if (paths.size() == 1)
+        importSingleImage(paths);
+    else
+        importMultipleImages(paths);
 }
 
+void MainWindow::importSingleImage(const QStringList &paths)
+{
+    CanvasItem *canvas = m_pView->canvasItem();
+
+    FitCanvasDlg dlg;
+    dlg.setParam(canvas->canvasSize());
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    FitCanvasType fitType = dlg.fitType();
+    double fitVal = dlg.fitValue();
+
+    const QString taskId = m_pProgressMgr->startTask(tr("Import"), paths.size());
+
+    auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
+    auto *importedItems = new QList<ImageItem *>();
+    auto runningY = std::make_shared<qreal>(0);
+
+    connect(
+        watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::progressValueChanged, this,
+        [this, taskId](int progressValue) { m_pProgressMgr->updateTask(taskId, progressValue); });
+
+    connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt, this,
+            [this, watcher, importedItems, runningY](int index) {
+                auto result = watcher->resultAt(index);
+                if (result.isValid()) {
+                    // DPI 检查：画布 DPI 已锁定时必须匹配
+                    if (result.dpiX > 0 && result.dpiY > 0) {
+                        if (!_tryLockCanvasDpi(result.dpiX, result.dpiY)) {
+                            qWarning() << "Skipped (DPI mismatch):" << result.path;
+                            return; // DPI 不匹配，拒绝导入
+                        }
+                    }
+
+                    auto *item = new ImageItem(result.pixmap, result.size);
+                    item->setItemPen(QPen(Qt::NoPen));
+                    item->setFilePath(result.path);
+                    item->setOriginalSize(result.size);
+
+                    // 设置图片 DPI 到 ImageItem
+                    if (result.dpiX > 0 && result.dpiY > 0)
+                        item->setDpi(result.dpiX, result.dpiY);
+
+                    item->setPos(0, *runningY);
+                    *runningY += result.size.height() + 10;
+
+                    m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
+                    importedItems->append(item);
+                } else {
+                    qWarning() << "Import failed:" << result.path << result.errorMessage;
+                }
+            });
+
+    connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished, this,
+            [this, watcher, taskId, importedItems, fitType, fitVal]() {
+                m_pProgressMgr->finishTask(taskId);
+                watcher->deleteLater();
+
+                // 导入完成后刷新状态栏（DPI 锁定可能已变更）
+                _updateCanvasLabel();
+                _updatePosLabel(m_lastScenePos);
+
+                if (fitType != fctNone && !importedItems->isEmpty()) {
+                    CanvasItem *canvas = m_pView->canvasItem();
+                    if (canvas) {
+                        QRectF unitedRect;
+                        for (auto *item : *importedItems) {
+                            QRectF r = item->mapToScene(item->boundingRect()).boundingRect();
+                            unitedRect = unitedRect.isValid() ? unitedRect.united(r) : r;
+                        }
+
+                        // 留白边距（mm → px），与 onFitCanvasToItems 一致
+                        const AppConfig &cfg = AppConfig::instance();
+                        qreal ppm = canvas->pixelsPerMm();
+                        qreal marginLeft = cfg.canvasMarginLeft() * ppm;
+                        qreal marginRight = cfg.canvasMarginRight() * ppm;
+                        qreal marginTop = cfg.canvasMarginTop() * ppm;
+                        qreal marginBottom = cfg.canvasMarginBottom() * ppm;
+
+                        qreal offsetX = -unitedRect.left() + marginLeft;
+                        qreal offsetY = -unitedRect.top() + marginTop;
+
+                        QSizeF oldSize = canvas->canvasSize();
+                        QSizeF newSize;
+                        switch (fitType) {
+                        case fctAdapt:
+                            newSize = QSizeF(unitedRect.width() + marginLeft + marginRight,
+                                             unitedRect.height() + marginTop + marginBottom);
+                            break;
+                        case fctWidth:
+                            newSize = QSizeF(fitVal, oldSize.height());
+                            break;
+                        case fctHeight:
+                            newSize = QSizeF(oldSize.width(), fitVal);
+                            break;
+                        default:
+                            break;
+                        }
+
+                        if (newSize.isValid() && newSize.width() > 0 && newSize.height() > 0
+                            && newSize != oldSize) {
+                            m_undoStack->beginMacro(tr("Fit Canvas on Import"));
+
+                            if (offsetX != 0 || offsetY != 0) {
+                                QPointF delta(offsetX, offsetY);
+                                QList<QPointF> oldPositions, newPositions;
+                                for (auto *item : *importedItems) {
+                                    oldPositions << item->pos();
+                                    newPositions << item->pos() + delta;
+                                    item->setPos(item->pos() + delta);
+                                }
+                                m_undoStack->push(new MoveItemsCommand(
+                                    QList<QGraphicsItem *>(importedItems->begin(),
+                                                           importedItems->end()),
+                                    oldPositions, newPositions, m_pView->scene()));
+                            }
+
+                            m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize,
+                                                                      m_pView->scene()));
+                            m_undoStack->endMacro();
+                            _updateCanvasLabel();
+                            m_pView->fitToCanvas();
+                        }
+                    }
+                }
+
+                delete importedItems;
+                qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz") << "Finished import";
+            });
+
+    auto future = QtConcurrent::mapped(paths, ImageUtils::runImportWorker);
+    watcher->setFuture(future);
+    qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz");
+}
 
 void MainWindow::importMultipleImages(const QStringList &paths)
 {
     CanvasItem *canvas = m_pView->canvasItem();
 
-    // 多图导入简化：不需要 DPI 筛选对话框，直接导入全部文件
-    // 使用垂直排列作为默认排列方式
-    const QStringList &ordered = paths;
+    ImageArrangementDialog dlg;
+    dlg.setFilePaths(paths);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    const ImageArrangement arr = dlg.arrangement();
+    const QStringList ordered = dlg.orderedPaths();
 
     FitCanvasDlg fitDlg;
     fitDlg.setParam(canvas->canvasSize());
@@ -1233,40 +1478,61 @@ void MainWindow::importMultipleImages(const QStringList &paths)
 
     auto *watcher = new QFutureWatcher<ImageUtils::ImportWorkerResult>(this);
     auto *importedItems = new QList<ImageItem *>();
+    // 多图导入 DPI 共享状态：记录首个有效 DPI，后续图片必须匹配
+    auto commonDpi = std::make_shared<QPair<int, int>>(0, 0);
     auto runningCoord = std::make_shared<qreal>(0);
 
     connect(
         watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::progressValueChanged, this,
         [this, taskId](int progressValue) { m_pProgressMgr->updateTask(taskId, progressValue); });
 
-    connect(
-        watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt,
-        this,
-        [this, watcher, importedItems, runningCoord](int index) {
-            auto result = watcher->resultAt(index);
-            if (result.isValid()) {
-                auto *canvas = m_pView->canvasItem();
+    connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt, this,
+            [this, watcher, importedItems, runningCoord, arr, commonDpi](int index) {
+                auto result = watcher->resultAt(index);
+                if (result.isValid()) {
+                    // 多图 DPI 筛选：以首个有效 DPI 为准，筛选相同 DPI 的图片
+                    if (result.dpiX > 0 && result.dpiY > 0) {
+                        if (commonDpi->first == 0 && commonDpi->second == 0) {
+                            // 首个有效 DPI：尝试锁定画布，失败则跳过
+                            if (!_tryLockCanvasDpi(result.dpiX, result.dpiY)) {
+                                qWarning() << "Skipped (DPI rejected):" << result.path;
+                                return;
+                            }
+                            *commonDpi = { result.dpiX, result.dpiY };
+                        } else if (result.dpiX != commonDpi->first
+                                   || result.dpiY != commonDpi->second) {
+                            // DPI 不匹配，跳过此图片
+                            qWarning()
+                                << "Skipped (DPI mismatch):" << result.path << "DPI:" << result.dpiX
+                                << "x" << result.dpiY << "expected:" << commonDpi->first << "x"
+                                << commonDpi->second;
+                            return;
+                        }
+                    }
 
-                // 计算图片物理尺寸
-                qreal imgDpiX = (result.dpiX > 0) ? static_cast<qreal>(result.dpiX) : 72.0;
-                qreal imgDpiY = (result.dpiY > 0) ? static_cast<qreal>(result.dpiY) : 72.0;
-                qreal physW = result.size.width() / imgDpiX * 25.4;
-                qreal physH = result.size.height() / imgDpiY * 25.4;
-                qreal ppi = canvas ? canvas->displayPpi() : 300.0;
-                qreal pxW = physW * ppi / 25.4;
-                qreal pxH = physH * ppi / 25.4;
+                    auto *item = new ImageItem(result.pixmap, result.size);
+                    item->setItemPen(QPen(Qt::NoPen));
+                    item->setFilePath(result.path);
+                    item->setOriginalSize(result.size);
 
-                auto *item = new ImageItem(result.pixmap, result.size);
-                item->setItemPen(QPen(Qt::NoPen));
-                item->setFilePath(result.path);
-                item->setOriginalSize(result.size);
-                item->setDpi(static_cast<int>(imgDpiX), static_cast<int>(imgDpiY));
-                item->setOriginalPhysicalMm(QSizeF(physW, physH));
-                item->setRect(QRectF(0, 0, pxW, pxH));
+                    // 设置图片 DPI
+                    if (result.dpiX > 0 && result.dpiY > 0)
+                        item->setDpi(result.dpiX, result.dpiY);
 
-                // 默认垂直排列
-                item->setPos(0, *runningCoord);
-                *runningCoord += pxH + 10;
+                    if (arr == ArrangeHorizontal) {
+                        item->setPos(*runningCoord, 0);
+                        *runningCoord += result.size.width();
+                    } else {
+                        item->setPos(0, *runningCoord);
+                        *runningCoord += result.size.height();
+                    }
+
+                    m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
+                    importedItems->append(item);
+                } else {
+                    qWarning() << "Import failed:" << result.path << result.errorMessage;
+                }
+            });
 
     connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished, this,
             [this, watcher, taskId, importedItems, fitType, fitVal]() {
@@ -1286,15 +1552,23 @@ void MainWindow::importMultipleImages(const QStringList &paths)
                             unitedRect = unitedRect.isValid() ? unitedRect.united(r) : r;
                         }
 
-                        qreal offsetX = unitedRect.left() < 0 ? -unitedRect.left() : 0;
-                        qreal offsetY = unitedRect.top() < 0 ? -unitedRect.top() : 0;
+                        // 留白边距（mm → px），与 onFitCanvasToItems 一致
+                        const AppConfig &cfg = AppConfig::instance();
+                        qreal ppm = canvas->pixelsPerMm();
+                        qreal marginLeft = cfg.canvasMarginLeft() * ppm;
+                        qreal marginRight = cfg.canvasMarginRight() * ppm;
+                        qreal marginTop = cfg.canvasMarginTop() * ppm;
+                        qreal marginBottom = cfg.canvasMarginBottom() * ppm;
+
+                        qreal offsetX = -unitedRect.left() + marginLeft;
+                        qreal offsetY = -unitedRect.top() + marginTop;
 
                         QSizeF oldSize = canvas->canvasSize();
                         QSizeF newSize;
                         switch (fitType) {
                         case fctAdapt:
-                            newSize =
-                                QSizeF(unitedRect.right() + offsetX, unitedRect.bottom() + offsetY);
+                            newSize = QSizeF(unitedRect.width() + marginLeft + marginRight,
+                                             unitedRect.height() + marginTop + marginBottom);
                             break;
                         case fctWidth:
                             newSize = QSizeF(fitVal, oldSize.height());
@@ -1310,7 +1584,7 @@ void MainWindow::importMultipleImages(const QStringList &paths)
                             && newSize != oldSize) {
                             m_undoStack->beginMacro(tr("Fit Canvas on Import"));
 
-                            if (offsetX > 0 || offsetY > 0) {
+                            if (offsetX != 0 || offsetY != 0) {
                                 QPointF delta(offsetX, offsetY);
                                 QList<QPointF> oldPositions, newPositions;
                                 for (auto *item : *importedItems) {
@@ -1362,18 +1636,67 @@ void MainWindow::onExportImage()
         return;
     }
 
-    // 始终弹出 DPI 选择对话框
-    QStringList dpiItems;
-    for (int dpi : kDpiValues)
-        dpiItems << QString::number(dpi);
-    bool ok = false;
-    const QString chosen = QInputDialog::getItem(
-        this, tr("Export DPI"),
-        tr("Select export DPI:"),
-        dpiItems, /* current = */ 2, /* editable = */ false, &ok);
-    if (!ok)
-        return;
-    int exportDpi = chosen.toInt();
+    // 3. 检查是否需要用户设置 DPI（无图片图元 且 画布 DPI 未锁定）
+    int dpiOverride = 0;
+    {
+        auto *canvas = m_pView->canvasItem();
+        const auto allItems = ::filterSelectableItems(m_pView->scene()->items());
+        bool hasImages = containsImageItemRecursive(allItems);
+        if (!hasImages && (!canvas || !canvas->isDpiLocked())) {
+            QStringList dpiItems;
+            for (int dpi : kDpiValues)
+                dpiItems << QString::number(dpi);
+            bool ok = false;
+            const QString chosen =
+                QInputDialog::getItem(this, tr("Set Export DPI"),
+                                      tr("No image items on the canvas.\n"
+                                         "Please set the export DPI:"),
+                                      dpiItems, /* current = */ 2, /* editable = */ false, &ok);
+            if (!ok)
+                return; // 用户取消导出
+            dpiOverride = chosen.toInt();
+        }
+    }
+
+    // 应用用户自定义 DPI 到画布（保持物理尺寸，但不锁定 DPI）
+    if (dpiOverride > 0) {
+        auto *canvas = m_pView->canvasItem();
+        if (canvas) {
+            // 先算出当前物理 mm（在修改 DPI 前）
+            QSizeF oldSize = canvas->canvasSize();
+            qreal oldPpi = canvas->ppi();
+            qreal mmW = oldSize.width() / oldPpi * 25.4;
+            qreal mmH = oldSize.height() / oldPpi * 25.4;
+
+            // 更新画布 DPI（不锁定）
+            canvas->setCanvasDpi(dpiOverride, dpiOverride);
+            canvas->setPpi(static_cast<qreal>(dpiOverride));
+
+            // 从物理 mm 反算新像素尺寸（ceil 保证整数边界，消除取整不一致）
+            qreal mmToPx = static_cast<qreal>(dpiOverride) / 25.4;
+            QSizeF newSize(std::ceil(mmW * mmToPx), std::ceil(mmH * mmToPx));
+            m_pView->setCanvasSize(newSize);
+
+            // 同步缩放非图片图元的像素尺寸和位置（factor = newPpi/oldPpi）
+            qreal factor = static_cast<qreal>(dpiOverride) / oldPpi;
+            if (!qFuzzyCompare(factor, 1.0)) {
+                const auto selectable = ::filterSelectableItems(m_pView->scene()->items());
+                for (auto *item : selectable) {
+                    if (dynamic_cast<ImageItem *>(item) || item->parentItem())
+                        continue;
+                    item->setPos(item->pos() * factor);
+                    item->setTransform(QTransform::fromScale(factor, factor) * item->transform());
+                }
+            }
+
+            m_hRuler->setPpi(static_cast<qreal>(dpiOverride));
+            m_vRuler->setPpi(static_cast<qreal>(dpiOverride));
+            m_pPropertyPanel->setDisplayPpi(static_cast<qreal>(dpiOverride));
+            m_hRuler->updateRuler();
+            m_vRuler->updateRuler();
+            _updateCanvasLabel();
+        }
+    }
 
     // 1. 选择保存路径
     QString path =
@@ -1403,8 +1726,7 @@ void MainWindow::onExportImage()
     m_ripXRes = ripXRes;
     m_ripYRes = ripYRes;
 
-    if (!m_tiffEngine->startExport(m_pView->scene(), m_pView, tiffPath,
-                                   exportDpi)) {
+    if (!m_tiffEngine->startExport(m_pView->scene(), m_pView, tiffPath, dpiOverride)) {
         m_pProgressMgr->cancelTask(m_exportTaskId);
         QMessageBox::warning(this, tr("Export"), m_tiffEngine->lastError());
     }
@@ -1487,6 +1809,10 @@ void MainWindow::onDelete()
     }
 
     m_undoStack->push(new RemoveItemsCommand(m_pView->scene(), deletable));
+
+    // 如果删除了图片图元，检查是否需要解除 DPI 锁定
+    if (hasImageItem)
+        _unlockCanvasDpiIfNoImages();
 }
 
 void MainWindow::onSelectAll()
@@ -1928,11 +2254,11 @@ void MainWindow::onResizeCanvas()
         return;
 
     ResizeCanvasDialog dlg(this);
-    dlg.setCurrentSizeMM(canvas->canvasSize(), canvas->displayPpi());
+    dlg.setCurrentSizeMM(canvas->canvasSize(), canvas->ppi());
     if (dlg.exec() != QDialog::Accepted)
         return;
 
-    QSizeF newSize = dlg.newPixelSize(canvas->displayPpi());
+    QSizeF newSize = dlg.newPixelSize(canvas->ppi());
     QSizeF oldSize = canvas->canvasSize();
 
     if (newSize == oldSize)
@@ -2294,4 +2620,230 @@ void MainWindow::_toggleHistoryPopup()
     m_taskHistoryPopup->showAbove(m_taskHistoryBtn, m_pProgressMgr->activeTaskList(),
                                   m_pProgressMgr->finishedTaskList());
     m_taskHistoryBtn->setChecked(true);
+}
+
+// ============================================================
+// 智能排版
+// ============================================================
+void MainWindow::onAutoLayout()
+{
+    // 1. 收集画布上所有 ImageItem 的文件路径
+    QStringList imagePaths;
+    QList<ImageItem *> imageItems;
+    const auto allItems = ::filterSelectableItems(m_pView->scene()->items());
+    for (auto *item : allItems) {
+        auto *imgItem = dynamic_cast<ImageItem *>(item);
+        if (imgItem && !imgItem->filePath().isEmpty() && QFileInfo::exists(imgItem->filePath())) {
+            imagePaths << imgItem->filePath();
+            imageItems << imgItem;
+        }
+    }
+
+    if (imagePaths.isEmpty()) {
+        QMessageBox::information(
+            this, tr("Auto Layout"),
+            tr("No image items with valid source files found on the canvas.\n\n"
+               "Only images imported from files (not clipboard) are supported."));
+        return;
+    }
+
+    // 2. 弹出排版设置对话框
+    AutoLayoutDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    // 3. 创建 LayoutEngine（若需要）
+    if (!m_layoutEngine) {
+        m_layoutEngine = new LayoutEngine(this);
+    }
+
+    // 4. 显示进度对话框（模态，禁止操作主界面）
+    QProgressDialog progressDlg(this);
+    progressDlg.setWindowTitle(tr("Auto Layout"));
+    progressDlg.setLabelText(tr("Auto-layout in progress, please wait..."));
+    progressDlg.setCancelButtonText(tr("Cancel"));
+    progressDlg.setWindowModality(Qt::WindowModal);
+    progressDlg.setMinimumDuration(0);
+    progressDlg.setRange(0, 100);
+    progressDlg.setValue(0);
+    progressDlg.setAutoReset(false);
+    progressDlg.setAutoClose(false);
+
+    // 5. 连接信号
+    bool layoutSuccess = false;
+    QStringList outputPaths;
+    QString errorMsg;
+
+    connect(m_layoutEngine, &LayoutEngine::progressChanged, &progressDlg,
+            &QProgressDialog::setValue);
+    connect(&progressDlg, &QProgressDialog::canceled, m_layoutEngine, &LayoutEngine::cancel);
+
+    QEventLoop loop;
+    connect(m_layoutEngine, &LayoutEngine::finished, &loop,
+            [&](bool success, const QStringList &paths, const QString &error) {
+                layoutSuccess = success;
+                outputPaths = paths;
+                errorMsg = error;
+                // Disconnect progress updates so late-arriving signals don't re-show
+                // the dialog after it is closed.
+                QObject::disconnect(m_layoutEngine, &LayoutEngine::progressChanged, &progressDlg,
+                                    &QProgressDialog::setValue);
+                loop.quit();
+            });
+
+    // 6. 启动排版
+    m_layoutEngine->start(imagePaths, dlg.paperWidth(), dlg.elementInterval(), dlg.loopCount(),
+                          dlg.operateCount());
+
+    loop.exec();
+    progressDlg.close();
+
+    // 7. 处理结果
+    if (!layoutSuccess || outputPaths.isEmpty()) {
+        QString msg = errorMsg.isEmpty() ? tr("Layout operation produced no output.\n\n"
+                                              "The Layout library may have encountered an error.")
+                                         : errorMsg;
+        QMessageBox::warning(this, tr("Auto Layout"), msg);
+        _unlockCanvasDpiIfNoImages();
+        return;
+    }
+
+    // 8. 替换图元：删除旧图元，添加新图元（类似导入多图流程，但不弹对话框，默认竖向排列后画布自适应）
+    QList<QGraphicsItem *> oldItems;
+    for (auto *imgItem : imageItems)
+        oldItems << static_cast<QGraphicsItem *>(imgItem);
+
+    m_undoStack->beginMacro(tr("Auto Layout"));
+
+    if (!oldItems.isEmpty())
+        m_undoStack->push(new RemoveItemsCommand(m_pView->scene(), oldItems));
+
+    // 删除旧图元后解锁画布 DPI，让新图元通过 _tryLockCanvasDpi 重新锁定
+    CanvasItem *canvas = m_pView->canvasItem();
+    if (canvas && canvas->isDpiLocked())
+        canvas->unlockDpi();
+
+    // 导入排版后的图片，纵向排列
+    constexpr qreal kVerticalGap = 10.0;
+    constexpr int kThumbScaleDiv = 4; // 缩略图缩放比，与 runImportWorker 一致
+    qreal yOffset = 0;
+    QList<ImageItem *> newItems;
+    // DPI 共享状态：以首个有效 DPI 锁定画布，后续图片必须匹配（与导入多图逻辑一致）
+    QPair<int, int> firstDpi(0, 0);
+    for (const auto &path : outputPaths) {
+        QImageReader reader(path);
+        reader.setAutoTransform(true);
+        reader.setAllocationLimit(0);
+        QImage image = reader.read();
+        if (image.isNull())
+            continue;
+
+        QSize originalSize = image.size();
+        int dpiX = 0, dpiY = 0;
+
+        // TIFF：从标签读取 DPI 与原始尺寸（缩略图模式下 pixmap 可能小于原始尺寸）
+        if (ImageUtils::isTiffFile(path)) {
+            QPair<int, int> dpi = ImageUtils::readTiffDpi(path);
+            dpiX = dpi.first;
+            dpiY = dpi.second;
+            originalSize = ImageUtils::readTiffSize(path);
+        }
+
+        // 多图 DPI 筛选：以首个有效 DPI 为准，筛选相同 DPI 的图片（与导入多图逻辑一致）
+        if (dpiX > 0 && dpiY > 0) {
+            if (firstDpi.first == 0 && firstDpi.second == 0) {
+                // 首个有效 DPI：尝试锁定画布，失败则跳过
+                if (!_tryLockCanvasDpi(dpiX, dpiY)) {
+                    qWarning() << "Skipped (DPI rejected):" << path;
+                    continue;
+                }
+                firstDpi = { dpiX, dpiY };
+            } else if (dpiX != firstDpi.first || dpiY != firstDpi.second) {
+                // DPI 不匹配，跳过此图片
+                qWarning() << "Skipped (DPI mismatch):" << path << "DPI:" << dpiX << "x" << dpiY
+                           << "expected:" << firstDpi.first << "x" << firstDpi.second;
+                continue;
+            }
+        }
+
+        // 生成缩略图（固定 1/4 缩放，与导入流程一致，节省内存）
+        if (image.width() > kThumbScaleDiv || image.height() > kThumbScaleDiv) {
+            QSize thumbSize(qMax(1, image.width() / kThumbScaleDiv),
+                            qMax(1, image.height() / kThumbScaleDiv));
+            image = image.scaled(thumbSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        }
+
+        QPixmap pix = QPixmap::fromImage(image);
+        auto *item = new ImageItem(pix, originalSize);
+        item->setItemPen(QPen(Qt::NoPen));
+        item->setFilePath(path);
+        item->setOriginalSize(originalSize);
+        item->setPos(0, yOffset);
+
+        if (dpiX > 0 && dpiY > 0)
+            item->setDpi(dpiX, dpiY);
+
+        m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
+        newItems.append(item);
+        yOffset += originalSize.height() + kVerticalGap;
+    }
+
+    // 画布自适应：根据新图元自动调整画布大小（带留白边距，与 onFitCanvasToItems 一致）
+    if (!newItems.isEmpty() && canvas) {
+        QRectF unitedRect;
+        for (auto *item : newItems) {
+            QRectF r = item->mapToScene(item->boundingRect()).boundingRect();
+            unitedRect = unitedRect.isValid() ? unitedRect.united(r) : r;
+        }
+
+        // 留白边距（mm → px），与 onFitCanvasToItems 一致
+        const AppConfig &cfg = AppConfig::instance();
+        qreal ppm = canvas->pixelsPerMm();
+        qreal marginLeft = cfg.canvasMarginLeft() * ppm;
+        qreal marginRight = cfg.canvasMarginRight() * ppm;
+        qreal marginTop = cfg.canvasMarginTop() * ppm;
+        qreal marginBottom = cfg.canvasMarginBottom() * ppm;
+
+        qreal offsetX = -unitedRect.left() + marginLeft;
+        qreal offsetY = -unitedRect.top() + marginTop;
+
+        QSizeF oldSize = canvas->canvasSize();
+        QSizeF newSize(unitedRect.width() + marginLeft + marginRight,
+                       unitedRect.height() + marginTop + marginBottom);
+
+        if (newSize.isValid() && newSize.width() > 0 && newSize.height() > 0
+            && newSize != oldSize) {
+            if (offsetX != 0 || offsetY != 0) {
+                QPointF delta(offsetX, offsetY);
+                QList<QPointF> oldPositions, newPositions;
+                for (auto *item : newItems) {
+                    oldPositions << item->pos();
+                    newPositions << item->pos() + delta;
+                    item->setPos(item->pos() + delta);
+                }
+                m_undoStack->push(
+                    new MoveItemsCommand(QList<QGraphicsItem *>(newItems.begin(), newItems.end()),
+                                         oldPositions, newPositions, m_pView->scene()));
+            }
+            m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize, m_pView->scene()));
+        }
+    }
+
+    m_undoStack->endMacro();
+
+    // 画布自适应后刷新视图和状态栏（与导入多图 finished 处理一致）
+    if (!newItems.isEmpty()) {
+        _updateCanvasLabel();
+        _updatePosLabel(m_lastScenePos);
+        m_pView->fitToCanvas();
+    }
+
+    // Clean up only the input copy directory — keep the output directory
+    QDir(QCoreApplication::applicationDirPath() + "/tmp_layout/in").removeRecursively();
+
+    // 9. 显示结果
+    if (!errorMsg.isEmpty()) {
+        QMessageBox::information(this, tr("Auto Layout"),
+                                 tr("Layout completed with warnings:\n%1").arg(errorMsg));
+    }
 }

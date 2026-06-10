@@ -13,11 +13,12 @@ QMAKE_CXXFLAGS += -Wall
 
 include(../Common.pri)
 
-# 链接独立库（DESTDIR 由 Common.pri 设置）
-LIBS += -L$$PROJECT_PATH/Bin -lColorTrans
-LIBS += -L$$PROJECT_PATH/Bin -lQtColorWidgets
-LIBS += -L$$PROJECT_PATH/Bin -lQtGradientEditor
-LIBS += -L$$PROJECT_PATH/Bin -lQSimpleUpdater
+# 链接 Libs/ 子库（DESTDIR 已由 Common.pri 分离 Debug/Release）
+LIBS += -L$$DESTDIR -lColorTrans
+LIBS += -L$$DESTDIR -lQtColorWidgets
+LIBS += -L$$DESTDIR -lQtGradientEditor
+LIBS += -L$$DESTDIR -lQSimpleUpdater
+LIBS += -L$$DESTDIR -lLayout
 
 
 HEADERS += \
@@ -36,6 +37,8 @@ HEADERS += \
     UI/RulerBar.h \
     UI/GradientDialog.h \
     UI/AlignLayoutDialog.h \
+    UI/AutoLayoutDialog.h \
+    UI/AdvancedLayoutDialog.h \
     UI/SettingsDialog.h \
     UI/PreferencesDialog.h \
     UI/PreferencesPage.h \
@@ -64,6 +67,7 @@ HEADERS += \
     Utils/SceneToJsonConverter.h \
     Utils/ColorUtils.h \
     Utils/AlignmentUtils.h \
+    Utils/LayoutEngine.h \
     NetWork/QHttp.h \
     Action/QAtActionBase.h \
     Action/QAtDrawAction.h \
@@ -93,6 +97,8 @@ SOURCES += \
     UI/RulerBar.cpp \
     UI/GradientDialog.cpp \
     UI/AlignLayoutDialog.cpp \
+    UI/AutoLayoutDialog.cpp \
+    UI/AdvancedLayoutDialog.cpp \
     UI/SettingsDialog.cpp \
     UI/PreferencesDialog.cpp \
     UI/GeneralPage.cpp \
@@ -119,6 +125,7 @@ SOURCES += \
     Utils/SceneToJsonConverter.cpp \
     Utils/ColorUtils.cpp \
     Utils/AlignmentUtils.cpp \
+    Utils/LayoutEngine.cpp \
     NetWork/QHttp.cpp \
     Action/QAtActionBase.cpp \
     Action/QAtDrawAction.cpp \
@@ -159,3 +166,4 @@ INCLUDEPATH += \
     $$PWD/../Libs/QtGradientEditor \
     $$PWD/../Libs/QSimpleUpdater/include \
     $$PWD/../Libs/QSimpleUpdater/src \
+    $$PWD/../Libs/Layout \

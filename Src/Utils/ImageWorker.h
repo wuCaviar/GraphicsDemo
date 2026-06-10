@@ -100,8 +100,6 @@ struct SourceTiffInput
     QString filePath;
     QRectF outputRect; // 在输出图像中的像素坐标
     int zOrder = 0;
-    QSize targetPixelSize;      // 重采样目标像素尺寸（0x0 表示无需重采样）
-    bool needsResample = false; // 是否需要从原始分辨率重采样
 };
 
 // ========== 预渲染 CMYK 图层 ==========
@@ -127,10 +125,8 @@ void bgraToCmykFallback(const uint8_t *bgra, uint8_t *cmyk, int pixelCount);
 
 // [DEPRECATED] 全缓冲实现，保留作为 StripPipeline 的验证参考路径。
 // 新代码应使用 StripPipeline::execute()。
-ExportWorkerResult exportTiff(const QString &outputPath,
-                              const QList<SourceTiffInput> &sources,
-                              QList<CmykOverlay> &&overlays,
-                              const QSize &outputSize,
+ExportWorkerResult exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
+                              QList<CmykOverlay> &&overlays, const QSize &outputSize,
                               const TiffExportSettings &settings,
                               ProgressCallback progress = nullptr);
 

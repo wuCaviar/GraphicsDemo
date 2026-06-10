@@ -146,8 +146,6 @@ private:
     QLabel *m_imgPathLabel = nullptr;
     QLabel *m_imgOriginalSizeLabel = nullptr;
     QLabel *m_imgDpiLabel = nullptr;
-    QLabel *m_imgScaleLabel = nullptr;
-    QLabel *m_imgEffectiveSizeLabel = nullptr;
 
     // 当前值缓存
     QPen m_oldPen;

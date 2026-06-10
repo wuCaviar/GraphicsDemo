@@ -45,11 +45,9 @@ struct StripSlot
         int numSourceRows = 0; // 行数
         bool hasData = false; // 该源是否覆盖本 strip
         QString error;
-        QRectF
-            outputRect; // 该源在输出图像中的 pixel rect
+        QRectF outputRect; // 该源在输出图像中的 pixel rect（宽高 = 源像素尺寸，1:1 映射）
+        int sourcePixelWidth = 0; // 源 TIFF 的实际像素宽度（= reader.width()），用于行步长
         int zOrder = 0; // z-order 排序键
-        double scaleX = 1.0; // 输出像素 → 源像素 X 方向缩放系数 (width_src / width_dst)
-        double scaleY = 1.0; // 输出像素 → 源像素 Y 方向缩放系数 (height_src / height_dst)
     };
     std::vector<SourceStripData> sourcesData;
 

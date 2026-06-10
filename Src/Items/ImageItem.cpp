@@ -16,8 +16,7 @@ ImageItem::ImageItem(const QPixmap &pixmap, QGraphicsItem *parent)
         m_rect = QRectF(QPointF(0, 0), pixmap.size());
 }
 
-ImageItem::ImageItem(const QPixmap &pixmap, const QSize &sourcePixelSize,
-                     QGraphicsItem *parent)
+ImageItem::ImageItem(const QPixmap &pixmap, const QSize &sourcePixelSize, QGraphicsItem *parent)
     : QGraphicsPixmapItem(pixmap, parent)
 {
     setFlag(ItemIsSelectable, true);
@@ -42,8 +41,6 @@ QGraphicsItem *ImageItem::cloneItem() const
     item->setMultiPageSource(m_isMultiPage);
     item->setOriginalSize(m_originalSize);
     item->setDpi(m_dpiX, m_dpiY);
-    item->setOriginalPhysicalMm(m_originalPhysicalMm);
-    item->setScale(m_scaleX, m_scaleY);
     return item;
 }
 
@@ -76,36 +73,7 @@ QPainterPath ImageItem::shape() const
     return path;
 }
 
-void ImageItem::setGeometryRect(const QRectF &r)
-{
-    prepareGeometryChange();
-    qreal oldW = m_rect.width();
-    qreal oldH = m_rect.height();
-    m_rect = r;
-    if (oldW > 1.0 && oldH > 1.0) {
-        m_scaleX *= r.width() / oldW;
-        m_scaleY *= r.height() / oldH;
-    }
-    update();
-}
-
-void ImageItem::setScale(qreal sx, qreal sy)
-{
-    m_scaleX = sx;
-    m_scaleY = sy;
-}
-
-QSize ImageItem::targetOutputPixels(int exportDpi) const
-{
-    qreal physW = m_originalPhysicalMm.width() * m_scaleX;
-    qreal physH = m_originalPhysicalMm.height() * m_scaleY;
-    int pxW = qMax(1, qRound(physW / 25.4 * exportDpi));
-    int pxH = qMax(1, qRound(physH / 25.4 * exportDpi));
-    return QSize(pxW, pxH);
-}
-
-void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
-                      QWidget *widget)
+void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
     Q_UNUSED(option);
     Q_UNUSED(widget);
@@ -117,12 +85,7 @@ void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 void ImageItem::serialize(QDataStream &out) const
 {
     out << pixmap() << pos() << rotation() << m_filePath;
-    out << m_rect << m_originalSize << m_dpiX << m_dpiY << m_isCmykSource
-        << m_isMultiPage;
-    // 新格式标记: 2 表示后面有 scale + physicalMm 字段
-    out << static_cast<quint8>(2);
-    out << m_scaleX << m_scaleY << m_originalPhysicalMm.width()
-        << m_originalPhysicalMm.height();
+    out << m_rect << m_originalSize << m_dpiX << m_dpiY << m_isCmykSource << m_isMultiPage;
     writeCmykIfValid(out, m_penCmyk);
 }
 
@@ -132,47 +95,14 @@ bool ImageItem::deserialize(QDataStream &in)
     qreal rot;
     QPointF pos_;
     in >> pix >> pos_ >> rot >> m_filePath;
-    in >> m_rect >> m_originalSize >> m_dpiX >> m_dpiY >> m_isCmykSource
-        >> m_isMultiPage;
+    in >> m_rect >> m_originalSize >> m_dpiX >> m_dpiY >> m_isCmykSource >> m_isMultiPage;
     if (in.status() != QDataStream::Ok)
         return false;
-
-    m_scaleX = 1.0;
-    m_scaleY = 1.0;
-
-    QIODevice *dev = in.device();
-    if (!dev->atEnd()) {
-        quint8 marker;
-        in >> marker;
-        if (in.status() == QDataStream::Ok && marker == 2) {
-            qreal physW = 0, physH = 0;
-            in >> m_scaleX >> m_scaleY >> physW >> physH;
-            if (in.status() == QDataStream::Ok && physW > 0 && physH > 0)
-                m_originalPhysicalMm = QSizeF(physW, physH);
-        }
-        // 如果 marker == 1，说明是旧格式 CMYK 标记
-        // readCmykIfAvailable 会通过 atEnd 回退处理 — 但已经消费了 marker
-        // 所以需要手动处理
-        if (in.status() == QDataStream::Ok && marker == 1) {
-            double c, m, y, k;
-            in >> c >> m >> y >> k;
-            if (in.status() == QDataStream::Ok) {
-                m_penCmyk = {c, m, y, k, true};
-            }
-        }
-    }
 
     setPixmap(pix);
     setPos(pos_);
     setRotation(rot);
-
-    // 回退计算物理尺寸（老项目兼容）
-    if (!m_originalPhysicalMm.isValid() && m_dpiX > 0 && m_dpiY > 0
-        && m_originalSize.isValid()) {
-        m_originalPhysicalMm = QSizeF(
-            m_originalSize.width() / static_cast<qreal>(m_dpiX) * 25.4,
-            m_originalSize.height() / static_cast<qreal>(m_dpiY) * 25.4);
-    }
-
+    if (!readCmykIfAvailable(in, in.device(), m_penCmyk))
+        return false;
     return true;
 }

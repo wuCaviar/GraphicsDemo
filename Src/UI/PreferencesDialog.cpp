@@ -9,7 +9,7 @@
 
 PreferencesDialog::PreferencesDialog(QWidget *parent) : QDialog(parent)
 {
-    setWindowTitle(tr("首选项"));
+    setWindowTitle(tr("Preferences"));
     setMinimumSize(600, 400);
     setupUI();
 
@@ -28,8 +28,7 @@ void PreferencesDialog::setupUI()
     m_tabWidget->setTabPosition(QTabWidget::North);
     mainLayout->addWidget(m_tabWidget);
 
-    auto *buttonBox = new QDialogButtonBox(
-        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttonBox, &QDialogButtonBox::accepted, this, [this]() {
         for (auto *page : m_pages) {
             if (!page->save())

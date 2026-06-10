@@ -17,14 +17,11 @@ namespace ImageUtils {
 //  execute() — 主调度循环
 // ============================================================================
 
-ExportWorkerResult
-StripPipeline::execute(const QString &outputPath,
-                      const QList<SourceTiffInput> &sources,
-                      QList<CmykOverlay> &&overlays,
-                      const QSize &outputSize,
-                      const TiffExportSettings &settings,
-                      ProgressCallback progress,
-                      std::atomic<bool> *cancelFlag)
+ExportWorkerResult StripPipeline::execute(const QString &outputPath,
+                                          const QList<SourceTiffInput> &sources,
+                                          QList<CmykOverlay> &&overlays, const QSize &outputSize,
+                                          const TiffExportSettings &settings,
+                                          ProgressCallback progress, std::atomic<bool> *cancelFlag)
 {
     ExportWorkerResult result;
     result.filePath = outputPath;
@@ -63,23 +60,27 @@ StripPipeline::execute(const QString &outputPath,
     std::condition_variable cv;
 
     // 流水线共享状态
-    std::atomic<bool> pipelineError{false};
+    std::atomic<bool> pipelineError{ false };
     std::mutex errorMutex;
     std::string errorMsg;
 
     // 进度：三个阶段的 strip 序号
-    std::atomic<int> producedStrips{0};
-    std::atomic<int> organizedStrips{0};
-    std::atomic<int> writtenStrips{0};
+    std::atomic<int> producedStrips{ 0 };
+    std::atomic<int> organizedStrips{ 0 };
+    std::atomic<int> writtenStrips{ 0 };
 
     // ---- 进度报告集成 ----
     // 权重: Producer 0-30%, Organizer 30-80%, Consumer 80-100%
     auto reportProgress = [&](int produced, int organized, int written) {
-        if (!progress) return;
+        if (!progress)
+            return;
         int pct = 0;
-        if (produced > 0)  pct = std::min(produced * 30 / totalStrips, 30);
-        if (organized > 0) pct = std::max(pct, 30 + std::min(organized * 50 / totalStrips, 50));
-        if (written > 0)   pct = std::max(pct, 80 + std::min(written * 20 / totalStrips, 20));
+        if (produced > 0)
+            pct = std::min(produced * 30 / totalStrips, 30);
+        if (organized > 0)
+            pct = std::max(pct, 30 + std::min(organized * 50 / totalStrips, 50));
+        if (written > 0)
+            pct = std::max(pct, 80 + std::min(written * 20 / totalStrips, 20));
         pct = std::min(pct, 100);
         progress(pct);
     };
@@ -129,8 +130,7 @@ StripPipeline::execute(const QString &outputPath,
         QFile iccFile(iccPath);
         if (iccFile.open(QIODevice::ReadOnly)) {
             QByteArray iccData = iccFile.readAll();
-            TIFFSetField(outTif.get(), TIFFTAG_ICCPROFILE,
-                         static_cast<uint32_t>(iccData.size()),
+            TIFFSetField(outTif.get(), TIFFTAG_ICCPROFILE, static_cast<uint32_t>(iccData.size()),
                          iccData.constData());
             iccFile.close();
         }
@@ -150,7 +150,8 @@ StripPipeline::execute(const QString &outputPath,
                 std::unique_lock lock(cvMutex);
                 cv.wait(lock, [&]() -> bool {
                     for (int i = 0; i < m_config.pipelineDepth; ++i) {
-                        if (stripSlots[i].state.load(std::memory_order_acquire) == StripSlot::State::Done)
+                        if (stripSlots[i].state.load(std::memory_order_acquire)
+                            == StripSlot::State::Done)
                             return true;
                     }
                     return isCancelled(cancelFlag) || pipelineError.load(std::memory_order_acquire);
@@ -158,13 +159,15 @@ StripPipeline::execute(const QString &outputPath,
                 if (isCancelled(cancelFlag) || pipelineError.load(std::memory_order_acquire))
                     break;
                 for (int i = 0; i < m_config.pipelineDepth; ++i) {
-                    if (stripSlots[i].state.load(std::memory_order_acquire) == StripSlot::State::Done) {
+                    if (stripSlots[i].state.load(std::memory_order_acquire)
+                        == StripSlot::State::Done) {
                         slotIdx = i;
                         break;
                     }
                 }
             }
-            if (slotIdx < 0) break;
+            if (slotIdx < 0)
+                break;
 
             StripSlot &slot = stripSlots[slotIdx];
             slot.stripIndex = k;
@@ -172,11 +175,13 @@ StripPipeline::execute(const QString &outputPath,
             slot.numRows = std::min(m_config.stripHeight, outH - slot.startRow);
             slot.state.store(StripSlot::State::Idle, std::memory_order_release);
 
-            producerStage(slot, sources, outputSize, readers, cancelFlag,
-                          pipelineError, errorMutex, errorMsg);
+            producerStage(slot, sources, outputSize, readers, cancelFlag, pipelineError, errorMutex,
+                          errorMsg);
 
-            if (isCancelled(cancelFlag)) break;
-            if (pipelineError.load(std::memory_order_acquire)) break;
+            if (isCancelled(cancelFlag))
+                break;
+            if (pipelineError.load(std::memory_order_acquire))
+                break;
 
             producedStrips.store(k + 1, std::memory_order_release);
             slot.state.store(StripSlot::State::SourceReady, std::memory_order_release);
@@ -196,7 +201,8 @@ StripPipeline::execute(const QString &outputPath,
                 std::unique_lock lock(cvMutex);
                 cv.wait(lock, [&]() -> bool {
                     for (int i = 0; i < m_config.pipelineDepth; ++i) {
-                        if (stripSlots[i].state.load(std::memory_order_acquire) == StripSlot::State::SourceReady)
+                        if (stripSlots[i].state.load(std::memory_order_acquire)
+                            == StripSlot::State::SourceReady)
                             return true;
                     }
                     int produced = producedStrips.load(std::memory_order_acquire);
@@ -206,19 +212,23 @@ StripPipeline::execute(const QString &outputPath,
                 if (isCancelled(cancelFlag) || pipelineError.load(std::memory_order_acquire))
                     break;
                 for (int i = 0; i < m_config.pipelineDepth; ++i) {
-                    if (stripSlots[i].state.load(std::memory_order_acquire) == StripSlot::State::SourceReady) {
+                    if (stripSlots[i].state.load(std::memory_order_acquire)
+                        == StripSlot::State::SourceReady) {
                         slotIdx = i;
                         break;
                     }
                 }
             }
-            if (slotIdx < 0) break;
+            if (slotIdx < 0)
+                break;
 
             StripSlot &slot = stripSlots[slotIdx];
             organizerStage(slot, overlays, outW, outH, cancelFlag);
 
-            if (isCancelled(cancelFlag)) break;
-            if (pipelineError.load(std::memory_order_acquire)) break;
+            if (isCancelled(cancelFlag))
+                break;
+            if (pipelineError.load(std::memory_order_acquire))
+                break;
 
             organizedStrips.store(k + 1, std::memory_order_release);
             slot.state.store(StripSlot::State::Composited, std::memory_order_release);
@@ -237,7 +247,8 @@ StripPipeline::execute(const QString &outputPath,
             std::unique_lock lock(cvMutex);
             cv.wait(lock, [&]() -> bool {
                 for (int i = 0; i < m_config.pipelineDepth; ++i) {
-                    if (stripSlots[i].state.load(std::memory_order_acquire) == StripSlot::State::Composited)
+                    if (stripSlots[i].state.load(std::memory_order_acquire)
+                        == StripSlot::State::Composited)
                         return true;
                 }
                 int organized = organizedStrips.load(std::memory_order_acquire);
@@ -247,18 +258,19 @@ StripPipeline::execute(const QString &outputPath,
             if (isCancelled(cancelFlag) || pipelineError.load(std::memory_order_acquire))
                 break;
             for (int i = 0; i < m_config.pipelineDepth; ++i) {
-                if (stripSlots[i].state.load(std::memory_order_acquire) == StripSlot::State::Composited) {
+                if (stripSlots[i].state.load(std::memory_order_acquire)
+                    == StripSlot::State::Composited) {
                     slotIdx = i;
                     break;
                 }
             }
         }
-        if (slotIdx < 0) break;
+        if (slotIdx < 0)
+            break;
 
         StripSlot &slot = stripSlots[slotIdx];
 
-        consumerStage(slot, outTif.get(), outW, outH,
-                      writtenStrips, totalStrips, cancelFlag,
+        consumerStage(slot, outTif.get(), outW, outH, writtenStrips, totalStrips, cancelFlag,
                       pipelineError, errorMutex, errorMsg, progress);
 
         if (pipelineError.load(std::memory_order_acquire))
@@ -272,7 +284,8 @@ StripPipeline::execute(const QString &outputPath,
                        organizedStrips.load(std::memory_order_acquire),
                        writtenStrips.load(std::memory_order_acquire));
 
-        if (isCancelled(cancelFlag)) break;
+        if (isCancelled(cancelFlag))
+            break;
     }
 
     // ---- 5. 等待线程结束 ----
@@ -309,15 +322,10 @@ StripPipeline::execute(const QString &outputPath,
 //  producerStage() — 并行读取源 TIFF 的 strip 数据
 // ============================================================================
 
-void StripPipeline::producerStage(
-    StripSlot &slot,
-    const QList<SourceTiffInput> &sources,
-    const QSize &outSize,
-    std::vector<SourceReader> &readers,
-    std::atomic<bool> *cancelFlag,
-    std::atomic<bool> &pipelineError,
-    std::mutex &errorMutex,
-    std::string &errorMsg)
+void StripPipeline::producerStage(StripSlot &slot, const QList<SourceTiffInput> &sources,
+                                  const QSize &outSize, std::vector<SourceReader> &readers,
+                                  std::atomic<bool> *cancelFlag, std::atomic<bool> &pipelineError,
+                                  std::mutex &errorMutex, std::string &errorMsg)
 {
     const int outH = outSize.height();
     const int stripY0 = slot.startRow;
@@ -363,28 +371,14 @@ void StripPipeline::producerStage(
                 return;
             }
 
-            // 只读阶段：计算映射参数
-            const int srcWidth = static_cast<int>(reader.width());
-            const int srcRectW = static_cast<int>(std::ceil(src.outputRect.width()));
-            const int srcRectH = static_cast<int>(std::ceil(src.outputRect.height()));
-
-            // 输出行 → 源行映射（浮点缩放）
-            double scaleY =
-                static_cast<double>(reader.height()) / srcRectH;
-            double scaleX =
-                static_cast<double>(srcWidth) / srcRectW;
-
+            // 1:1 映射：outputRect 尺寸 == 源图像像素尺寸
+            int srcTop = static_cast<int>(std::floor(src.outputRect.top()));
             int stripSrcY0 = std::max(stripY0, srcRectY0);
             int stripSrcY1 = std::min(stripY1, srcRectY1);
-
-            // 映射到源图像行号（取整覆盖所有涉及的源行）
-            // srcY1F 用 ceil 保证不遗漏上边界
-            double srcY0F = (stripSrcY0 - srcRectY0) * scaleY;
-            double srcY1F = (stripSrcY1 - srcRectY0) * scaleY;
-            int sourceRow0 = std::clamp(static_cast<int>(std::floor(srcY0F)), 0,
-                                        static_cast<int>(reader.height()) - 1);
-            int sourceRow1 = std::clamp(static_cast<int>(std::ceil(srcY1F) - 1), 0,
-                                        static_cast<int>(reader.height()) - 1);
+            int sourceRow0 = stripSrcY0 - srcTop;
+            int sourceRow1 = stripSrcY1 - srcTop - 1;
+            sourceRow0 = std::clamp(sourceRow0, 0, static_cast<int>(reader.height()) - 1);
+            sourceRow1 = std::clamp(sourceRow1, 0, static_cast<int>(reader.height()) - 1);
 
             int numRows = sourceRow1 - sourceRow0 + 1;
             if (numRows <= 0) {
@@ -414,21 +408,19 @@ void StripPipeline::producerStage(
             sd.outputRect = src.outputRect;
             sd.sourcePixelWidth = static_cast<int>(reader.width());
             sd.zOrder = src.zOrder;
-            sd.scaleX = scaleX;
-            sd.scaleY = scaleY;
 
             // 逐行读取并转换为 CMYK（预分配行缓冲区，避免每行 malloc）
             size_t rowBytes = static_cast<size_t>(reader.width()) * 4;
-            std::vector<uint8_t> rowBuf(reader.width() * 4);  // 一次性分配
+            std::vector<uint8_t> rowBuf(reader.width() * 4); // 一次性分配
             for (int row = sourceRow0; row <= sourceRow1; ++row) {
-                if (isCancelled(cancelFlag)) break;
+                if (isCancelled(cancelFlag))
+                    break;
 
                 if (!reader.readAndConvertRow(row, rowBuf)) {
                     std::memset(rowBuf.data(), 0, rowBytes);
                 }
                 int localIdx = row - sourceRow0;
-                std::memcpy(sd.cmykRows.data() + localIdx * rowBytes,
-                            rowBuf.data(), rowBytes);
+                std::memcpy(sd.cmykRows.data() + localIdx * rowBytes, rowBuf.data(), rowBytes);
             }
 
             slot.sourcesCompleted.fetch_add(1, std::memory_order_release);
@@ -445,12 +437,8 @@ void StripPipeline::producerStage(
 //  organizerStage() — 逐行合成 strip
 // ============================================================================
 
-void StripPipeline::organizerStage(
-    StripSlot &slot,
-    const QList<CmykOverlay> &overlays,
-    int outWidth,
-    int outHeight,
-    std::atomic<bool> *cancelFlag)
+void StripPipeline::organizerStage(StripSlot &slot, const QList<CmykOverlay> &overlays,
+                                   int outWidth, int outHeight, std::atomic<bool> *cancelFlag)
 {
     const int numRows = slot.numRows;
     const int stripY0 = slot.startRow;
@@ -509,8 +497,7 @@ void StripPipeline::organizerStage(
             return;
 
         int globalY = stripY0 + localY;
-        uint8_t *outRow = slot.compositedRows.data()
-                        + static_cast<size_t>(localY) * outWidth * 4;
+        uint8_t *outRow = slot.compositedRows.data() + static_cast<size_t>(localY) * outWidth * 4;
 
         // 初始化为白色 (CMYK 0,0,0,0)
         std::memset(outRow, 0, static_cast<size_t>(outWidth) * 4);
@@ -518,84 +505,45 @@ void StripPipeline::organizerStage(
         // 按 z-order 叠加每个参与者
         for (const auto &p : participants) {
             if (p.type == CompositorParticipant::Type::SourceReader) {
-                // ============ 源 TIFF 数据（带缩放映射） ============
+                // ============ 源 TIFF 数据（1:1 直接拷贝） ============
                 const auto *sd = p.sourceData;
                 if (!sd || !sd->hasData)
                     continue;
 
                 int sdRectY0 = std::max(0, static_cast<int>(std::floor(sd->outputRect.top())));
-                int sdRectY1 = std::min(outHeight, static_cast<int>(std::ceil(sd->outputRect.bottom())));
+                int sdRectY1 =
+                    std::min(outHeight, static_cast<int>(std::ceil(sd->outputRect.bottom())));
                 if (globalY < sdRectY0 || globalY >= sdRectY1)
                     continue;
 
-                // 输出行 → 源行映射（浮点，双线性插值）
-                // srcY 是浮点源行号，映射到 localRow0..localRow1 范围
-                double srcY =
-                    (globalY - sd->outputRect.top()) * sd->scaleY;
-                int srcY0 = static_cast<int>(std::floor(srcY));
-                int srcY1 = std::min(srcY0 + 1,
-                                     static_cast<int>(sd->startSourceRow
-                                                      + sd->numSourceRows) - 1);
-                double yFrac = srcY - srcY0;
+                // 1:1 映射：输出行 → 源行 = globalY - outputRect.top()
+                int srcRow = globalY - static_cast<int>(std::floor(sd->outputRect.top()));
+                int localRow = srcRow - sd->startSourceRow;
+                if (localRow < 0 || localRow >= sd->numSourceRows)
+                    continue;
 
-                int localRow0 = std::clamp(
-                    srcY0 - sd->startSourceRow, 0, sd->numSourceRows - 1);
-                int localRow1 = std::clamp(
-                    srcY1 - sd->startSourceRow, 0, sd->numSourceRows - 1);
+                // 使用 sourcePixelWidth（= reader.width()）作为行步长，
+                // 与 Producer 分配 cmykRows 时的步长一致。
+                // 不能使用 ceil(outputRect.width())，因为浮点精度误差可能导致
+                // ceil(width) = width + 1，造成步长错位。
+                int srcWidth = sd->sourcePixelWidth;
+                int bx0 = std::max(0, static_cast<int>(std::floor(sd->outputRect.left())));
+                int bx1 = std::min(outWidth, static_cast<int>(std::ceil(sd->outputRect.right())));
+                // 钳制拷贝范围，防止浮点精度导致 ceil(right) - floor(left) > srcWidth
+                bx1 = std::min(bx1, bx0 + srcWidth);
 
-                // 源图像像素宽度 (reader.width())，不是输出目标宽度
-                // sd->cmykRows 每行 = reader.width() * 4 字节
-                // sd->outputRect.width() 是输出像素坐标中的宽度
-
-                int bx0 = std::max(
-                    0, static_cast<int>(std::floor(sd->outputRect.left())));
-                int bx1 = std::min(outWidth, static_cast<int>(std::ceil(
-                                                 sd->outputRect.right())));
-
-                // sd->cmykRows 中每行的像素数 = reader.width() (原始TIFF宽度)
-                // 这里无法直接访问 reader，用 sd->scaleX 反推:
-                // scaleX = reader.width() / outputRect.width()
-                // => reader.width() = scaleX * outputRect.width()
-                int storedWidth = static_cast<int>(
-                    std::ceil(sd->outputRect.width() * sd->scaleX));
-
-                const uint8_t *srcRowData0 =
-                    sd->cmykRows.data()
-                    + static_cast<size_t>(localRow0) * storedWidth * 4;
-                const uint8_t *srcRowData1 =
-                    (localRow1 == localRow0)
-                        ? srcRowData0
-                        : sd->cmykRows.data()
-                            + static_cast<size_t>(localRow1) * storedWidth * 4;
-
-                // 逐像素 X 方向双线性插值
-                // sd->scaleX = originalTIFF.width / outputRect.width
-                for (int x = bx0; x < bx1; ++x) {
-                    double srcX = (x - sd->outputRect.left()) * sd->scaleX;
-                    int srcX0 = static_cast<int>(std::floor(srcX));
-                    int srcX1 = std::min(srcX0 + 1, storedWidth - 1);
-                    double xFrac = srcX - srcX0;
-
-                    int i0 = srcX0 * 4;
-                    int i1 = srcX1 * 4;
-
-                    for (int c = 0; c < 4; ++c) {
-                        double v0 = srcRowData0[i0 + c] * (1.0 - xFrac)
-                                    + srcRowData0[i1 + c] * xFrac;
-                        double v1 = srcRowData1[i0 + c] * (1.0 - xFrac)
-                                    + srcRowData1[i1 + c] * xFrac;
-                        double v = v0 * (1.0 - yFrac) + v1 * yFrac;
-                        outRow[x * 4 + c] = static_cast<uint8_t>(
-                            qBound(0.0, v, 255.0));
-                    }
-                }
+                const uint8_t *srcRowData =
+                    sd->cmykRows.data() + static_cast<size_t>(localRow) * srcWidth * 4;
+                // 源像素直接覆盖到输出行对应位置
+                std::memcpy(outRow + bx0 * 4,
+                            srcRowData + (bx0 - static_cast<int>(sd->outputRect.left())) * 4,
+                            static_cast<size_t>(bx1 - bx0) * 4);
             } else {
                 // ============ Overlay（1:1 直接拷贝） ============
                 const auto *ov = p.overlay;
                 if (!ov)
                     continue;
-                if (globalY < ov->outputRect.top()
-                    || globalY >= ov->outputRect.bottom())
+                if (globalY < ov->outputRect.top() || globalY >= ov->outputRect.bottom())
                     continue;
 
                 int bx0 = std::max(0, static_cast<int>(std::floor(ov->outputRect.left())));
@@ -605,8 +553,8 @@ void StripPipeline::organizerStage(
 
                 // 1:1 映射：overlay 渲染尺寸 == outputRect 尺寸
                 int srcRow = globalY - static_cast<int>(std::floor(ov->outputRect.top()));
-                const uint8_t *srcRowData = ov->data.data()
-                    + static_cast<size_t>(srcRow) * ov->width * 4;
+                const uint8_t *srcRowData =
+                    ov->data.data() + static_cast<size_t>(srcRow) * ov->width * 4;
                 // 逐像素合成：跳过透明像素 (CMYK 0,0,0,0)，防止高 z-order
                 // overlay 的透明区域擦除低 z-order overlay 的实际像素。
                 // 仅当 overlay 与其他 overlay 的外接矩形重叠时才需要此检查，
@@ -631,18 +579,11 @@ void StripPipeline::organizerStage(
 //  consumerStage() — 写入合成行到输出 TIFF
 // ============================================================================
 
-void StripPipeline::consumerStage(
-    StripSlot &slot,
-    TIFF *tif,
-    int outWidth,
-    int /*outH*/,
-    std::atomic<int> &writtenStrips,
-    int /*totalStrips*/,
-    std::atomic<bool> *cancelFlag,
-    std::atomic<bool> &pipelineError,
-    std::mutex &errorMutex,
-    std::string &errorMsg,
-    ProgressCallback /*progress*/)
+void StripPipeline::consumerStage(StripSlot &slot, TIFF *tif, int outWidth, int /*outH*/,
+                                  std::atomic<int> &writtenStrips, int /*totalStrips*/,
+                                  std::atomic<bool> *cancelFlag, std::atomic<bool> &pipelineError,
+                                  std::mutex &errorMutex, std::string &errorMsg,
+                                  ProgressCallback /*progress*/)
 {
     const size_t rowStride = static_cast<size_t>(outWidth) * 4;
     const int numRows = slot.numRows;
@@ -679,25 +620,21 @@ void StripPipeline::consumerStage(
 //  validateAgainstLegacy() — 像素级对比验证（调试用）
 // ============================================================================
 
-ExportVerificationResult
-StripPipeline::validateAgainstLegacy(
-    const QString &outputPath,
-    const QList<SourceTiffInput> &sources,
-    QList<CmykOverlay> overlays,
-    const QSize &outputSize,
-    const TiffExportSettings &settings,
-    ProgressCallback progress)
+ExportVerificationResult StripPipeline::validateAgainstLegacy(
+    const QString &outputPath, const QList<SourceTiffInput> &sources, QList<CmykOverlay> overlays,
+    const QSize &outputSize, const TiffExportSettings &settings, ProgressCallback progress)
 {
     ExportVerificationResult vResult;
 
-    if (progress) progress(0);
+    if (progress)
+        progress(0);
 
     // ---- Step 1: 复制两份 overlays (execute 和 exportTiff 都是右值消费) ----
     auto copyOverlays = [](const QList<CmykOverlay> &src) -> QList<CmykOverlay> {
         QList<CmykOverlay> dst;
         for (const auto &ov : src) {
             CmykOverlay copy;
-            copy.data = ov.data;          // 深拷贝像素
+            copy.data = ov.data; // 深拷贝像素
             copy.width = ov.width;
             copy.height = ov.height;
             copy.outputRect = ov.outputRect;
@@ -713,8 +650,8 @@ StripPipeline::validateAgainstLegacy(
     // ---- Step 2: Run pipeline → outputPath ----
     StripPipeline::Config cfg;
     StripPipeline pipeline(cfg);
-    ExportWorkerResult pipeResult = pipeline.execute(
-        outputPath, sources, std::move(overlays), outputSize, settings, progress);
+    ExportWorkerResult pipeResult =
+        pipeline.execute(outputPath, sources, std::move(overlays), outputSize, settings, progress);
     if (!pipeResult.success) {
         vResult.errorMessage = QString("Pipeline failed: %1").arg(pipeResult.errorMessage);
         return vResult;
@@ -722,15 +659,16 @@ StripPipeline::validateAgainstLegacy(
 
     // ---- Step 3: Run legacy → outputPath + ".legacy.tif" ----
     QString legacyPath = outputPath + ".legacy.tif";
-    ExportWorkerResult legacyResult = exportTiff(
-        legacyPath, sources, std::move(legacyOverlays), outputSize, settings, progress);
+    ExportWorkerResult legacyResult =
+        exportTiff(legacyPath, sources, std::move(legacyOverlays), outputSize, settings, progress);
     if (!legacyResult.success) {
         vResult.errorMessage = QString("Legacy failed: %1").arg(legacyResult.errorMessage);
         QFile::remove(legacyPath);
         return vResult;
     }
 
-    if (progress) progress(95);
+    if (progress)
+        progress(95);
 
     // ---- Step 4: 逐像素比较两个 TIFF 文件 ----
     QByteArray pipePathBytes = outputPath.toLocal8Bit();
@@ -739,8 +677,10 @@ StripPipeline::validateAgainstLegacy(
     TIFF *legacyTif = TIFFOpen(legacyPathBytes.constData(), "r");
 
     if (!pipeTif || !legacyTif) {
-        if (pipeTif) TIFFClose(pipeTif);
-        if (legacyTif) TIFFClose(legacyTif);
+        if (pipeTif)
+            TIFFClose(pipeTif);
+        if (legacyTif)
+            TIFFClose(legacyTif);
         vResult.errorMessage = "Cannot open output files for comparison";
         QFile::remove(legacyPath);
         return vResult;
@@ -754,7 +694,10 @@ StripPipeline::validateAgainstLegacy(
 
     if (pipeW != legacyW || pipeH != legacyH) {
         vResult.errorMessage = QString("Dimension mismatch: pipeline %1x%2, legacy %3x%4")
-                                   .arg(pipeW).arg(pipeH).arg(legacyW).arg(legacyH);
+                                   .arg(pipeW)
+                                   .arg(pipeH)
+                                   .arg(legacyW)
+                                   .arg(legacyH);
         TIFFClose(pipeTif);
         TIFFClose(legacyTif);
         QFile::remove(legacyPath);
@@ -767,15 +710,16 @@ StripPipeline::validateAgainstLegacy(
     std::vector<uint8_t> legacyBuf(scanlineSize);
 
     for (uint32_t y = 0; y < pipeH; ++y) {
-        if (TIFFReadScanline(pipeTif, pipeBuf.data(), y, 0) < 0) break;
-        if (TIFFReadScanline(legacyTif, legacyBuf.data(), y, 0) < 0) break;
+        if (TIFFReadScanline(pipeTif, pipeBuf.data(), y, 0) < 0)
+            break;
+        if (TIFFReadScanline(legacyTif, legacyBuf.data(), y, 0) < 0)
+            break;
 
         for (int x = 0; x < static_cast<int>(pipeW); ++x) {
             bool diff = false;
             for (int c = 0; c < 4; ++c) {
                 int off = x * 4 + c;
-                int d = std::abs(static_cast<int>(pipeBuf[off])
-                                - static_cast<int>(legacyBuf[off]));
+                int d = std::abs(static_cast<int>(pipeBuf[off]) - static_cast<int>(legacyBuf[off]));
                 if (d > 0) {
                     diff = true;
                     if (d > vResult.maxChannelDiff)
@@ -803,7 +747,8 @@ StripPipeline::validateAgainstLegacy(
                                    .arg(vResult.maxChannelDiff);
     }
 
-    if (progress) progress(100);
+    if (progress)
+        progress(100);
     return vResult;
 }
 

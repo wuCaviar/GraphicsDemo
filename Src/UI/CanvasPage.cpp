@@ -14,14 +14,14 @@ CanvasPage::CanvasPage(QWidget *parent) : PreferencesPage(parent)
 
 QString CanvasPage::title() const
 {
-    return tr("画布");
+    return tr("Canvas");
 }
 
 void CanvasPage::setupUI()
 {
     auto *layout = new QVBoxLayout(this);
 
-    auto *group = new QGroupBox(tr("画布留白（适配图元时生效）"), this);
+    auto *group = new QGroupBox(tr("Canvas Margins (applied when fitting canvas to items)"), this);
     auto *formLayout = new QFormLayout(group);
 
     auto createSpin = [&](const QString &tooltip) -> QDoubleSpinBox * {
@@ -34,15 +34,15 @@ void CanvasPage::setupUI()
         return spin;
     };
 
-    m_marginLeftSpin = createSpin(tr("画布左侧留白"));
-    m_marginRightSpin = createSpin(tr("画布右侧留白"));
-    m_marginTopSpin = createSpin(tr("画布上方留白"));
-    m_marginBottomSpin = createSpin(tr("画布下方留白"));
+    m_marginLeftSpin = createSpin(tr("Canvas left margin"));
+    m_marginRightSpin = createSpin(tr("Canvas right margin"));
+    m_marginTopSpin = createSpin(tr("Canvas top margin"));
+    m_marginBottomSpin = createSpin(tr("Canvas bottom margin"));
 
-    formLayout->addRow(tr("左侧留白:"), m_marginLeftSpin);
-    formLayout->addRow(tr("右侧留白:"), m_marginRightSpin);
-    formLayout->addRow(tr("上方留白:"), m_marginTopSpin);
-    formLayout->addRow(tr("下方留白:"), m_marginBottomSpin);
+    formLayout->addRow(tr("Left:"), m_marginLeftSpin);
+    formLayout->addRow(tr("Right:"), m_marginRightSpin);
+    formLayout->addRow(tr("Top:"), m_marginTopSpin);
+    formLayout->addRow(tr("Bottom:"), m_marginBottomSpin);
 
     layout->addWidget(group);
     layout->addStretch();

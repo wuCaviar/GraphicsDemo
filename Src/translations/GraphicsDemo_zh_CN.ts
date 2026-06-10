@@ -474,12 +474,12 @@
     <name>GeneralPage</name>
     <message>
         <location filename="../UI/GeneralPage.cpp" line="21"/>
-        <source>常规</source>
+        <source>General</source>
         <translation>常规</translation>
     </message>
     <message>
         <location filename="../UI/GeneralPage.cpp" line="29"/>
-        <source>RIP 路径设置</source>
+        <source>RIP Path Settings</source>
         <translation>RIP 路径设置</translation>
     </message>
     <message>
@@ -491,22 +491,22 @@
         <location filename="../UI/GeneralPage.cpp" line="34"/>
         <location filename="../UI/GeneralPage.cpp" line="49"/>
         <location filename="../UI/GeneralPage.cpp" line="70"/>
-        <source>浏览...</source>
+        <source>Browse...</source>
         <translation>浏览...</translation>
     </message>
     <message>
         <location filename="../UI/GeneralPage.cpp" line="37"/>
-        <source>选择 RIP 可执行文件</source>
+        <source>Select RIP Executable</source>
         <translation>选择 RIP 可执行文件</translation>
     </message>
     <message>
         <location filename="../UI/GeneralPage.cpp" line="38"/>
-        <source>可执行文件 (*.exe);;所有文件 (*)</source>
+        <source>Executables (*.exe);;All Files (*)</source>
         <translation>可执行文件 (*.exe);;所有文件 (*)</translation>
     </message>
     <message>
         <location filename="../UI/GeneralPage.cpp" line="45"/>
-        <source>RIP 程序:</source>
+        <source>RIP Program:</source>
         <translation>RIP 程序:</translation>
     </message>
     <message>
@@ -516,22 +516,22 @@
     </message>
     <message>
         <location filename="../UI/GeneralPage.cpp" line="52"/>
-        <source>选择 RIP 配置文件</source>
+        <source>Select RIP Configuration File</source>
         <translation>选择 RIP 配置文件</translation>
     </message>
     <message>
         <location filename="../UI/GeneralPage.cpp" line="53"/>
-        <source>XML 文件 (*.xml);;所有文件 (*)</source>
+        <source>XML Files (*.xml);;All Files (*)</source>
         <translation>XML 文件 (*.xml);;所有文件 (*)</translation>
     </message>
     <message>
         <location filename="../UI/GeneralPage.cpp" line="60"/>
-        <source>RIP 配置:</source>
+        <source>RIP Config:</source>
         <translation>RIP 配置:</translation>
     </message>
     <message>
         <location filename="../UI/GeneralPage.cpp" line="65"/>
-        <source>ICC 色彩管理</source>
+        <source>ICC Color Management</source>
         <translation>ICC 色彩管理</translation>
     </message>
     <message>
@@ -541,12 +541,12 @@
     </message>
     <message>
         <location filename="../UI/GeneralPage.cpp" line="73"/>
-        <source>选择 ICC 配置文件目录</source>
+        <source>Select ICC Profile Directory</source>
         <translation>选择 ICC 配置文件目录</translation>
     </message>
     <message>
         <location filename="../UI/GeneralPage.cpp" line="80"/>
-        <source>ICC 目录:</source>
+        <source>ICC Directory:</source>
         <translation>ICC 目录:</translation>
     </message>
 </context>
@@ -590,7 +590,7 @@
         <translation type="vanished">确定</translation>
     </message>
     <message>
-        <source>Cancel</source>
+        <source>cancel</source>
         <translation type="vanished">取消</translation>
     </message>
     <message>
@@ -1452,6 +1452,331 @@ Please use images with matching DPI.</source>
         <source>Task history</source>
         <translation>任务历史</translation>
     </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="559"/>
+        <location filename="../UI/mainwindow.cpp" line="2644"/>
+        <location filename="../UI/mainwindow.cpp" line="2662"/>
+        <location filename="../UI/mainwindow.cpp" line="2706"/>
+        <location filename="../UI/mainwindow.cpp" line="2716"/>
+        <location filename="../UI/mainwindow.cpp" line="2846"/>
+        <source>Auto Layout</source>
+        <translation>智能排版</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="2663"/>
+        <source>Auto-layout in progress, please wait...</source>
+        <translation>智能排版进行中，请稍候...</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="2644"/>
+        <source>No image items with valid source files found on the canvas.
+
+Only images imported from files (not clipboard) are supported.</source>
+        <translation>画布上没有找到带有效源文件的图片图元。
+
+仅支持从文件导入的图片（不支持剪贴板图片）。</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="2703"/>
+        <source>Layout operation produced no output.
+
+The Layout library may have encountered an error.</source>
+        <translation>排版操作未产生输出。
+
+排版库可能遇到了错误。</translation>
+    </message>
+    <message>
+        <location filename="../UI/mainwindow.cpp" line="2847"/>
+        <source>Layout completed with warnings:
+%1</source>
+        <translation>排版完成，但有警告：
+%1</translation>
+    </message>
+</context>
+<context>
+    <name>AutoLayoutDialog</name>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="17"/>
+        <source>Auto Layout</source>
+        <translation>智能排版</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="23"/>
+        <source>Layout Parameters</source>
+        <translation>排版参数</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="32"/>
+        <source> mm</source>
+        <translation> mm</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="33"/>
+        <source>Layout canvas width, in millimeters</source>
+        <translation>排版画布宽度，单位毫米</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="36"/>
+        <source>Use Paper Count</source>
+        <translation>使用纸张数量</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="38"/>
+        <source>Use custom paper width when checked; otherwise auto-determined by the layout library</source>
+        <translation>勾选后使用自定义纸张宽度，否则由排版库自动决定</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="40"/>
+        <source>Paper Width</source>
+        <translation>纸张宽度</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="47"/>
+        <source>Element Interval</source>
+        <translation>裁片间隔</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="48"/>
+        <source>Minimum spacing between images</source>
+        <translation>图片之间的最小间距</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="55"/>
+        <source>Thread Count</source>
+        <translation>排版单元</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="56"/>
+        <source>Number of parallel layout threads; recommended: set to CPU core count</source>
+        <translation>并行排版线程数，建议设为 CPU 核心数</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="62"/>
+        <source>Operate Count</source>
+        <translation>排版数量</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="63"/>
+        <source>Number of images to arrange per operation</source>
+        <translation>每次操作排列的图片数量</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="68"/>
+        <source>Advanced Settings...</source>
+        <translation>高级设置...</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="69"/>
+        <source>Configure advanced layout library parameters such as resolution thresholds and color marking</source>
+        <translation>配置分辨率阈值、颜色标记等排版库高级参数</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="74"/>
+        <source>Auto-layout all image items on the canvas using the above parameters.
+After layout is complete, original items will be replaced with layout result images.</source>
+        <translation>将画布中所有图片图元按上述参数进行自动排版。
+排版完成后，原图元将被替换为排版后的图片。</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="85"/>
+        <source>Start Layout</source>
+        <translation>开始排版</translation>
+    </message>
+    <message>
+        <location filename="../UI/AutoLayoutDialog.cpp" line="86"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+</context>
+<context>
+    <name>AdvancedLayoutDialog</name>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="20"/>
+        <source>Advanced Settings</source>
+        <translation>高级设置</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="33"/>
+        <source>Resolution Settings</source>
+        <translation>分辨率设置</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="38"/>
+        <source>Default DPI when input image has no DPI info; also affects image scaling</source>
+        <translation>输入图片无DPI信息时的默认值，也会影响图片缩放比例</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="39"/>
+        <source>Low Resolution Threshold</source>
+        <translation>低分辨率阈值</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="43"/>
+        <source>Output DPI cap: output image DPI will never exceed this value
+E.g. input DPI=300, cap=150 means output DPI is clamped to 150</source>
+        <translation>输出DPI上限：任何情况下输出图片DPI不会超过此值
+如输入图片DPI=300，此值=150，则输出DPI被压制为150</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="45"/>
+        <source>Max DPI Cap</source>
+        <translation>最大DPI上限</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="49"/>
+        <source>Fixed DPI value used when resolution mode is "Custom"</source>
+        <translation>分辨率模式为"自定义"时使用的固定DPI值</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="50"/>
+        <source>Custom DPI Value</source>
+        <translation>自定义DPI值</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="53"/>
+        <source>Maximum</source>
+        <translation>最大值</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="53"/>
+        <source>Minimum</source>
+        <translation>最小值</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="53"/>
+        <source>Custom</source>
+        <translation>自定义</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="54"/>
+        <source>Output DPI strategy:
+Maximum — use the highest DPI in this group
+Minimum — use the lowest DPI in this group
+Custom — always use the "Custom" DPI value</source>
+        <translation>输出DPI选择策略：
+最大值 — 取本组图片中最高DPI
+最小值 — 取本组图片中最低DPI
+自定义 — 固定使用"自定义"DPI</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="62"/>
+        <source>Resolution Mode</source>
+        <translation>分辨率模式</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="67"/>
+        <source>Layout Options</source>
+        <translation>排版选项</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="70"/>
+        <source>Append Date to Output Folder</source>
+        <translation>输出文件夹添加日期</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="71"/>
+        <source>Append a date suffix to the layout output folder name (handled by caller)</source>
+        <translation>排版输出文件夹名中添加日期后缀（由调用方处理）</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="74"/>
+        <source>Output Material Saving Report</source>
+        <translation>输出省料统计</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="75"/>
+        <source>Output a material saving statistics text file after layout</source>
+        <translation>排版完成后输出省料统计文本文件</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="78"/>
+        <source>Add Title</source>
+        <translation>添加标题</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="79"/>
+        <source>Add a folder name title at the top of the layout result image</source>
+        <translation>在排版结果图片顶部添加文件夹名称标题</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="82"/>
+        <source>Enable Color Marking</source>
+        <translation>启用颜色标记</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="83"/>
+        <source>Draw color marker dashed lines for each piece outline during layout
+Checking this enables Color 1–10 below</source>
+        <translation>排版时为每个裁片轮廓绘制颜色标记虚线
+勾选后下方 Color 1–10 才生效</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="87"/>
+        <source>Alternate Coloring</source>
+        <translation>间隔着色</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="88"/>
+        <source>Check to color every other piece (alternate mode);
+Unchecked colors every piece</source>
+        <translation>勾选后每隔一个裁片着色（交替模式）；
+未勾选则为每个裁片着色</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="94"/>
+        <source>Color Marking Settings</source>
+        <translation>颜色标记设置</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="116"/>
+        <source>Save</source>
+        <translation>保存</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="117"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="197"/>
+        <source>Red</source>
+        <translation>红色</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="198"/>
+        <source>Green</source>
+        <translation>绿色</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="199"/>
+        <source>Blue</source>
+        <translation>蓝色</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="200"/>
+        <source>Yellow</source>
+        <translation>黄色</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="201"/>
+        <source>Black</source>
+        <translation>黑色</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="202"/>
+        <source>White</source>
+        <translation>白色</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="203"/>
+        <source>Pink</source>
+        <translation>粉色</translation>
+    </message>
+    <message>
+        <location filename="../UI/AdvancedLayoutDialog.cpp" line="204"/>
+        <source>Purple</source>
+        <translation>紫色</translation>
+    </message>
 </context>
 <context>
     <name>NewFileDialog</name>
@@ -1519,8 +1844,66 @@ Please use images with matching DPI.</source>
     </message>
     <message>
         <location filename="../UI/PreferencesDialog.cpp" line="11"/>
-        <source>首选项</source>
+        <source>Preferences</source>
         <translation>首选项</translation>
+    </message>
+</context>
+<context>
+    <name>CanvasPage</name>
+    <message>
+        <location filename="../UI/CanvasPage.cpp" line="17"/>
+        <source>Canvas</source>
+        <translation>画布</translation>
+    </message>
+    <message>
+        <location filename="../UI/CanvasPage.cpp" line="24"/>
+        <source>Canvas Margins (applied when fitting canvas to items)</source>
+        <translation>画布留白（适配图元时生效）</translation>
+    </message>
+    <message>
+        <location filename="../UI/CanvasPage.cpp" line="32"/>
+        <source> mm</source>
+        <translation> mm</translation>
+    </message>
+    <message>
+        <location filename="../UI/CanvasPage.cpp" line="37"/>
+        <source>Canvas left margin</source>
+        <translation>画布左侧留白</translation>
+    </message>
+    <message>
+        <location filename="../UI/CanvasPage.cpp" line="38"/>
+        <source>Canvas right margin</source>
+        <translation>画布右侧留白</translation>
+    </message>
+    <message>
+        <location filename="../UI/CanvasPage.cpp" line="39"/>
+        <source>Canvas top margin</source>
+        <translation>画布上方留白</translation>
+    </message>
+    <message>
+        <location filename="../UI/CanvasPage.cpp" line="40"/>
+        <source>Canvas bottom margin</source>
+        <translation>画布下方留白</translation>
+    </message>
+    <message>
+        <location filename="../UI/CanvasPage.cpp" line="42"/>
+        <source>Left:</source>
+        <translation>左侧留白:</translation>
+    </message>
+    <message>
+        <location filename="../UI/CanvasPage.cpp" line="43"/>
+        <source>Right:</source>
+        <translation>右侧留白:</translation>
+    </message>
+    <message>
+        <location filename="../UI/CanvasPage.cpp" line="44"/>
+        <source>Top:</source>
+        <translation>上方留白:</translation>
+    </message>
+    <message>
+        <location filename="../UI/CanvasPage.cpp" line="45"/>
+        <source>Bottom:</source>
+        <translation>下方留白:</translation>
     </message>
 </context>
 <context>
@@ -2233,33 +2616,13 @@ Please use images with matching DPI.</source>
     <name>SettingsDialog</name>
     <message>
         <location filename="../UI/SettingsDialog.cpp" line="31"/>
-        <source>设置</source>
+        <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../UI/SettingsDialog.cpp" line="57"/>
-        <source>曲线文件设置</source>
-        <translation>曲线文件设置</translation>
-    </message>
-    <message>
-        <location filename="../UI/SettingsDialog.cpp" line="67"/>
-        <source>网点曲线:</source>
-        <translation>网点曲线:</translation>
-    </message>
-    <message>
-        <location filename="../UI/SettingsDialog.cpp" line="76"/>
-        <source>色彩曲线:</source>
-        <translation>色彩曲线:</translation>
-    </message>
-    <message>
-        <location filename="../UI/SettingsDialog.cpp" line="81"/>
-        <source>输出信息</source>
-        <translation>输出信息</translation>
-    </message>
-    <message>
-        <location filename="../UI/SettingsDialog.cpp" line="91"/>
-        <source>输出路径:</source>
-        <translation>输出路径:</translation>
+        <location filename="../UI/SettingsDialog.cpp" line="37"/>
+        <source>Resolution</source>
+        <translation>分辨率</translation>
     </message>
     <message>
         <location filename="../UI/SettingsDialog.cpp" line="40"/>
@@ -2272,66 +2635,26 @@ Please use images with matching DPI.</source>
         <translation>Y:</translation>
     </message>
     <message>
-        <location filename="../UI/SettingsDialog.cpp" line="64"/>
-        <location filename="../UI/SettingsDialog.cpp" line="73"/>
-        <source>选择文件...</source>
-        <translation>选择文件...</translation>
-    </message>
-    <message>
-        <location filename="../UI/SettingsDialog.cpp" line="88"/>
-        <source>选择路径...</source>
-        <translation>选择路径...</translation>
-    </message>
-    <message>
-        <location filename="../UI/SettingsDialog.cpp" line="62"/>
-        <source>网点曲线文件路径</source>
-        <translation>网点曲线文件路径</translation>
-    </message>
-    <message>
-        <location filename="../UI/SettingsDialog.cpp" line="37"/>
-        <source>分辨率</source>
-        <translation>分辨率</translation>
-    </message>
-    <message>
         <location filename="../UI/SettingsDialog.cpp" line="43"/>
         <location filename="../UI/SettingsDialog.cpp" line="50"/>
         <source> dpi</source>
         <translation> dpi</translation>
     </message>
     <message>
-        <location filename="../UI/SettingsDialog.cpp" line="71"/>
-        <source>色彩曲线文件路径</source>
-        <translation>色彩曲线文件路径</translation>
+        <location filename="../UI/SettingsDialog.cpp" line="57"/>
+        <source>Curve File Settings</source>
+        <translation>曲线文件设置</translation>
     </message>
     <message>
-        <location filename="../UI/SettingsDialog.cpp" line="86"/>
-        <source>输出路径</source>
-        <translation>输出路径</translation>
+        <location filename="../UI/SettingsDialog.cpp" line="62"/>
+        <source>Dot curve file path</source>
+        <translation>网点曲线文件路径</translation>
     </message>
     <message>
-        <location filename="../UI/SettingsDialog.cpp" line="103"/>
-        <source>选择网点曲线文件</source>
-        <translation>选择网点曲线文件</translation>
-    </message>
-    <message>
-        <location filename="../UI/SettingsDialog.cpp" line="103"/>
-        <source>曲线文件 (*.p)</source>
-        <translation>曲线文件 (*.p)</translation>
-    </message>
-    <message>
-        <location filename="../UI/SettingsDialog.cpp" line="109"/>
-        <source>选择色彩曲线文件</source>
-        <translation>选择色彩曲线文件</translation>
-    </message>
-    <message>
-        <location filename="../UI/SettingsDialog.cpp" line="109"/>
-        <source>色彩曲线文件 (*.icm)</source>
-        <translation>色彩曲线文件 (*.icm)</translation>
-    </message>
-    <message>
-        <location filename="../UI/SettingsDialog.cpp" line="115"/>
-        <source>选择输出路径</source>
-        <translation>选择输出路径</translation>
+        <location filename="../UI/SettingsDialog.cpp" line="64"/>
+        <location filename="../UI/SettingsDialog.cpp" line="73"/>
+        <source>Select File...</source>
+        <translation>选择文件...</translation>
     </message>
     <message>
         <location filename="../UI/SettingsDialog.cpp" line="65"/>
@@ -2339,9 +2662,39 @@ Please use images with matching DPI.</source>
         <translation>选择网点曲线文件 (*.p)</translation>
     </message>
     <message>
+        <location filename="../UI/SettingsDialog.cpp" line="67"/>
+        <source>Dot Curve:</source>
+        <translation>网点曲线:</translation>
+    </message>
+    <message>
+        <location filename="../UI/SettingsDialog.cpp" line="71"/>
+        <source>Color curve file path</source>
+        <translation>色彩曲线文件路径</translation>
+    </message>
+    <message>
         <location filename="../UI/SettingsDialog.cpp" line="74"/>
         <source>Select color curve file (*.icm)</source>
         <translation>选择色彩曲线文件 (*.icm)</translation>
+    </message>
+    <message>
+        <location filename="../UI/SettingsDialog.cpp" line="76"/>
+        <source>Color Curve:</source>
+        <translation>色彩曲线:</translation>
+    </message>
+    <message>
+        <location filename="../UI/SettingsDialog.cpp" line="81"/>
+        <source>Output Info</source>
+        <translation>输出信息</translation>
+    </message>
+    <message>
+        <location filename="../UI/SettingsDialog.cpp" line="86"/>
+        <source>Output path</source>
+        <translation>输出路径</translation>
+    </message>
+    <message>
+        <location filename="../UI/SettingsDialog.cpp" line="88"/>
+        <source>Select Path...</source>
+        <translation>选择路径...</translation>
     </message>
     <message>
         <location filename="../UI/SettingsDialog.cpp" line="89"/>
@@ -2349,9 +2702,39 @@ Please use images with matching DPI.</source>
         <translation>选择输出路径</translation>
     </message>
     <message>
+        <location filename="../UI/SettingsDialog.cpp" line="91"/>
+        <source>Output Path:</source>
+        <translation>输出路径:</translation>
+    </message>
+    <message>
         <location filename="../UI/SettingsDialog.cpp" line="98"/>
         <source>Save settings and close</source>
         <translation>保存设置并关闭</translation>
+    </message>
+    <message>
+        <location filename="../UI/SettingsDialog.cpp" line="103"/>
+        <source>Select Dot Curve File</source>
+        <translation>选择网点曲线文件</translation>
+    </message>
+    <message>
+        <location filename="../UI/SettingsDialog.cpp" line="103"/>
+        <source>Curve Files (*.p)</source>
+        <translation>曲线文件 (*.p)</translation>
+    </message>
+    <message>
+        <location filename="../UI/SettingsDialog.cpp" line="109"/>
+        <source>Select Color Curve File</source>
+        <translation>选择色彩曲线文件</translation>
+    </message>
+    <message>
+        <location filename="../UI/SettingsDialog.cpp" line="109"/>
+        <source>Color Curve Files (*.icm)</source>
+        <translation>色彩曲线文件 (*.icm)</translation>
+    </message>
+    <message>
+        <location filename="../UI/SettingsDialog.cpp" line="115"/>
+        <source>Select Output Path</source>
+        <translation>选择输出路径</translation>
     </message>
 </context>
 <context>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- arranged rectangles inside -->
+  <rect x="2" y="6" width="9" height="6" rx="1"/>
+  <rect x="13" y="6" width="9" height="6" rx="1"/>
+  <rect x="2" y="14" width="9" height="6" rx="1"/>
+  <rect x="13" y="14" width="5" height="6" rx="1"/>
+  <!-- sparkle for "auto" -->
+  <polyline points="21,14 22,12 23,14 22,16 21,14"/>
+</svg>
