@@ -96,7 +96,7 @@ private:
     QGraphicsItem *m_currentItem = nullptr;
     bool m_updating = false; // 防止信号循环
 
-    qreal m_ppi = 300.0;
+    qreal m_ppi = 150.0;
 
     // 分组框
     QGroupBox *m_geomGroup = nullptr;

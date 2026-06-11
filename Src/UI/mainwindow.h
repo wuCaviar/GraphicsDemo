@@ -16,6 +16,7 @@
 #include <QUndoStack>
 #include <QProgressBar>
 #include <QTimer>
+#include <QFuture>
 
 class QLabel;
 class QPushButton;
@@ -27,7 +28,9 @@ class AutoLayoutDialog;
 class LayoutEngine;
 class TaskHistoryPopup;
 
+#ifdef USE_LEGACY_EXPORT
 class TiffExportEngine;
+#endif
 
 namespace Ui {
 class MainWindow;
@@ -98,6 +101,12 @@ private slots:
     void onAutoLayout();
     void onUpdateInfo();
 
+signals:
+    // 新导出流程信号（跨线程进度报告）
+    void exportProgress(int percent);
+    void exportComplete(const QString &filePath);
+    void exportError(const QString &errorMessage);
+
 private:
     void _initWidget();
     void _initMenuBar();
@@ -117,10 +126,7 @@ private:
     void importSingleImage(const QStringList &paths);
     void importMultipleImages(const QStringList &paths);
 
-    // DPI 管理
-    bool _tryLockCanvasDpi(int dpiX,
-                           int dpiY); // 尝试锁定画布 DPI，返回是否允许导入
-    void _unlockCanvasDpiIfNoImages(); // 画布无图片时解除 DPI 锁定
+    // DPI 锁定已移除 — 画布使用固定 150 PPI，允许任意 DPI 图片导入
 
     void copyItemsToClipboard(const QList<QGraphicsItem *> &items);
     QList<QGraphicsItem *> pasteItemsFromClipboard();
@@ -143,7 +149,9 @@ private:
 
     NetWorkUtils *m_pNetWorkUtils = nullptr;
 
+#ifdef USE_LEGACY_EXPORT
     TiffExportEngine *m_tiffEngine = nullptr; // TIFF 导出模块
+#endif
     QString m_exportTaskId; // 当前导出进度任务 ID
 
     // 当前导出的 RIP 配置（由 onExportImage 设置，exportFinished 回调中使用）
@@ -169,6 +177,10 @@ private:
 
     // 自动排版引擎
     LayoutEngine *m_layoutEngine = nullptr;
+
+    // 新导出流程：后台 ExportEngine 渲染任务
+    QFuture<void> m_exportFuture;
+    void exportWithEngine(const QString &json, const QString &outputPath);
 
     // 刻度尺
     class RulerBar *m_hRuler = nullptr;

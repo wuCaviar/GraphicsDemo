@@ -18,6 +18,8 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
     a.setApplicationName("ATGraphics");
     a.setApplicationVersion(appVersion());
+    a.setAttribute(Qt::AA_EnableHighDpiScaling, true);
+    a.setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
 
     // 加载中文翻译
     const QStringList uiLanguages = QLocale::system().uiLanguages();

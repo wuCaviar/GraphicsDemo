@@ -11,7 +11,11 @@ class RulerBar : public QWidget
     Q_OBJECT
 
 public:
-    enum RulerOrientation { Horizontal, Vertical };
+    enum RulerOrientation
+    {
+        Horizontal,
+        Vertical
+    };
 
     explicit RulerBar(RulerOrientation orientation, QWidget *parent = nullptr);
 
@@ -42,10 +46,10 @@ private:
 
     RulerOrientation m_orientation;
     QGraphicsView *m_pView = nullptr;
-    qreal m_scale = 1.0;         // 缩放系数
-    qreal m_originPx = 0.0;      // 画布原点 (0,0) 在刻度尺上的屏幕像素位置
-    qreal m_mousePos = -1.0;     // 鼠标在刻度尺方向上的场景坐标（-1 表示无效）
-    qreal m_ppi = 300.0;         // 当前 PPI（默认 300，影响 mm 换算）
+    qreal m_scale = 1.0; // 缩放系数
+    qreal m_originPx = 0.0; // 画布原点 (0,0) 在刻度尺上的屏幕像素位置
+    qreal m_mousePos = -1.0; // 鼠标在刻度尺方向上的场景坐标（-1 表示无效）
+    qreal m_ppi = 150.0; // 当前 PPI（默认 150，影响 mm 换算）
 };
 
 #endif // RULERBAR_H

@@ -2,7 +2,7 @@
 #include <QPainter>
 
 CanvasItem::CanvasItem(QGraphicsItem *parent)
-    : QGraphicsRectItem(QRectF(0, 0, 2480.0, 3508.0), parent) // A4 默认 210x297mm @300ppi
+    : QGraphicsRectItem(QRectF(0, 0, 1240.0, 1754.0), parent) // A4 默认 210x297mm @150ppi
 {
     setFlag(ItemIsSelectable, false);
     setFlag(ItemIsMovable, false);

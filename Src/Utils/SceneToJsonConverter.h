@@ -15,16 +15,23 @@ class QGraphicsScene;
 // 颜色：优先使用图元存储的 CMYK 值，否则从 Qt RGBA 转换。
 // 渐变：从 QBrush 中提取渐变类型、方向和色标。
 // 文字：fontSize 使用点值（point size），与 EE 测试用例一致。
+// 精度：全程使用 qreal（double），不做整数截断。
 // ============================================================================
 class SceneToJsonConverter
 {
 public:
+    struct ConvertResult
+    {
+        QString json;
+        bool success = false;
+        QString errorMessage;
+    };
+
     // 将 scene 转换为 EE JSON 字符串
-    // rgbProfile / cmykProfile: ICC 配置文件路径（相对于 EE exe 目录）
-    // errorOut: 若非空，转换失败时写入错误描述
-    // 返回空字符串表示失败
-    static QString convert(QGraphicsScene *scene, const QString &rgbProfile = {},
-                           const QString &cmykProfile = {}, QString *errorOut = nullptr);
+    // rgbProfile / cmykProfile / grayProfile: ICC 配置文件路径（相对于 EE 的 ICC Profile 目录）
+    static ConvertResult convert(QGraphicsScene *scene, const QString &rgbProfile = { },
+                                 const QString &cmykProfile = { },
+                                 const QString &grayProfile = { });
 };
 
 #endif // SCENETOJSONCONVERTER_H

@@ -32,11 +32,11 @@ win32 {
     LIBS += -L$$TIFF_ROOT/lib -L$$LCMS2_ROOT/bin
 } else:macx {
     OPENCV_ROOT = /opt/homebrew
-    INCLUDEPATH += /opt/homebrew/include /opt/homebrew/include/opencv4
-    LIBS += -L/opt/homebrew/lib
+    INCLUDEPATH += /opt/homebrew/include /opt/homebrew/include/opencv4 $$PROJECT_PATH/3rdParty/ExportEngine/include
+    LIBS += -L/opt/homebrew/lib -L$$PROJECT_PATH/3rdParty/ExportEngine/lib
 } else:unix {
     INCLUDEPATH += /usr/include /usr/local/include
     LIBS += -L/usr/lib -L/usr/local/lib
 }
 
-LIBS += -ltiff -llcms2
+LIBS += -ltiff -llcms2 -lExportEngine

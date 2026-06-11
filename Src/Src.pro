@@ -27,7 +27,6 @@ HEADERS += \
     UI/FitCanvasDlg.h \
     UI/ImageArrangementDialog.h \
     UI/MergeTiffProcessor.h \
-    UI/TiffExportEngine.h \
     UI/mainwindow.h \
     UI/qatgraphicsview.h \
     UI/GraphicsScene.h \
@@ -59,9 +58,6 @@ HEADERS += \
     Commands/Commands.h \
     Utils/ImageUtils.h \
     Utils/ImageWorker.h \
-    Utils/ScopedTiffHandle.h \
-    Utils/SourceReader.h \
-    Utils/TiffExportPipeline.h \
     Utils/ProcessGuard.h \
     Utils/ProgressManager.h \
     Utils/SceneToJsonConverter.h \
@@ -87,7 +83,6 @@ SOURCES += \
     UI/FitCanvasDlg.cpp \
     UI/ImageArrangementDialog.cpp \
     UI/MergeTiffProcessor.cpp \
-    UI/TiffExportEngine.cpp \
     UI/mainwindow.cpp \
     UI/qatgraphicsview.cpp \
     UI/GraphicsScene.cpp \
@@ -118,8 +113,6 @@ SOURCES += \
     Commands/Commands.cpp \
     Utils/ImageUtils.cpp \
     Utils/ImageWorker.cpp \
-    Utils/SourceReader.cpp \
-    Utils/TiffExportPipeline.cpp \
     Utils/ProcessGuard.cpp \
     Utils/ProgressManager.cpp \
     Utils/SceneToJsonConverter.cpp \
@@ -166,4 +159,22 @@ INCLUDEPATH += \
     $$PWD/../Libs/QtGradientEditor \
     $$PWD/../Libs/QSimpleUpdater/include \
     $$PWD/../Libs/QSimpleUpdater/src \
-    $$PWD/../Libs/Layout \
+    $$PWD/../Libs/Layout
+
+# ============================================================
+# 旧导出路径（TiffExportEngine + StripPipeline）
+# 定义 USE_LEGACY_EXPORT 以启用，默认禁用
+#   DEFINES += USE_LEGACY_EXPORT
+# ============================================================
+contains(DEFINES, USE_LEGACY_EXPORT) {
+    HEADERS += \
+        UI/TiffExportEngine.h \
+        Utils/ScopedTiffHandle.h \
+        Utils/SourceReader.h \
+        Utils/TiffExportPipeline.h
+
+    SOURCES += \
+        UI/TiffExportEngine.cpp \
+        Utils/SourceReader.cpp \
+        Utils/TiffExportPipeline.cpp
+}

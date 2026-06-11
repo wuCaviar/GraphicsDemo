@@ -40,7 +40,7 @@ ExportImageDialog::ExportImageDialog(QWidget *parent, const ExportParameters &pa
     m_dpiCombo = new QComboBox(this);
     for (int dpi : kDpiValues)
         m_dpiCombo->addItem(QString::number(dpi) + tr(" dpi"), dpi);
-    m_dpiCombo->setCurrentIndex(1); // 默认 300 dpi
+    m_dpiCombo->setCurrentIndex(0); // 默认 150 dpi
     m_dpiCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     mainLayout->addRow(tr("DPI:"), m_dpiCombo);
 

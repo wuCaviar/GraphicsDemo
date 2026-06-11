@@ -42,7 +42,7 @@ protected:
 private:
     void updateEffectivePpi();
 
-    qreal m_ppi = 300.0; // 有效显示 PPI（用于 mm↔px 换算）
+    qreal m_ppi = 150.0; // 有效显示 PPI（用于 mm↔px 换算）
     int m_canvasDpiX = 0; // 画布 X 方向 DPI，0 = 未确定
     int m_canvasDpiY = 0; // 画布 Y 方向 DPI，0 = 未确定
     bool m_dpiLocked = false; // DPI 是否锁定

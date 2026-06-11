@@ -11,13 +11,15 @@
 #include <QGraphicsLineItem>
 #include <QGraphicsPathItem>
 #include <QGraphicsScene>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLinearGradient>
 #include <QPainterPath>
 #include <QRadialGradient>
 
 #include <algorithm>
 #include <cmath>
-#include <sstream>
 #include <vector>
 
 // ============================================================================
@@ -68,63 +70,79 @@ const char *lineStyleString(Qt::PenStyle style)
     }
 }
 
-// 颜色 → EE JSON 片段（纯色，无渐变）
+// 构建颜色 JSON 对象（纯色，无渐变）
 // 优先使用存储的 CMYK 值，否则从 QColor 转 RGBA
-std::string colorToJson(IGraphicsItem *gi, bool isPen, const QColor &fallback)
+QJsonObject makeColorJson(IGraphicsItem *gi, bool isPen, const QColor &fallback)
 {
-    std::ostringstream os;
-    double c = 0, m = 0, y = 0, k = 0;
+    QJsonObject obj;
 
     if (isPen && gi->hasPenCmyk()) {
+        double c = 0, m = 0, y = 0, k = 0;
         gi->penCmyk(c, m, y, k);
-        os << "{\"space\":\"cmyk\",\"c\":" << c << ",\"m\":" << m << ",\"y\":" << y
-           << ",\"k\":" << k << ",\"a\":1.0}";
+        obj["space"] = QStringLiteral("cmyk");
+        obj["c"] = c;
+        obj["m"] = m;
+        obj["y"] = y;
+        obj["k"] = k;
+        obj["a"] = 1.0;
     } else if (!isPen && gi->hasBrushCmyk()) {
+        double c = 0, m = 0, y = 0, k = 0;
         gi->brushCmyk(c, m, y, k);
-        os << "{\"space\":\"cmyk\",\"c\":" << c << ",\"m\":" << m << ",\"y\":" << y
-           << ",\"k\":" << k << ",\"a\":1.0}";
+        obj["space"] = QStringLiteral("cmyk");
+        obj["c"] = c;
+        obj["m"] = m;
+        obj["y"] = y;
+        obj["k"] = k;
+        obj["a"] = 1.0;
     } else {
         QColor col = fallback.isValid() ? fallback : QColor(0, 0, 0);
-        os << "{\"space\":\"rgba\",\"r\":" << col.red() << ",\"g\":" << col.green()
-           << ",\"b\":" << col.blue() << ",\"a\":" << (col.alphaF() >= 0 ? col.alphaF() : 1.0)
-           << "}";
+        obj["space"] = QStringLiteral("rgba");
+        obj["r"] = static_cast<double>(col.red());
+        obj["g"] = static_cast<double>(col.green());
+        obj["b"] = static_cast<double>(col.blue());
+        obj["a"] = static_cast<double>(col.alphaF());
     }
-    return os.str();
+    return obj;
 }
 
-// 渐变停止点颜色 → JSON（优先 CMYK，否则 RGBA）
-std::string gradientStopColorToJson(IGraphicsItem *gi, double pos, const QColor &qtColor)
+// 渐变停止点颜色 JSON
+QJsonObject makeGradientStopColorJson(IGraphicsItem *gi, double pos, const QColor &qtColor)
 {
-    std::ostringstream os;
-    double c = 0, m = 0, y = 0, k = 0;
+    QJsonObject obj;
 
     if (gi->hasGradientStopCmyk(pos)) {
+        double c = 0, m = 0, y = 0, k = 0;
         gi->gradientStopCmyk(pos, c, m, y, k);
-        os << "{\"space\":\"cmyk\",\"c\":" << c << ",\"m\":" << m << ",\"y\":" << y
-           << ",\"k\":" << k << ",\"a\":1.0}";
+        obj["space"] = QStringLiteral("cmyk");
+        obj["c"] = c;
+        obj["m"] = m;
+        obj["y"] = y;
+        obj["k"] = k;
+        obj["a"] = 1.0;
     } else {
         QColor col = qtColor.isValid() ? qtColor : QColor(0, 0, 0);
-        os << "{\"space\":\"rgba\",\"r\":" << col.red() << ",\"g\":" << col.green()
-           << ",\"b\":" << col.blue() << ",\"a\":" << (col.alphaF() >= 0 ? col.alphaF() : 1.0)
-           << "}";
+        obj["space"] = QStringLiteral("rgba");
+        obj["r"] = static_cast<double>(col.red());
+        obj["g"] = static_cast<double>(col.green());
+        obj["b"] = static_cast<double>(col.blue());
+        obj["a"] = static_cast<double>(col.alphaF());
     }
-    return os.str();
+    return obj;
 }
 
-// 从 QBrush 提取渐变信息并写入 JSON
-// 返回 true 表示写入了渐变数据
-bool writeGradientJson(std::ostringstream &os, IGraphicsItem *gi, const QBrush &brush,
-                       const QRectF &itemRect)
+// 从 QBrush 提取渐变信息，返回 QJsonObject
+// 返回空对象表示无渐变
+QJsonObject makeGradientJson(IGraphicsItem *gi, const QBrush &brush, const QRectF &itemRect)
 {
     const QGradient *gradient = brush.gradient();
     if (!gradient)
-        return false;
+        return { };
 
     const auto stops = gradient->stops();
     if (stops.size() < 2)
-        return false;
+        return { };
 
-    os << ",\"gradient\":{";
+    QJsonObject obj;
 
     switch (gradient->type()) {
     case QGradient::LinearGradient: {
@@ -132,83 +150,92 @@ bool writeGradientJson(std::ostringstream &os, IGraphicsItem *gi, const QBrush &
         QPointF start = linear->start();
         QPointF end = linear->finalStop();
 
-        // 转换为归一化坐标（减去图元位置，除以尺寸）
-        double nx1 = (start.x() - itemRect.left()) / itemRect.width();
-        double ny1 = (start.y() - itemRect.top()) / itemRect.height();
-        double nx2 = (end.x() - itemRect.left()) / itemRect.width();
-        double ny2 = (end.y() - itemRect.top()) / itemRect.height();
+        // 归一化坐标（qreal 精度，避免整数除法）
+        qreal nx1 = (start.x() - itemRect.left()) / itemRect.width();
+        qreal ny1 = (start.y() - itemRect.top()) / itemRect.height();
+        qreal nx2 = (end.x() - itemRect.left()) / itemRect.width();
+        qreal ny2 = (end.y() - itemRect.top()) / itemRect.height();
 
-        os << "\"type\":\"linear\""
-           << ",\"x1\":" << nx1 << ",\"y1\":" << ny1 << ",\"x2\":" << nx2 << ",\"y2\":" << ny2;
+        obj["type"] = QStringLiteral("linear");
+        obj["x1"] = nx1;
+        obj["y1"] = ny1;
+        obj["x2"] = nx2;
+        obj["y2"] = ny2;
         break;
     }
     case QGradient::RadialGradient: {
         auto *radial = static_cast<const QRadialGradient *>(gradient);
         QPointF center = radial->center();
-        double radius = radial->radius();
+        qreal radius = radial->radius();
 
-        double cx = (center.x() - itemRect.left()) / itemRect.width();
-        double cy = (center.y() - itemRect.top()) / itemRect.height();
-        double r = radius / std::max(itemRect.width(), itemRect.height());
+        qreal cx = (center.x() - itemRect.left()) / itemRect.width();
+        qreal cy = (center.y() - itemRect.top()) / itemRect.height();
+        qreal r = radius / std::max(itemRect.width(), itemRect.height());
 
-        os << "\"type\":\"radial\""
-           << ",\"cx\":" << cx << ",\"cy\":" << cy << ",\"r\":" << r;
+        obj["type"] = QStringLiteral("radial");
+        obj["cx"] = cx;
+        obj["cy"] = cy;
+        obj["r"] = r;
         break;
     }
     case QGradient::ConicalGradient: {
         auto *conical = static_cast<const QConicalGradient *>(gradient);
         QPointF center = conical->center();
 
-        double cx = (center.x() - itemRect.left()) / itemRect.width();
-        double cy = (center.y() - itemRect.top()) / itemRect.height();
+        qreal cx = (center.x() - itemRect.left()) / itemRect.width();
+        qreal cy = (center.y() - itemRect.top()) / itemRect.height();
 
-        os << "\"type\":\"conic\""
-           << ",\"cx\":" << cx << ",\"cy\":" << cy << ",\"startAngle\":" << conical->angle();
+        obj["type"] = QStringLiteral("conic");
+        obj["cx"] = cx;
+        obj["cy"] = cy;
+        obj["startAngle"] = conical->angle();
         break;
     }
     default:
-        os << "\"type\":\"linear\",\"x1\":0,\"y1\":0,\"x2\":1,\"y2\":0";
+        obj["type"] = QStringLiteral("linear");
+        obj["x1"] = 0.0;
+        obj["y1"] = 0.0;
+        obj["x2"] = 1.0;
+        obj["y2"] = 0.0;
         break;
     }
 
-    // 停止点
-    os << ",\"stops\":[";
-    for (int i = 0; i < stops.size(); ++i) {
-        if (i > 0)
-            os << ",";
-        os << "{\"offset\":" << stops[i].first
-           << ",\"color\":" << gradientStopColorToJson(gi, stops[i].first, stops[i].second) << "}";
+    // 色标数组
+    QJsonArray stopsArr;
+    for (const auto &stop : stops) {
+        QJsonObject stopObj;
+        stopObj["offset"] = stop.first;
+        stopObj["color"] = makeGradientStopColorJson(gi, stop.first, stop.second);
+        stopsArr.append(stopObj);
     }
-    os << "]";
+    obj["stops"] = stopsArr;
 
-    os << "}";
-    return true;
+    return obj;
 }
 
-// fillColor JSON：纯色 或 纯色+渐变
-// itemRect: 图元在场景坐标中的几何矩形（用于渐变归一化坐标计算）
-std::string fillColorToJson(IGraphicsItem *gi, const QBrush &brush, const QRectF &itemRect)
+// 构建 fillColor JSON 对象（纯色，不含渐变）
+QJsonObject makeFillColorJson(IGraphicsItem *gi, const QBrush &brush)
 {
-    std::ostringstream os;
-    os << "{";
+    QJsonObject obj;
 
-    // 基础色（渐变时用作 fallback，实际渲染以 stops 为准）
     if (gi->hasBrushCmyk()) {
-        double c, m, y, k;
+        double c = 0, m = 0, y = 0, k = 0;
         gi->brushCmyk(c, m, y, k);
-        os << "\"space\":\"cmyk\",\"c\":" << c << ",\"m\":" << m << ",\"y\":" << y << ",\"k\":" << k
-           << ",\"a\":1.0";
+        obj["space"] = QStringLiteral("cmyk");
+        obj["c"] = c;
+        obj["m"] = m;
+        obj["y"] = y;
+        obj["k"] = k;
+        obj["a"] = 1.0;
     } else {
         QColor col = brush.color();
-        os << "\"space\":\"rgba\",\"r\":" << col.red() << ",\"g\":" << col.green()
-           << ",\"b\":" << col.blue() << ",\"a\":" << (col.alphaF() >= 0 ? col.alphaF() : 1.0);
+        obj["space"] = QStringLiteral("rgba");
+        obj["r"] = static_cast<double>(col.red());
+        obj["g"] = static_cast<double>(col.green());
+        obj["b"] = static_cast<double>(col.blue());
+        obj["a"] = static_cast<double>(col.alphaF());
     }
-
-    // 渐变（嵌入同一 JSON 对象）
-    writeGradientJson(os, gi, brush, itemRect);
-
-    os << "}";
-    return os.str();
+    return obj;
 }
 
 } // namespace
@@ -217,17 +244,17 @@ std::string fillColorToJson(IGraphicsItem *gi, const QBrush &brush, const QRectF
 //  SceneToJsonConverter
 // ============================================================================
 
-QString SceneToJsonConverter::convert(QGraphicsScene *scene, const QString &rgbProfile,
-                                      const QString &cmykProfile, QString *errorOut)
+SceneToJsonConverter::ConvertResult SceneToJsonConverter::convert(QGraphicsScene *scene,
+                                                                  const QString &rgbProfile,
+                                                                  const QString &cmykProfile,
+                                                                  const QString &grayProfile)
 {
-    auto fail = [&](const QString &msg) -> QString {
-        if (errorOut)
-            *errorOut = msg;
-        return {};
-    };
+    ConvertResult result;
 
-    if (!scene)
-        return fail(QStringLiteral("Scene is null"));
+    if (!scene) {
+        result.errorMessage = QStringLiteral("Scene is null");
+        return result;
+    }
 
     // 1. 查找 CanvasItem 获取画布尺寸和 DPI
     CanvasItem *canvasItem = nullptr;
@@ -237,15 +264,17 @@ QString SceneToJsonConverter::convert(QGraphicsScene *scene, const QString &rgbP
             break;
     }
 
-    if (!canvasItem)
-        return fail(QStringLiteral("No CanvasItem found in scene"));
+    if (!canvasItem) {
+        result.errorMessage = QStringLiteral("No CanvasItem found in scene");
+        return result;
+    }
 
     QRectF canvasRect = canvasItem->rect();
     int width = static_cast<int>(canvasRect.width());
     int height = static_cast<int>(canvasRect.height());
-    int dpi = canvasItem->isDpiLocked() ? canvasItem->canvasDpiX() : 300;
+    int dpi = canvasItem->canvasDpiX();
     if (dpi <= 0)
-        dpi = 300;
+        dpi = canvasItem->ppi() > 0 ? static_cast<int>(canvasItem->ppi()) : 150;
 
     // 2. 收集所有图元（展开分组），按 z-order 排列
     std::vector<CollectedItem> items;
@@ -264,17 +293,7 @@ QString SceneToJsonConverter::convert(QGraphicsScene *scene, const QString &rgbP
     // items 按 scene->items() 顺序（z 从高到低），反转得到从低到高
     std::reverse(items.begin(), items.end());
 
-    // 3. 按类型分桶，构建 JSON
-    std::ostringstream os;
-    os << "{\"canvas\":{";
-    os << "\"width\":" << width << ",\"height\":" << height << ",\"dpi\":" << dpi;
-
-    if (!rgbProfile.isEmpty())
-        os << ",\"rgbProfile\":\"" << rgbProfile.toStdString() << "\"";
-    if (!cmykProfile.isEmpty())
-        os << ",\"cmykProfile\":\"" << cmykProfile.toStdString() << "\"";
-
-    // 分桶
+    // 3. 按类型分桶
     std::vector<const CollectedItem *> rects, circles, lines, beziers, freelines, texts, images;
     for (const auto &ci : items) {
         switch (ci.gi->itemType()) {
@@ -304,303 +323,325 @@ QString SceneToJsonConverter::convert(QGraphicsScene *scene, const QString &rgbP
         }
     }
 
-    auto penColor = [](IGraphicsItem *gi, QGraphicsItem * /*item*/) -> std::string {
-        return colorToJson(gi, true, gi->itemPen().color());
+    // 画笔颜色辅助 lambda
+    auto penColor = [](IGraphicsItem *gi) -> QJsonObject {
+        return makeColorJson(gi, true, gi->itemPen().color());
     };
 
+    // === 构建各类型 JSON 数组 ===
+
     // --- rects ---
+    QJsonArray rectsArr;
     if (!rects.empty()) {
-        os << ",\"rects\":[";
-        for (size_t i = 0; i < rects.size(); ++i) {
-            const auto &ci = *rects[i];
-            auto *item = ci.item;
-            auto *gi = ci.gi;
-            QPen pen = gi->itemPen();
-            QBrush brush = gi->itemBrush();
-            QPointF scenePos = item->scenePos();
-
-            // 使用精确几何矩形（不含画笔边距），手动计算以避免 boundingRect 的额外边距
-            QRectF geo = gi->supportsGeometryRect() ? gi->geometryRect() : item->boundingRect();
-            double pw = (pen.style() != Qt::NoPen) ? pen.widthF() : 0.0;
-            QRectF geomRect(geo.x() + pw / 2.0, geo.y() + pw / 2.0, geo.width() - pw,
-                            geo.height() - pw);
-            QRectF sceneRect(scenePos + geomRect.topLeft(), geomRect.size());
-
-            if (i > 0)
-                os << ",";
-            os << "{\"x\":" << sceneRect.x() << ",\"y\":" << sceneRect.y()
-               << ",\"width\":" << sceneRect.width() << ",\"height\":" << sceneRect.height()
-               << ",\"z\":" << ci.z;
-
-            // 填充
-            if (brush.style() != Qt::NoBrush) {
-                os << ",\"fillColor\":" << fillColorToJson(gi, brush, sceneRect);
-            }
-
-            // 描边
-            if (pen.style() != Qt::NoPen && pw > 0) {
-                os << ",\"strokeColor\":" << penColor(gi, item) << ",\"strokeWidth\":" << pw;
-            }
-
-            os << ",\"rotation\":" << item->rotation();
-
-            // 圆角
-            auto *rectItem = dynamic_cast<RectItem *>(item);
-            if (rectItem) {
-                qreal cr = rectItem->cornerRadius();
-                if (cr > 0)
-                    os << ",\"cornerRadius\":" << cr;
-            }
-
-            if (pen.style() != Qt::NoPen)
-                os << ",\"lineStyle\":\"" << lineStyleString(pen.style()) << "\"";
-
-            os << "}";
-        }
-        os << "]";
-    }
-
-    // --- circles ---
-    if (!circles.empty()) {
-        os << ",\"circles\":[";
-        for (size_t i = 0; i < circles.size(); ++i) {
-            const auto &ci = *circles[i];
-            auto *item = ci.item;
-            auto *gi = ci.gi;
+        for (const auto &ci : rects) {
+            auto *item = ci->item;
+            auto *gi = ci->gi;
             QPen pen = gi->itemPen();
             QBrush brush = gi->itemBrush();
             QPointF scenePos = item->scenePos();
 
             // 精确几何矩形（不含画笔边距）
             QRectF geo = gi->supportsGeometryRect() ? gi->geometryRect() : item->boundingRect();
-            double pw = (pen.style() != Qt::NoPen) ? pen.widthF() : 0.0;
+            qreal pw = (pen.style() != Qt::NoPen) ? pen.widthF() : 0.0;
+            QRectF geomRect(geo.x() + pw / 2.0, geo.y() + pw / 2.0, geo.width() - pw,
+                            geo.height() - pw);
+            QRectF sceneRect(scenePos + geomRect.topLeft(), geomRect.size());
+
+            QJsonObject obj;
+            obj["x"] = sceneRect.x();
+            obj["y"] = sceneRect.y();
+            obj["width"] = sceneRect.width();
+            obj["height"] = sceneRect.height();
+            obj["z"] = ci->z;
+
+            // 渐变（顶层，不与 fillColor 共存）
+            QJsonObject gradient = makeGradientJson(gi, brush, sceneRect);
+            if (!gradient.isEmpty()) {
+                obj["gradient"] = gradient;
+            } else if (brush.style() != Qt::NoBrush) {
+                obj["fillColor"] = makeFillColorJson(gi, brush);
+            }
+
+            // 描边
+            if (pen.style() != Qt::NoPen && pw > 0.0) {
+                obj["strokeColor"] = penColor(gi);
+                obj["strokeWidth"] = pw;
+            }
+
+            obj["rotation"] = item->rotation();
+
+            // 圆角
+            auto *rectItem = dynamic_cast<RectItem *>(item);
+            if (rectItem) {
+                qreal cr = rectItem->cornerRadius();
+                if (cr > 0.0)
+                    obj["cornerRadius"] = cr;
+            }
+
+            if (pen.style() != Qt::NoPen)
+                obj["lineStyle"] = QString::fromLatin1(lineStyleString(pen.style()));
+
+            rectsArr.append(obj);
+        }
+    }
+
+    // --- circles ---
+    QJsonArray circlesArr;
+    if (!circles.empty()) {
+        for (const auto &ci : circles) {
+            auto *item = ci->item;
+            auto *gi = ci->gi;
+            QPen pen = gi->itemPen();
+            QBrush brush = gi->itemBrush();
+            QPointF scenePos = item->scenePos();
+
+            // 精确几何矩形（不含画笔边距）
+            QRectF geo = gi->supportsGeometryRect() ? gi->geometryRect() : item->boundingRect();
+            qreal pw = (pen.style() != Qt::NoPen) ? pen.widthF() : 0.0;
             QRectF geomRect(geo.x() + pw / 2.0, geo.y() + pw / 2.0, geo.width() - pw,
                             geo.height() - pw);
 
-            double cx = scenePos.x() + geomRect.center().x();
-            double cy = scenePos.y() + geomRect.center().y();
-            double rx = geomRect.width() / 2.0;
-            double ry = geomRect.height() / 2.0;
+            qreal cx = scenePos.x() + geomRect.center().x();
+            qreal cy = scenePos.y() + geomRect.center().y();
+            qreal rx = geomRect.width() / 2.0;
+            qreal ry = geomRect.height() / 2.0;
             QRectF sceneRect(scenePos + geomRect.topLeft(), geomRect.size());
 
-            if (i > 0)
-                os << ",";
-            os << "{\"cx\":" << cx << ",\"cy\":" << cy << ",\"radiusX\":" << rx
-               << ",\"radiusY\":" << ry << ",\"z\":" << ci.z;
+            QJsonObject obj;
+            obj["cx"] = cx;
+            obj["cy"] = cy;
+            obj["radiusX"] = rx;
+            obj["radiusY"] = ry;
+            obj["z"] = ci->z;
 
-            if (brush.style() != Qt::NoBrush) {
-                os << ",\"fillColor\":" << fillColorToJson(gi, brush, sceneRect);
+            // 渐变（顶层）
+            QJsonObject gradient = makeGradientJson(gi, brush, sceneRect);
+            if (!gradient.isEmpty()) {
+                obj["gradient"] = gradient;
+            } else if (brush.style() != Qt::NoBrush) {
+                obj["fillColor"] = makeFillColorJson(gi, brush);
             }
 
-            if (pen.style() != Qt::NoPen && pw > 0) {
-                os << ",\"strokeColor\":" << penColor(gi, item) << ",\"strokeWidth\":" << pw;
+            if (pen.style() != Qt::NoPen && pw > 0.0) {
+                obj["strokeColor"] = penColor(gi);
+                obj["strokeWidth"] = pw;
             }
 
-            os << ",\"rotation\":" << item->rotation();
+            obj["rotation"] = item->rotation();
 
             if (pen.style() != Qt::NoPen)
-                os << ",\"lineStyle\":\"" << lineStyleString(pen.style()) << "\"";
+                obj["lineStyle"] = QString::fromLatin1(lineStyleString(pen.style()));
 
-            os << "}";
+            circlesArr.append(obj);
         }
-        os << "]";
     }
 
     // --- freeLines ---
+    QJsonArray freeLinesArr;
     if (!freelines.empty()) {
-        os << ",\"freeLines\":[";
-        for (size_t i = 0; i < freelines.size(); ++i) {
-            const auto &ci = *freelines[i];
-            auto *item = ci.item;
-            auto *gi = ci.gi;
+        for (const auto &ci : freelines) {
+            auto *item = ci->item;
+            auto *gi = ci->gi;
             QPen pen = gi->itemPen();
             QPointF scenePos = item->scenePos();
 
-            // 使用 path() 而非 shape()：path() 返回原始控制点（item-local 坐标），
-            // shape() 返回描边后的轮廓，不适合提取折线顶点
             auto *pathItem = dynamic_cast<QGraphicsPathItem *>(item);
             QPainterPath path = pathItem ? pathItem->path() : item->shape();
 
-            if (i > 0)
-                os << ",";
-            os << "{\"points\":[";
-
-            bool first = true;
+            QJsonArray pointsArr;
             for (int j = 0; j < path.elementCount(); ++j) {
                 auto el = path.elementAt(j);
                 if (el.isMoveTo() || el.isLineTo()) {
-                    if (!first)
-                        os << ",";
-                    os << "{\"x\":" << scenePos.x() + el.x << ",\"y\":" << scenePos.y() + el.y
-                       << "}";
-                    first = false;
+                    QJsonObject pt;
+                    pt["x"] = scenePos.x() + el.x;
+                    pt["y"] = scenePos.y() + el.y;
+                    pointsArr.append(pt);
                 }
             }
 
-            os << "],\"z\":" << ci.z << ",\"strokeColor\":" << penColor(gi, item)
-               << ",\"strokeWidth\":" << pen.widthF() << ",\"lineStyle\":\""
-               << lineStyleString(pen.style()) << "\"}";
+            QJsonObject obj;
+            obj["points"] = pointsArr;
+            obj["z"] = ci->z;
+            obj["strokeColor"] = penColor(gi);
+            obj["strokeWidth"] = pen.widthF();
+            obj["lineStyle"] = QString::fromLatin1(lineStyleString(pen.style()));
+            freeLinesArr.append(obj);
         }
-        os << "]";
     }
 
     // --- bezierCurves ---
+    QJsonArray bezierArr;
     if (!beziers.empty()) {
-        os << ",\"bezierCurves\":[";
-        for (size_t i = 0; i < beziers.size(); ++i) {
-            const auto &ci = *beziers[i];
-            auto *item = ci.item;
-            auto *gi = ci.gi;
+        for (const auto &ci : beziers) {
+            auto *item = ci->item;
+            auto *gi = ci->gi;
             QPen pen = gi->itemPen();
             QPointF scenePos = item->scenePos();
 
             auto *pathItem = dynamic_cast<QGraphicsPathItem *>(item);
             QPainterPath path = pathItem ? pathItem->path() : QPainterPath();
 
-            if (i > 0)
-                os << ",";
-            os << "{\"controlPoints\":[";
-
-            bool first = true;
+            QJsonArray cpArr;
             for (int j = 0; j < path.elementCount(); ++j) {
                 auto el = path.elementAt(j);
                 if (el.isMoveTo() || el.isLineTo() || el.isCurveTo()) {
-                    if (!first)
-                        os << ",";
-                    os << "{\"x\":" << scenePos.x() + el.x << ",\"y\":" << scenePos.y() + el.y
-                       << "}";
-                    first = false;
+                    QJsonObject pt;
+                    pt["x"] = scenePos.x() + el.x;
+                    pt["y"] = scenePos.y() + el.y;
+                    cpArr.append(pt);
                 }
             }
 
-            os << "],\"z\":" << ci.z << ",\"strokeColor\":" << penColor(gi, item)
-               << ",\"strokeWidth\":" << pen.widthF() << ",\"lineStyle\":\""
-               << lineStyleString(pen.style()) << "\"}";
+            QJsonObject obj;
+            obj["controlPoints"] = cpArr;
+            obj["z"] = ci->z;
+            obj["strokeColor"] = penColor(gi);
+            obj["strokeWidth"] = pen.widthF();
+            obj["lineStyle"] = QString::fromLatin1(lineStyleString(pen.style()));
+            bezierArr.append(obj);
         }
-        os << "]";
     }
 
     // --- lines ---
+    QJsonArray linesArr;
     if (!lines.empty()) {
-        os << ",\"lines\":[";
-        for (size_t i = 0; i < lines.size(); ++i) {
-            const auto &ci = *lines[i];
-            auto *item = ci.item;
-            auto *gi = ci.gi;
+        for (const auto &ci : lines) {
+            auto *item = ci->item;
+            auto *gi = ci->gi;
             QPen pen = gi->itemPen();
             QPointF scenePos = item->scenePos();
 
-            // LineItem 的 line() 是本地坐标
             auto *lineItem = dynamic_cast<QGraphicsLineItem *>(item);
             QLineF line = lineItem ? lineItem->line() : QLineF();
 
-            if (i > 0)
-                os << ",";
-            os << "{\"x1\":" << scenePos.x() + line.x1() << ",\"y1\":" << scenePos.y() + line.y1()
-               << ",\"x2\":" << scenePos.x() + line.x2() << ",\"y2\":" << scenePos.y() + line.y2()
-               << ",\"z\":" << ci.z << ",\"strokeColor\":" << penColor(gi, item)
-               << ",\"strokeWidth\":" << pen.widthF() << ",\"lineStyle\":\""
-               << lineStyleString(pen.style()) << "\"}";
+            QJsonObject obj;
+            obj["x1"] = scenePos.x() + line.x1();
+            obj["y1"] = scenePos.y() + line.y1();
+            obj["x2"] = scenePos.x() + line.x2();
+            obj["y2"] = scenePos.y() + line.y2();
+            obj["z"] = ci->z;
+            obj["strokeColor"] = penColor(gi);
+            obj["strokeWidth"] = pen.widthF();
+            obj["lineStyle"] = QString::fromLatin1(lineStyleString(pen.style()));
+            linesArr.append(obj);
         }
-        os << "]";
     }
 
     // --- texts ---
+    QJsonArray textsArr;
     if (!texts.empty()) {
-        os << ",\"texts\":[";
-        for (size_t i = 0; i < texts.size(); ++i) {
-            const auto &ci = *texts[i];
-            auto *item = ci.item;
-            auto *gi = ci.gi;
+        for (const auto &ci : texts) {
+            auto *item = ci->item;
+            auto *gi = ci->gi;
             QPointF scenePos = item->scenePos();
             QFont font = gi->itemFont();
             QString content = gi->text();
 
             // 文字颜色
-            std::string textCol;
+            QJsonObject textCol;
             if (gi->hasPenCmyk()) {
-                double c, m, y, k;
+                double c = 0, m = 0, y = 0, k = 0;
                 gi->penCmyk(c, m, y, k);
-                std::ostringstream t;
-                t << "{\"space\":\"cmyk\",\"c\":" << c << ",\"m\":" << m << ",\"y\":" << y
-                  << ",\"k\":" << k << ",\"a\":1.0}";
-                textCol = t.str();
+                textCol["space"] = QStringLiteral("cmyk");
+                textCol["c"] = c;
+                textCol["m"] = m;
+                textCol["y"] = y;
+                textCol["k"] = k;
+                textCol["a"] = 1.0;
             } else {
                 QColor col = gi->itemPen().color();
-                std::ostringstream t;
-                t << "{\"space\":\"rgba\",\"r\":" << col.red() << ",\"g\":" << col.green()
-                  << ",\"b\":" << col.blue()
-                  << ",\"a\":" << (col.alphaF() >= 0 ? col.alphaF() : 1.0) << "}";
-                textCol = t.str();
+                textCol["space"] = QStringLiteral("rgba");
+                textCol["r"] = static_cast<double>(col.red());
+                textCol["g"] = static_cast<double>(col.green());
+                textCol["b"] = static_cast<double>(col.blue());
+                textCol["a"] = static_cast<double>(col.alphaF());
             }
 
-            // 转义 JSON 字符串中的特殊字符
-            std::string escaped;
-            for (int j = 0; j < content.size(); ++j) {
-                QChar ch = content.at(j);
-                if (ch == '\"')
-                    escaped += "\\\"";
-                else if (ch == '\\')
-                    escaped += "\\\\";
-                else if (ch == '\n')
-                    escaped += "\\n";
-                else if (ch == '\r')
-                    escaped += "\\r";
-                else if (ch == '\t')
-                    escaped += "\\t";
-                else
-                    escaped += ch.toLatin1();
-            }
+            // 字号：优先点值（qreal），其次像素值
+            qreal fontSize = font.pointSizeF();
+            if (fontSize <= 0.0)
+                fontSize = static_cast<qreal>(font.pixelSize());
 
-            // 字号：优先点值，若为像素字体则用 pixelSize
-            double fontSize = font.pointSizeF();
-            if (fontSize <= 0)
-                fontSize = font.pixelSize();
-
-            if (i > 0)
-                os << ",";
-            os << "{\"x\":" << scenePos.x() << ",\"y\":" << scenePos.y() << ",\"z\":" << ci.z
-               << ",\"content\":\"" << escaped << "\""
-               << ",\"fontFamily\":\"" << font.family().toStdString() << "\""
-               << ",\"fontSize\":" << fontSize << ",\"bold\":" << (font.bold() ? "true" : "false")
-               << ",\"italic\":" << (font.italic() ? "true" : "false")
-               << ",\"textColor\":" << textCol << ",\"rotation\":" << item->rotation() << "}";
+            QJsonObject obj;
+            obj["x"] = scenePos.x();
+            obj["y"] = scenePos.y();
+            obj["z"] = ci->z;
+            obj["content"] = content; // QJsonObject 自动处理 Unicode 和转义
+            obj["fontFamily"] = font.family();
+            obj["fontSize"] = fontSize;
+            obj["bold"] = font.bold();
+            obj["italic"] = font.italic();
+            obj["textColor"] = textCol;
+            obj["rotation"] = item->rotation();
+            textsArr.append(obj);
         }
-        os << "]";
     }
 
     // --- images ---
+    QJsonArray imagesArr;
     if (!images.empty()) {
-        os << ",\"images\":[";
-        for (size_t i = 0; i < images.size(); ++i) {
-            const auto &ci = *images[i];
-            auto *item = ci.item;
-            auto *gi = ci.gi;
+        for (const auto &ci : images) {
+            auto *item = ci->item;
+            auto *gi = ci->gi;
             QPointF scenePos = item->scenePos();
             QRectF r = item->boundingRect();
             QString filePath = gi->filePath();
 
-            // 转义文件路径中的反斜杠
-            std::string pathStr = filePath.toStdString();
-            std::string escapedPath;
-            for (char ch : pathStr) {
-                if (ch == '\\' || ch == '\"')
-                    escapedPath += "/";
-                else
-                    escapedPath += ch;
-            }
-
-            if (i > 0)
-                os << ",";
-            os << "{\"filePath\":\"" << escapedPath << "\""
-               << ",\"x\":" << scenePos.x() + r.x() << ",\"y\":" << scenePos.y() + r.y()
-               << ",\"width\":" << r.width() << ",\"height\":" << r.height() << ",\"z\":" << ci.z
-               << "}";
+            QJsonObject obj;
+            obj["filePath"] = filePath; // QJsonObject 自动转义反斜杠
+            obj["x"] = scenePos.x() + r.x();
+            obj["y"] = scenePos.y() + r.y();
+            obj["width"] = r.width();
+            obj["height"] = r.height();
+            obj["z"] = ci->z;
+            imagesArr.append(obj);
         }
-        os << "]";
     }
 
-    os << "}}";
+    // 4. 组装顶层 canvas JSON
+    QJsonObject canvasObj;
+    canvasObj["width"] = width;
+    canvasObj["height"] = height;
+    canvasObj["dpi"] = dpi;
+    canvasObj["unit"] = QStringLiteral("px");
 
-    return QString::fromStdString(os.str());
+    // 背景色（白色）
+    QJsonObject bg;
+    bg["space"] = QStringLiteral("rgba");
+    bg["r"] = 255.0;
+    bg["g"] = 255.0;
+    bg["b"] = 255.0;
+    bg["a"] = 1.0;
+    canvasObj["background"] = bg;
+
+    if (!rgbProfile.isEmpty())
+        canvasObj["rgbProfile"] = rgbProfile;
+    if (!cmykProfile.isEmpty())
+        canvasObj["cmykProfile"] = cmykProfile;
+    if (!grayProfile.isEmpty())
+        canvasObj["grayProfile"] = grayProfile;
+
+    if (!rectsArr.isEmpty())
+        canvasObj["rects"] = rectsArr;
+    if (!circlesArr.isEmpty())
+        canvasObj["circles"] = circlesArr;
+    if (!freeLinesArr.isEmpty())
+        canvasObj["freeLines"] = freeLinesArr;
+    if (!bezierArr.isEmpty())
+        canvasObj["bezierCurves"] = bezierArr;
+    if (!linesArr.isEmpty())
+        canvasObj["lines"] = linesArr;
+    if (!textsArr.isEmpty())
+        canvasObj["texts"] = textsArr;
+    if (!imagesArr.isEmpty())
+        canvasObj["images"] = imagesArr;
+
+    QJsonObject root;
+    root["canvas"] = canvasObj;
+
+    QJsonDocument doc(root);
+    result.json = QString::fromUtf8(doc.toJson(QJsonDocument::Compact));
+    result.success = true;
+
+    return result;
 }
