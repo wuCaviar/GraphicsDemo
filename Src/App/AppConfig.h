@@ -30,6 +30,7 @@ public:
     // -- 具体 ICC 文件路径 --
     QString srgbIccPath() const;
     QString cmykIccPath() const;
+    QString grayIccPath() const;
 
     // -- RIP 配置中的 ICC (从 ripconfig.xml 读取，SettingsDialog 维护) --
     QString dotCurveIccPath() const { return m_dotCurveIccPath; }

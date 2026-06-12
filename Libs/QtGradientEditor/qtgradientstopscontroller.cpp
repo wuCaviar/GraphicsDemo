@@ -312,10 +312,14 @@ void QtGradientStopsControllerPrivate::slotChangeColor(const QColor &color)
     if (!stop)
         return;
     m_model->changeStop(stop, color);
+    // 通过 HSV/RGB 滑块直接修改了颜色，旧 CMYK 缓存失效
+    m_stopsCmyk.remove(stop->position());
     const auto stops = m_model->selectedStops();
     for (QtGradientStop *s : stops) {
-        if (s != stop)
+        if (s != stop) {
             m_model->changeStop(s, color);
+            m_stopsCmyk.remove(s->position());
+        }
     }
 }
 

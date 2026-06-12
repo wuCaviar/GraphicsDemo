@@ -122,8 +122,10 @@ void PropertyPanel::setupUI()
     m_textGroup = new QGroupBox(tr("Text"));
     auto *textLayout = new QFormLayout(m_textGroup);
     m_fontCombo = new QFontComboBox;
+    // 仅显示当前平台实际可用的可缩放字体族，排除位图字体和不可渲染的别名
+    m_fontCombo->setFontFilters(QFontComboBox::ScalableFonts);
     m_fontSizeSpin = new QSpinBox;
-    m_fontSizeSpin->setRange(1, 999);
+    m_fontSizeSpin->setRange(1, 9999);
     m_boldBtn = new QPushButton(tr("B"));
     m_boldBtn->setCheckable(true);
     m_boldBtn->setFixedSize(30, 24);

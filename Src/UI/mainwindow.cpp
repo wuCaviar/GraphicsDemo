@@ -1283,7 +1283,15 @@ void MainWindow::importSingleImage(const QStringList &paths)
             [this, watcher, importedItems, runningY](int index) {
                 auto result = watcher->resultAt(index);
                 if (result.isValid()) {
-                    auto *item = new ImageItem(result.pixmap, result.size);
+                    // 根据图片 DPI 与画布 PPI 计算场景像素尺寸，保持物理尺寸一致
+                    qreal canvasPpi = m_pView->canvasItem()->ppi();
+                    QSize sceneSize = result.size;
+                    if (result.dpiX > 0 && result.dpiY > 0) {
+                        sceneSize = QSize(qRound(result.size.width() * canvasPpi / result.dpiX),
+                                          qRound(result.size.height() * canvasPpi / result.dpiY));
+                    }
+
+                    auto *item = new ImageItem(result.pixmap, sceneSize);
                     item->setItemPen(QPen(Qt::NoPen));
                     item->setFilePath(result.path);
                     item->setOriginalSize(result.size);
@@ -1293,7 +1301,7 @@ void MainWindow::importSingleImage(const QStringList &paths)
                         item->setDpi(result.dpiX, result.dpiY);
 
                     item->setPos(0, *runningY);
-                    *runningY += result.size.height() + 10;
+                    *runningY += sceneSize.height() + 10;
 
                     m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
                     importedItems->append(item);
@@ -1417,7 +1425,15 @@ void MainWindow::importMultipleImages(const QStringList &paths)
             [this, watcher, importedItems, runningCoord, arr](int index) {
                 auto result = watcher->resultAt(index);
                 if (result.isValid()) {
-                    auto *item = new ImageItem(result.pixmap, result.size);
+                    // 根据图片 DPI 与画布 PPI 计算场景像素尺寸，保持物理尺寸一致
+                    qreal canvasPpi = m_pView->canvasItem()->ppi();
+                    QSize sceneSize = result.size;
+                    if (result.dpiX > 0 && result.dpiY > 0) {
+                        sceneSize = QSize(qRound(result.size.width() * canvasPpi / result.dpiX),
+                                          qRound(result.size.height() * canvasPpi / result.dpiY));
+                    }
+
+                    auto *item = new ImageItem(result.pixmap, sceneSize);
                     item->setItemPen(QPen(Qt::NoPen));
                     item->setFilePath(result.path);
                     item->setOriginalSize(result.size);
@@ -1428,10 +1444,10 @@ void MainWindow::importMultipleImages(const QStringList &paths)
 
                     if (arr == ArrangeHorizontal) {
                         item->setPos(*runningCoord, 0);
-                        *runningCoord += result.size.width();
+                        *runningCoord += sceneSize.width();
                     } else {
                         item->setPos(0, *runningCoord);
-                        *runningCoord += result.size.height();
+                        *runningCoord += sceneSize.height();
                     }
 
                     m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
@@ -1641,7 +1657,7 @@ void MainWindow::onExportImage()
 #else
     // === 新导出路径: SceneToJsonConverter → ExportEngine ===
 
-    // 1. 必须选择导出 DPI（画布不再锁定 DPI）
+    // 1. 必须选择导出 DPI（不修改画布，仅在 JSON 转换时按比例缩放坐标）
     QStringList dpiItems;
     for (int dpi : kDpiValues)
         dpiItems << QString::number(dpi);
@@ -1652,42 +1668,6 @@ void MainWindow::onExportImage()
     if (!ok)
         return; // 用户取消导出
     int dpiOverride = chosen.toInt();
-
-    // 应用 DPI 到画布（保持物理尺寸不变）
-    {
-        auto *canvas = m_pView->canvasItem();
-        if (canvas) {
-            QSizeF oldSize = canvas->canvasSize();
-            qreal oldPpi = canvas->ppi();
-            qreal mmW = oldSize.width() / oldPpi * 25.4;
-            qreal mmH = oldSize.height() / oldPpi * 25.4;
-
-            canvas->setCanvasDpi(dpiOverride, dpiOverride);
-            canvas->setPpi(static_cast<qreal>(dpiOverride));
-
-            qreal mmToPx = static_cast<qreal>(dpiOverride) / 25.4;
-            QSizeF newSize(std::ceil(mmW * mmToPx), std::ceil(mmH * mmToPx));
-            m_pView->setCanvasSize(newSize);
-
-            qreal factor = static_cast<qreal>(dpiOverride) / oldPpi;
-            if (!qFuzzyCompare(factor, 1.0)) {
-                const auto selectable = ::filterSelectableItems(m_pView->scene()->items());
-                for (auto *item : selectable) {
-                    if (dynamic_cast<ImageItem *>(item) || item->parentItem())
-                        continue;
-                    item->setPos(item->pos() * factor);
-                    item->setTransform(QTransform::fromScale(factor, factor) * item->transform());
-                }
-            }
-
-            m_hRuler->setPpi(static_cast<qreal>(dpiOverride));
-            m_vRuler->setPpi(static_cast<qreal>(dpiOverride));
-            m_pPropertyPanel->setDisplayPpi(static_cast<qreal>(dpiOverride));
-            m_hRuler->updateRuler();
-            m_vRuler->updateRuler();
-            _updateCanvasLabel();
-        }
-    }
 
     // 2. 选择保存路径（.prn，派生 .tif）
     QString path =
@@ -1713,7 +1693,8 @@ void MainWindow::onExportImage()
     // 4. 场景 → JSON
     const auto &cfg = AppConfig::instance();
     auto convertResult =
-        SceneToJsonConverter::convert(m_pView->scene(), cfg.srgbIccPath(), cfg.cmykIccPath());
+        SceneToJsonConverter::convert(m_pView->scene(), { } /* rgbProfile */, { } /* cmykProfile */,
+                                      { } /* grayProfile */, dpiOverride);
     if (!convertResult.success) {
         QMessageBox::warning(this, tr("Export"),
                              tr("Failed to convert scene: %1").arg(convertResult.errorMessage));
@@ -1727,6 +1708,15 @@ void MainWindow::onExportImage()
     m_ripYRes = ripYRes;
 
     QString json = convertResult.json;
+
+    QFile jsonFile(fi.absolutePath() + "/" + fi.completeBaseName() + ".json");
+    if (jsonFile.open(QIODevice::WriteOnly)) {
+        jsonFile.write(json.toUtf8());
+        jsonFile.close();
+    } else {
+        qWarning() << "Failed to write intermediate JSON file:" << jsonFile.errorString();
+    }
+
     m_exportFuture =
         QtConcurrent::run([this, json, tiffPath]() { exportWithEngine(json, tiffPath); });
 #endif
@@ -1737,11 +1727,26 @@ void MainWindow::onExportImage()
 // ============================================================
 void MainWindow::exportWithEngine(const QString &json, const QString &outputPath)
 {
+    // helper: EE error strings are UTF-8 (nlohmann::json uses UTF-8 internally);
+    // QString::fromStdString() uses the system local code page (GBK on Chinese Windows)
+    // and would garble any non-ASCII content in the error message.
+    auto toQString = [](const std::string &s) {
+        return QString::fromUtf8(s.data(), static_cast<int>(s.size()));
+    };
+
     // 1. 解析 JSON → Canvas
     ATHC::EE::Canvas canvas;
     ATHC::EE::JsonSceneParser parser;
-    if (!parser.parseFromJson(json.toStdString(), canvas)) {
-        emit exportError(QString::fromStdString(parser.errorString()));
+    try {
+        if (!parser.parseFromJson(json.toStdString(), canvas)) {
+            emit exportError(toQString(parser.errorString()));
+            return;
+        }
+    } catch (const std::exception &e) {
+        emit exportError(tr("JSON parse exception: %1").arg(QString::fromUtf8(e.what())));
+        return;
+    } catch (...) {
+        emit exportError(tr("Unknown exception during JSON parsing"));
         return;
     }
 
@@ -1750,10 +1755,10 @@ void MainWindow::exportWithEngine(const QString &json, const QString &outputPath
     const auto &cfg = AppConfig::instance();
     std::string rgbPath = cfg.srgbIccPath().toStdString();
     std::string cmykPath = cfg.cmykIccPath().toStdString();
-    std::string grayPath; // 暂不使用独立 Gray profile
+    std::string grayPath = cfg.grayIccPath().toStdString();
 
     if (!converter.loadProfile(rgbPath, cmykPath, grayPath)) {
-        emit exportError(QString::fromStdString(converter.errorString()));
+        emit exportError(toQString(converter.errorString()));
         return;
     }
 
@@ -1769,7 +1774,7 @@ void MainWindow::exportWithEngine(const QString &json, const QString &outputPath
     writer.setConverter(&converter);
     if (!writer.beginWrite(outputPath.toStdString(), canvas.width, canvas.height, canvas.dpi,
                            tileSize, iccBytes)) {
-        emit exportError(QString::fromStdString(writer.errorString()));
+        emit exportError(toQString(writer.errorString()));
         return;
     }
 
@@ -1808,13 +1813,13 @@ void MainWindow::exportWithEngine(const QString &json, const QString &outputPath
         });
 
     if (!writeOk.load()) {
-        emit exportError(QString::fromStdString(writer.errorString()));
+        emit exportError(toQString(writer.errorString()));
         return;
     }
 
     // 7. 关闭 TIFF
     if (!writer.endWrite()) {
-        emit exportError(QString::fromStdString(writer.errorString()));
+        emit exportError(toQString(writer.errorString()));
         return;
     }
 
@@ -2818,6 +2823,14 @@ void MainWindow::onAutoLayout()
             originalSize = ImageUtils::readTiffSize(path);
         }
 
+        // 根据图片 DPI 与画布 PPI 计算场景像素尺寸，保持物理尺寸一致
+        QSize sceneSize = originalSize;
+        if (dpiX > 0 && dpiY > 0) {
+            qreal canvasPpi = canvas->ppi();
+            sceneSize = QSize(qRound(originalSize.width() * canvasPpi / dpiX),
+                              qRound(originalSize.height() * canvasPpi / dpiY));
+        }
+
         // 生成缩略图（固定 1/4 缩放，与导入流程一致，节省内存）
         if (image.width() > kThumbScaleDiv || image.height() > kThumbScaleDiv) {
             QSize thumbSize(qMax(1, image.width() / kThumbScaleDiv),
@@ -2826,7 +2839,7 @@ void MainWindow::onAutoLayout()
         }
 
         QPixmap pix = QPixmap::fromImage(image);
-        auto *item = new ImageItem(pix, originalSize);
+        auto *item = new ImageItem(pix, sceneSize);
         item->setItemPen(QPen(Qt::NoPen));
         item->setFilePath(path);
         item->setOriginalSize(originalSize);
@@ -2837,7 +2850,7 @@ void MainWindow::onAutoLayout()
 
         m_undoStack->push(new AddItemCommand(m_pView->scene(), item));
         newItems.append(item);
-        yOffset += originalSize.height() + kVerticalGap;
+        yOffset += sceneSize.height() + kVerticalGap;
     }
 
     // 画布自适应：根据新图元自动调整画布大小（带留白边距，与 onFitCanvasToItems 一致）

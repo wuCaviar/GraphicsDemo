@@ -16,8 +16,7 @@ ImageItem::ImageItem(const QPixmap &pixmap, QGraphicsItem *parent)
         m_rect = QRectF(QPointF(0, 0), pixmap.size());
 }
 
-ImageItem::ImageItem(const QPixmap &pixmap, const QSize &sourcePixelSize,
-                     QGraphicsItem *parent)
+ImageItem::ImageItem(const QPixmap &pixmap, const QSize &sourcePixelSize, QGraphicsItem *parent)
     : QGraphicsPixmapItem(pixmap, parent)
 {
     setFlag(ItemIsSelectable, true);
@@ -27,7 +26,7 @@ ImageItem::ImageItem(const QPixmap &pixmap, const QSize &sourcePixelSize,
 
 QGraphicsItem *ImageItem::cloneItem() const
 {
-    auto *item = new ImageItem(pixmap());
+    auto *item = new ImageItem(pixmap(), m_rect.size().toSize());
     item->setItemPen(m_pen);
     if (m_penCmyk.valid)
         item->setItemPenCmyk(m_penCmyk.c, m_penCmyk.m, m_penCmyk.y, m_penCmyk.k);
@@ -74,8 +73,7 @@ QPainterPath ImageItem::shape() const
     return path;
 }
 
-void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
-                      QWidget *widget)
+void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
     Q_UNUSED(option);
     Q_UNUSED(widget);
@@ -87,8 +85,7 @@ void ImageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 void ImageItem::serialize(QDataStream &out) const
 {
     out << pixmap() << pos() << rotation() << m_filePath;
-    out << m_rect << m_originalSize << m_dpiX << m_dpiY << m_isCmykSource
-        << m_isMultiPage;
+    out << m_rect << m_originalSize << m_dpiX << m_dpiY << m_isCmykSource << m_isMultiPage;
     writeCmykIfValid(out, m_penCmyk);
 }
 
@@ -98,8 +95,7 @@ bool ImageItem::deserialize(QDataStream &in)
     qreal rot;
     QPointF pos_;
     in >> pix >> pos_ >> rot >> m_filePath;
-    in >> m_rect >> m_originalSize >> m_dpiX >> m_dpiY >> m_isCmykSource
-        >> m_isMultiPage;
+    in >> m_rect >> m_originalSize >> m_dpiX >> m_dpiY >> m_isCmykSource >> m_isMultiPage;
     if (in.status() != QDataStream::Ok)
         return false;
 

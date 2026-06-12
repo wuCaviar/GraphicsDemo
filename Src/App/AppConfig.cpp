@@ -154,3 +154,8 @@ QString AppConfig::cmykIccPath() const
 {
     return iccProfileBasePath() + QStringLiteral("/CMYK/JapanColor2001Coated.icc");
 }
+
+QString AppConfig::grayIccPath() const
+{
+    return iccProfileBasePath() + QStringLiteral("/Gray/Dot Gain 15%.icc");
+}
