@@ -59,6 +59,12 @@ public:
     void setCanvasMarginTop(double v) { m_canvasMarginTop = v; }
     void setCanvasMarginBottom(double v) { m_canvasMarginBottom = v; }
 
+    // -- 图片缩略图缓存 --
+    QString cachePath() const { return m_cachePath; }
+    void setCachePath(const QString &path) { m_cachePath = path; }
+    qint64 maxCacheSizeBytes() const { return m_maxCacheSizeBytes; }
+    void setMaxCacheSizeBytes(qint64 bytes) { m_maxCacheSizeBytes = bytes; }
+
 private:
     AppConfig() = default;
     ~AppConfig() = default;
@@ -76,6 +82,10 @@ private:
     double m_canvasMarginRight = 6.35;
     double m_canvasMarginTop = 5.08;
     double m_canvasMarginBottom = 5.08;
+
+    // 图片缩略图缓存
+    QString m_cachePath; // 空 = 使用 QStandardPaths::CacheLocation
+    qint64 m_maxCacheSizeBytes = 500LL * 1024 * 1024; // 500 MiB
 };
 
 #endif // APPCONFIG_H

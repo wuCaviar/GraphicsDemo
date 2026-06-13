@@ -26,7 +26,6 @@ HEADERS += \
     App/AppConfig.h \
     UI/FitCanvasDlg.h \
     UI/ImageArrangementDialog.h \
-    UI/MergeTiffProcessor.h \
     UI/mainwindow.h \
     UI/qatgraphicsview.h \
     UI/GraphicsScene.h \
@@ -56,6 +55,7 @@ HEADERS += \
     Items/CanvasItem.h \
     Items/ResizeHandleItem.h \
     Commands/Commands.h \
+    Utils/ImageCacheManager.h \
     Utils/ImageUtils.h \
     Utils/ImageWorker.h \
     Utils/ProcessGuard.h \
@@ -73,8 +73,10 @@ HEADERS += \
     Utils/NetWorkUtils.h \
     Utils/ProjectFile.h \
     Tiff/tifffile.h \
-    version.h \
-    ATHCPresets.h \
+    atVersion.h \
+    atPresets.h \
+    atDebug.h \
+    atDefine.h \
 
 SOURCES += \
     App/SingleInstance.cpp \
@@ -82,7 +84,6 @@ SOURCES += \
     App/main.cpp \
     UI/FitCanvasDlg.cpp \
     UI/ImageArrangementDialog.cpp \
-    UI/MergeTiffProcessor.cpp \
     UI/mainwindow.cpp \
     UI/qatgraphicsview.cpp \
     UI/GraphicsScene.cpp \
@@ -111,6 +112,7 @@ SOURCES += \
     Items/CanvasItem.cpp \
     Items/ResizeHandleItem.cpp \
     Commands/Commands.cpp \
+    Utils/ImageCacheManager.cpp \
     Utils/ImageUtils.cpp \
     Utils/ImageWorker.cpp \
     Utils/ProcessGuard.cpp \

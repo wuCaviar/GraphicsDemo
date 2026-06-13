@@ -2,6 +2,7 @@
 #define IMAGEWORKER_H
 
 #include "ImageUtils.h"
+
 #include <QList>
 #include <QPixmap>
 #include <QStringList>

@@ -22,20 +22,18 @@ namespace ImageUtils {
 
 // ========== Pipeline 实现 ==========
 
-void ImageImportPipeline::addProcessor(
-    std::unique_ptr<IImportPostProcessor> processor)
+void ImageImportPipeline::addProcessor(std::unique_ptr<IImportPostProcessor> processor)
 {
     m_processors.push_back(std::move(processor));
 }
 
 void ImageImportPipeline::removeProcessor(const QString &name)
 {
-    m_processors.erase(
-        std::remove_if(m_processors.begin(), m_processors.end(),
-                       [&](const std::unique_ptr<IImportPostProcessor> &p) {
-                           return p->name() == name;
-                       }),
-        m_processors.end());
+    m_processors.erase(std::remove_if(m_processors.begin(), m_processors.end(),
+                                      [&](const std::unique_ptr<IImportPostProcessor> &p) {
+                                          return p->name() == name;
+                                      }),
+                       m_processors.end());
 }
 
 void ImageImportPipeline::run(const QStringList &filepaths)
@@ -43,20 +41,18 @@ void ImageImportPipeline::run(const QStringList &filepaths)
     Q_UNUSED(filepaths);
 }
 
-void ImageExportPipeline::addProcessor(
-    std::unique_ptr<IExportPreProcessor> processor)
+void ImageExportPipeline::addProcessor(std::unique_ptr<IExportPreProcessor> processor)
 {
     m_processors.push_back(std::move(processor));
 }
 
 void ImageExportPipeline::removeProcessor(const QString &name)
 {
-    m_processors.erase(
-        std::remove_if(m_processors.begin(), m_processors.end(),
-                       [&](const std::unique_ptr<IExportPreProcessor> &p) {
-                           return p->name() == name;
-                       }),
-        m_processors.end());
+    m_processors.erase(std::remove_if(m_processors.begin(), m_processors.end(),
+                                      [&](const std::unique_ptr<IExportPreProcessor> &p) {
+                                          return p->name() == name;
+                                      }),
+                       m_processors.end());
 }
 
 void ImageExportPipeline::run(QImage &image, const QRectF &exportRect)
@@ -72,38 +68,41 @@ ImportWorkerResult runImportWorker(const QString &filePath)
     ImportWorkerResult result;
     result.path = filePath;
 
-    QImageReader reader(filePath);
-    reader.setAutoTransform(true);
-    reader.setAllocationLimit(0);
-    QImage image = reader.read();
-
-    if (image.isNull()) {
-        result.errorMessage = QString("Failed to load image: %1").arg(filePath);
-        return result;
-    }
-
-    // 提取 TIFF DPI（仅 TIFF 格式有效，轻量级读取标签不解码图像）
+    // Step 1: 获取原始像素尺寸和 DPI（轻量级，不解码图像）
+    //   TIFF → 直接从标签读取
+    //   其他 → QImageReader::size()（不解码）
     if (ImageUtils::isTiffFile(filePath)) {
         QPair<int, int> dpi = ImageUtils::readTiffDpi(filePath);
         result.dpiX = dpi.first;
         result.dpiY = dpi.second;
-
-        QSize size = ImageUtils::readTiffSize(filePath);
-        result.size = size;
+        result.size = ImageUtils::readTiffSize(filePath);
+    } else {
+        QImageReader reader(filePath);
+        QSize sz = reader.size(); // 不解码，仅读头部
+        if (sz.isValid()) {
+            result.size = sz;
+        } else {
+            // 极少数格式不支持 size()，回退到完整解码
+            reader.setAllocationLimit(0);
+            QImage img = reader.read();
+            if (img.isNull()) {
+                result.errorMessage = QString("Failed to load image: %1").arg(filePath);
+                return result;
+            }
+            result.size = img.size();
+        }
     }
 
-    // 生成缩略图：固定 1/4 缩放，减少内存占用
+    // Step 2: 生成缩略图（缓存感知，自适应目标长边 800px）
     // 缩略图仅用于屏幕显示，物理尺寸通过 m_rect 保持与原图一致
     // 导出时从磁盘重新读取原图，不受缩略图影响
-    constexpr int kThumbScaleDiv = 4;
-    if (image.width() > kThumbScaleDiv || image.height() > kThumbScaleDiv) {
-        QSize thumbSize(qMax(1, image.width() / kThumbScaleDiv),
-                        qMax(1, image.height() / kThumbScaleDiv));
-        image = image.scaled(thumbSize, Qt::IgnoreAspectRatio,
-                             Qt::SmoothTransformation);
+    QImage thumbnail = ImageUtils::generateDisplayThumbnail(filePath);
+    if (thumbnail.isNull()) {
+        result.errorMessage = QString("Failed to load image: %1").arg(filePath);
+        return result;
     }
 
-    result.pixmap = QPixmap::fromImage(image);
+    result.pixmap = QPixmap::fromImage(thumbnail);
     return result;
 }
 
@@ -191,8 +190,7 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
     if (bitsPerSample != 8 || sampleFormat != SAMPLEFORMAT_UINT) {
         TIFFClose(tif);
         buf.errorMessage =
-            QString("Only 8-bit unsigned integer TIFFs are supported: %1")
-                .arg(input.filePath);
+            QString("Only 8-bit unsigned integer TIFFs are supported: %1").arg(input.filePath);
         return buf;
     }
 
@@ -201,8 +199,7 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
     try {
         buf.data.resize(static_cast<size_t>(w) * h * 4); // CMYK output
     } catch (const std::bad_alloc &) {
-        buf.errorMessage =
-            QString("Not enough memory for %1x%2 CMYK buffer").arg(w).arg(h);
+        buf.errorMessage = QString("Not enough memory for %1x%2 CMYK buffer").arg(w).arg(h);
         return buf;
     }
 
@@ -222,18 +219,16 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
     } else if (photometric == PHOTOMETRIC_RGB && samplesPerPixel >= 3) {
         srcType = RGB;
         srcBpp = samplesPerPixel; // 3 or 4
-    } else if ((photometric == PHOTOMETRIC_MINISBLACK
-                || photometric == PHOTOMETRIC_MINISWHITE)
+    } else if ((photometric == PHOTOMETRIC_MINISBLACK || photometric == PHOTOMETRIC_MINISWHITE)
                && samplesPerPixel == 1) {
         srcType = GRAY;
         srcBpp = 1;
     } else {
         TIFFClose(tif);
-        buf.errorMessage =
-            QString("Unsupported TIFF format (photometric=%1, samples=%2): %3")
-                .arg(photometric)
-                .arg(samplesPerPixel)
-                .arg(input.filePath);
+        buf.errorMessage = QString("Unsupported TIFF format (photometric=%1, samples=%2): %3")
+                               .arg(photometric)
+                               .arg(samplesPerPixel)
+                               .arg(input.filePath);
         return buf;
     }
 
@@ -245,8 +240,7 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
     cmsHTRANSFORM rgbToCmyk = nullptr;
     if (srcType == RGB && cm.isValid()) {
         rgbToCmyk = cm.createBgraToCmyk8(INTENT_PERCEPTUAL,
-                                         cmsFLAGS_BLACKPOINTCOMPENSATION
-                                             | cmsFLAGS_HIGHRESPRECALC);
+                                         cmsFLAGS_BLACKPOINTCOMPENSATION | cmsFLAGS_HIGHRESPRECALC);
     }
 
     bool isMiniswhite = (photometric == PHOTOMETRIC_MINISWHITE);
@@ -278,8 +272,8 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
                 }
             }
             if (rgbToCmyk) {
-                QATColorManager::convertBgra8ToCmyk8(rgbToCmyk, bgraLine.data(),
-                                                     dst, static_cast<int>(w));
+                QATColorManager::convertBgra8ToCmyk8(rgbToCmyk, bgraLine.data(), dst,
+                                                     static_cast<int>(w));
             } else {
                 bgraToCmykFallback(bgraLine.data(), dst, static_cast<int>(w));
             }
@@ -288,9 +282,7 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
 
         case GRAY:
             for (uint32_t x = 0; x < w; ++x) {
-                uint8_t gray = isMiniswhite
-                                   ? static_cast<uint8_t>(255 - rowData[x])
-                                   : rowData[x];
+                uint8_t gray = isMiniswhite ? static_cast<uint8_t>(255 - rowData[x]) : rowData[x];
                 int off = static_cast<int>(x) * 4;
                 dst[off + 0] = 0; // C
                 dst[off + 1] = 0; // M
@@ -307,9 +299,7 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
                 if (rgbToCmyk)
                     cmsDeleteTransform(rgbToCmyk);
                 TIFFClose(tif);
-                buf.errorMessage = QString("Read error at row %1: %2")
-                                       .arg(row)
-                                       .arg(input.filePath);
+                buf.errorMessage = QString("Read error at row %1: %2").arg(row).arg(input.filePath);
                 buf.valid = false;
                 return buf;
             }
@@ -317,24 +307,20 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
         }
     } else {
         // Separate planes: read each plane into temp buffers, then interleave
-        std::vector<std::vector<uint8_t>> planes(
-            samplesPerPixel > 4 ? 4 : samplesPerPixel);
+        std::vector<std::vector<uint8_t>> planes(samplesPerPixel > 4 ? 4 : samplesPerPixel);
         int effectivePlanes = (srcType == CMYK) ? 4 : samplesPerPixel;
 
         for (int s = 0; s < effectivePlanes; ++s) {
             planes[s].resize(static_cast<size_t>(w) * h);
             for (uint32_t row = 0; row < h; ++row) {
-                if (TIFFReadScanline(tif, scanBuf.data(), row,
-                                     static_cast<uint16_t>(s))
-                    < 0) {
+                if (TIFFReadScanline(tif, scanBuf.data(), row, static_cast<uint16_t>(s)) < 0) {
                     if (rgbToCmyk)
                         cmsDeleteTransform(rgbToCmyk);
                     TIFFClose(tif);
-                    buf.errorMessage =
-                        QString("Read error at row %1 plane %2: %3")
-                            .arg(row)
-                            .arg(s)
-                            .arg(input.filePath);
+                    buf.errorMessage = QString("Read error at row %1 plane %2: %3")
+                                           .arg(row)
+                                           .arg(s)
+                                           .arg(input.filePath);
                     buf.valid = false;
                     return buf;
                 }
@@ -364,20 +350,17 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
                     bgraLine[x * 4 + 3] = 255;
                 }
                 if (rgbToCmyk) {
-                    QATColorManager::convertBgra8ToCmyk8(
-                        rgbToCmyk, bgraLine.data(), dst, static_cast<int>(w));
+                    QATColorManager::convertBgra8ToCmyk8(rgbToCmyk, bgraLine.data(), dst,
+                                                         static_cast<int>(w));
                 } else {
-                    bgraToCmykFallback(bgraLine.data(), dst,
-                                       static_cast<int>(w));
+                    bgraToCmykFallback(bgraLine.data(), dst, static_cast<int>(w));
                 }
                 break;
             }
             case GRAY:
                 for (uint32_t x = 0; x < w; ++x) {
-                    uint8_t gray =
-                        isMiniswhite
-                            ? static_cast<uint8_t>(255 - planes[0][row * w + x])
-                            : planes[0][row * w + x];
+                    uint8_t gray = isMiniswhite ? static_cast<uint8_t>(255 - planes[0][row * w + x])
+                                                : planes[0][row * w + x];
                     int off = static_cast<int>(x) * 4;
                     dst[off + 0] = 0;
                     dst[off + 1] = 0;
@@ -399,10 +382,9 @@ static CmykBuffer readSourceToCmyk(const SourceTiffInput &input)
 
 // ========== 统一 TIFF 导出 (Legacy — 全缓冲模式) ==========
 
-ExportWorkerResult
-exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
-           QList<CmykOverlay> &&overlays, const QSize &outputSize,
-           const TiffExportSettings &settings, ProgressCallback progress)
+ExportWorkerResult exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
+                              QList<CmykOverlay> &&overlays, const QSize &outputSize,
+                              const TiffExportSettings &settings, ProgressCallback progress)
 {
     ExportWorkerResult result;
     result.filePath = outputPath;
@@ -459,9 +441,7 @@ exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
 
     // ===== Phase 2: 按 z-order 排序 =====
     std::sort(buffers.begin(), buffers.end(),
-              [](const CmykBuffer &a, const CmykBuffer &b) {
-                  return a.zOrder < b.zOrder;
-              });
+              [](const CmykBuffer &a, const CmykBuffer &b) { return a.zOrder < b.zOrder; });
 
     const int outW = outputSize.width();
     const int outH = outputSize.height();
@@ -475,8 +455,7 @@ exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
     constexpr size_t kMaxOutputPixels = static_cast<size_t>(30000) * 300000;
     size_t outputPixels = static_cast<size_t>(outW) * static_cast<size_t>(outH);
     if (outputPixels > kMaxOutputPixels) {
-        result.errorMessage =
-            QString("Output too large: %1x%2").arg(outW).arg(outH);
+        result.errorMessage = QString("Output too large: %1x%2").arg(outW).arg(outH);
         return result;
     }
 
@@ -484,8 +463,7 @@ exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
     try {
         outBuf.resize(outputPixels * 4);
     } catch (const std::bad_alloc &) {
-        result.errorMessage =
-            QString("Not enough memory for %1x%2 output").arg(outW).arg(outH);
+        result.errorMessage = QString("Not enough memory for %1x%2 output").arg(outW).arg(outH);
         return result;
     }
 
@@ -504,21 +482,16 @@ exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
 
         chunkFutures.append(QtConcurrent::run([&, startRow, endRow]() {
             for (int y = startRow; y < endRow; ++y) {
-                uint8_t *outRow =
-                    outBuf.data() + static_cast<size_t>(y) * outW * 4;
+                uint8_t *outRow = outBuf.data() + static_cast<size_t>(y) * outW * 4;
                 // Initialize to white (CMYK 0,0,0,0)
                 std::memset(outRow, 0, static_cast<size_t>(outW) * 4);
 
                 for (int bi = 0; bi < buffers.size(); ++bi) {
                     const CmykBuffer &buf = buffers[bi];
-                    int bx0 =
-                        std::max(0, static_cast<int>(buf.outputRect.left()));
-                    int by0 =
-                        std::max(0, static_cast<int>(buf.outputRect.top()));
-                    int bx1 = std::min(
-                        outW, static_cast<int>(buf.outputRect.right()));
-                    int by1 = std::min(
-                        outH, static_cast<int>(buf.outputRect.bottom()));
+                    int bx0 = std::max(0, static_cast<int>(buf.outputRect.left()));
+                    int by0 = std::max(0, static_cast<int>(buf.outputRect.top()));
+                    int bx1 = std::min(outW, static_cast<int>(buf.outputRect.right()));
+                    int by1 = std::min(outH, static_cast<int>(buf.outputRect.bottom()));
 
                     if (y < by0 || y >= by1)
                         continue;
@@ -539,24 +512,19 @@ exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
                     double fy = srcY - std::floor(srcY);
 
                     const uint8_t *row0 =
-                        buf.data.data()
-                        + static_cast<size_t>(iy0) * buf.width * 4;
+                        buf.data.data() + static_cast<size_t>(iy0) * buf.width * 4;
                     const uint8_t *row1 =
-                        buf.data.data()
-                        + static_cast<size_t>(iy1) * buf.width * 4;
+                        buf.data.data() + static_cast<size_t>(iy1) * buf.width * 4;
 
                     for (int x = bx0; x < bx1; ++x) {
                         double srcX = (x - buf.outputRect.left()) * scaleX;
                         int ix0 = static_cast<int>(std::floor(srcX));
                         int ix1 = ix0 + 1;
-                        ix0 =
-                            std::clamp(ix0, 0, static_cast<int>(buf.width) - 1);
-                        ix1 =
-                            std::clamp(ix1, 0, static_cast<int>(buf.width) - 1);
+                        ix0 = std::clamp(ix0, 0, static_cast<int>(buf.width) - 1);
+                        ix1 = std::clamp(ix1, 0, static_cast<int>(buf.width) - 1);
                         // 8.8 定点数插值：fx/fy ∈ [0, 1) 映射到 [0, 255]
                         constexpr int FP_SHIFT = 8;
-                        int fxI = static_cast<int>((srcX - std::floor(srcX))
-                                                   * (1 << FP_SHIFT));
+                        int fxI = static_cast<int>((srcX - std::floor(srcX)) * (1 << FP_SHIFT));
                         int fyI = static_cast<int>(fy * (1 << FP_SHIFT));
 
                         int off = x * 4;
@@ -568,8 +536,8 @@ exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
                             int top = (p00 << FP_SHIFT) + (p10 - p00) * fxI;
                             int bot = (p01 << FP_SHIFT) + (p11 - p01) * fxI;
                             int val = top + ((bot - top) * fyI >> FP_SHIFT);
-                            outRow[off + c] = static_cast<uint8_t>(
-                                std::clamp(val >> FP_SHIFT, 0, 255));
+                            outRow[off + c] =
+                                static_cast<uint8_t>(std::clamp(val >> FP_SHIFT, 0, 255));
                         }
                     }
                 }
@@ -588,8 +556,7 @@ exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
     // ===== Phase 4: 写入输出 TIFF (90→100%) =====
     TIFF *tif = TIFFOpen(outputPath.toLocal8Bit().constData(), "w");
     if (!tif) {
-        result.errorMessage =
-            QString("Cannot create output TIFF: %1").arg(outputPath);
+        result.errorMessage = QString("Cannot create output TIFF: %1").arg(outputPath);
         return result;
     }
 
@@ -625,8 +592,7 @@ exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
     TIFFSetField(tif, TIFFTAG_SOFTWARE, "GraphicsDemo");
     TIFFSetField(tif, TIFFTAG_SUBFILETYPE, static_cast<uint32_t>(0));
 
-    QString dateTime =
-        QDateTime::currentDateTime().toString("yyyy:MM:dd HH:mm:ss");
+    QString dateTime = QDateTime::currentDateTime().toString("yyyy:MM:dd HH:mm:ss");
     TIFFSetField(tif, TIFFTAG_DATETIME, dateTime.toUtf8().constData());
 
     // ICC Profile
@@ -637,8 +603,7 @@ exportTiff(const QString &outputPath, const QList<SourceTiffInput> &sources,
         QFile iccFile(iccPath);
         if (iccFile.open(QIODevice::ReadOnly)) {
             QByteArray iccData = iccFile.readAll();
-            TIFFSetField(tif, TIFFTAG_ICCPROFILE,
-                         static_cast<uint32_t>(iccData.size()),
+            TIFFSetField(tif, TIFFTAG_ICCPROFILE, static_cast<uint32_t>(iccData.size()),
                          iccData.constData());
             iccFile.close();
         }

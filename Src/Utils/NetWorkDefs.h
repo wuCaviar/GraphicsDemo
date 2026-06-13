@@ -13,13 +13,17 @@
 #define NETWORK_ROOT_ADDRIP NETWORK_ROOT "/addrip"
 #define NETWORK_ROOT_RIPSTATUS NETWORK_ROOT "/ripstatus"
 #define NETWORK_ROOT_RIPVERSION NETWORK_ROOT "/ripVersion"
+#define NETWORK_ROOT_CANCELRIP NETWORK_ROOT "/cancelRip"
+#define NETWORK_ROOT_EXIT NETWORK_ROOT "/exit"
 
 enum NetworkRequestType
 {
     RequestHelpAbout,
     RequestAddRip,
     RequestRipStatus,
-    RequestRipVersion
+    RequestRipVersion,
+    RequestCancelRip,
+    RequestExit
 };
 
 #endif // NETWORKDEFS_H

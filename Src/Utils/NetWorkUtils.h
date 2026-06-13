@@ -40,6 +40,12 @@ public:
     // /ripVersion
     void doRipVersion();
 
+    // /cancelRip
+    void doCancelRip();
+
+    // /exit
+    void doExit();
+
 protected:
     virtual void timerEvent(QTimerEvent *event) override;
 

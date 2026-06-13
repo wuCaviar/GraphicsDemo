@@ -1,5 +1,5 @@
 #include "NewFileDialog.h"
-#include "ATHCPresets.h"
+#include "atDefine.h"
 
 #include <QComboBox>
 #include <QDoubleSpinBox>

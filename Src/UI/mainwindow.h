@@ -8,8 +8,8 @@
 #include "qatgraphicsview.h"
 #include "AlignmentUtils.h"
 #include "NetWorkUtils.h"
-#include "version.h"
 #include "ProcessGuard.h"
+#include "atDefine.h"
 
 #include <QMainWindow>
 #include <QMap>
@@ -134,6 +134,9 @@ private:
     void rotateSelectedItems(qreal angleDelta);
 
     bool _maybeSaveProject(); // 提示保存，返回 false 表示用户取消操作
+
+    /// 项目加载后异步刷新图元缩略图（缓存感知，不阻塞 UI）
+    void refreshImageItemsFromCache(const QList<QGraphicsItem *> &items);
 
     // 对齐/分布辅助方法
     void applyAlign(AlignmentUtils::AlignDirection direction);

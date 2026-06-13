@@ -1,5 +1,5 @@
 #include "SettingsDialog.h"
-#include "ATHCPresets.h"
+#include "atDefine.h"
 
 #include <QComboBox>
 #include <QDialogButtonBox>

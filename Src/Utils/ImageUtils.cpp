@@ -1,4 +1,5 @@
 #include "ImageUtils.h"
+#include "ImageCacheManager.h"
 #include "ImageWorker.h"
 #include "IGraphicsItem.h"
 #include "ImageItem.h"
@@ -220,6 +221,52 @@ QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)
 
     TIFFClose(tif);
     return result;
+}
+
+// ========== 统一缩略图生成（缓存感知） ==========
+
+QImage generateDisplayThumbnail(const QString &filePath, int targetLongEdge)
+{
+    // 1. 优先从缓存加载（原子 check+load，避免 TOCTOU 竞争）
+    ImageCacheManager &cache = ImageCacheManager::instance();
+    QImage cached = cache.loadIfCached(filePath);
+    if (!cached.isNull())
+        return cached;
+
+    // 2. 缓存未命中：从原图解码
+    QImageReader reader(filePath);
+    reader.setAutoTransform(true);
+    reader.setAllocationLimit(0);
+
+    // JPEG 等格式支持解码时缩放，优先使用
+    QSize origSize = reader.size();
+    if (origSize.isValid()) {
+        int longEdge = qMax(origSize.width(), origSize.height());
+        if (longEdge > targetLongEdge) {
+            qreal scale = static_cast<qreal>(targetLongEdge) / longEdge;
+            QSize decodeSize(qMax(1, qRound(origSize.width() * scale)),
+                             qMax(1, qRound(origSize.height() * scale)));
+            reader.setScaledSize(decodeSize);
+        }
+    }
+
+    QImage image = reader.read();
+    if (image.isNull())
+        return { };
+
+    // 3. 若解码时未缩放（格式不支持 setScaledSize 或尺寸已 ≤ 目标），再执行缩放
+    int longEdge = qMax(image.width(), image.height());
+    if (longEdge > targetLongEdge) {
+        qreal scale = static_cast<qreal>(targetLongEdge) / longEdge;
+        int thumbW = qMax(1, qRound(image.width() * scale));
+        int thumbH = qMax(1, qRound(image.height() * scale));
+        image = image.scaled(thumbW, thumbH, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    }
+
+    // 4. 写入缓存（不影响返回值）
+    cache.saveThumbnail(filePath, image);
+
+    return image;
 }
 
 } // namespace ImageUtils

@@ -6,7 +6,6 @@
 #include "LayoutEngine.h"
 #include "AlignmentUtils.h"
 #include "AppConfig.h"
-#include "ATHCPresets.h"
 #include "BezierCurveItem.h"
 #include "CanvasItem.h"
 #include "Commands.h"
@@ -15,6 +14,7 @@
 #include "ImageArrangementDialog.h"
 #include "ImageItem.h"
 #include "ImageUtils.h"
+#include "ImageCacheManager.h"
 #include "ProjectFile.h"
 
 #include "LineItem.h"
@@ -33,6 +33,7 @@
 #include "GraphicsItemGroup.h"
 #include "FitCanvasDlg.h"
 #include "SceneToJsonConverter.h"
+#include "atDefine.h"
 
 // ExportEngine API（新导出路径）
 #include <ExportEngine/ExportEngine.h>
@@ -48,7 +49,6 @@
 #include <QtConcurrent>
 #include <QFutureWatcher>
 #include <QCloseEvent>
-#include <QPointer>
 #include <QDataStream>
 #include <QFile>
 #include <QFileDialog>
@@ -1122,6 +1122,9 @@ void MainWindow::onOpenProject()
                 m_projectModified = false;
                 setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
 
+                // 后台异步刷新缩略图缓存（不阻塞 UI）
+                refreshImageItemsFromCache(loadedItems);
+
                 watcher->deleteLater();
             });
 
@@ -1384,12 +1387,12 @@ void MainWindow::importSingleImage(const QStringList &paths)
                 }
 
                 delete importedItems;
-                qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz") << "Finished import";
+                atDebug() << "Finished import";
             });
 
     auto future = QtConcurrent::mapped(paths, ImageUtils::runImportWorker);
     watcher->setFuture(future);
-    qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz");
+    atDebug() << "Started import task for" << paths.size() << "images";
 }
 
 void MainWindow::importMultipleImages(const QStringList &paths)
@@ -1530,12 +1533,12 @@ void MainWindow::importMultipleImages(const QStringList &paths)
                 }
 
                 delete importedItems;
-                qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz") << "Finished import";
+                atDebug() << "Finished import";
             });
 
     auto future = QtConcurrent::mapped(ordered, ImageUtils::runImportWorker);
     watcher->setFuture(future);
-    qDebug() << QTime::currentTime().toString("HH:mm:ss.zzz");
+    atDebug() << "Started import task for" << paths.size() << "images";
 }
 
 // 递归检查图元列表中是否包含 ImageItem（会遍历组内的子图元）
@@ -2801,27 +2804,32 @@ void MainWindow::onAutoLayout()
     // 导入排版后的图片，纵向排列
     CanvasItem *canvas = m_pView->canvasItem();
     constexpr qreal kVerticalGap = 10.0;
-    constexpr int kThumbScaleDiv = 4; // 缩略图缩放比，与 runImportWorker 一致
     qreal yOffset = 0;
     QList<ImageItem *> newItems;
     for (const auto &path : outputPaths) {
-        QImageReader reader(path);
-        reader.setAutoTransform(true);
-        reader.setAllocationLimit(0);
-        QImage image = reader.read();
-        if (image.isNull())
-            continue;
-
-        QSize originalSize = image.size();
+        // 获取原始尺寸（轻量级，不解码）
+        QSize originalSize;
         int dpiX = 0, dpiY = 0;
 
-        // TIFF：从标签读取 DPI 与原始尺寸
         if (ImageUtils::isTiffFile(path)) {
             QPair<int, int> dpi = ImageUtils::readTiffDpi(path);
             dpiX = dpi.first;
             dpiY = dpi.second;
             originalSize = ImageUtils::readTiffSize(path);
+        } else {
+            QImageReader reader(path);
+            originalSize = reader.size();
+            if (!originalSize.isValid()) {
+                reader.setAllocationLimit(0);
+                QImage img = reader.read();
+                if (img.isNull())
+                    continue;
+                originalSize = img.size();
+            }
         }
+
+        if (!originalSize.isValid())
+            continue;
 
         // 根据图片 DPI 与画布 PPI 计算场景像素尺寸，保持物理尺寸一致
         QSize sceneSize = originalSize;
@@ -2831,14 +2839,12 @@ void MainWindow::onAutoLayout()
                               qRound(originalSize.height() * canvasPpi / dpiY));
         }
 
-        // 生成缩略图（固定 1/4 缩放，与导入流程一致，节省内存）
-        if (image.width() > kThumbScaleDiv || image.height() > kThumbScaleDiv) {
-            QSize thumbSize(qMax(1, image.width() / kThumbScaleDiv),
-                            qMax(1, image.height() / kThumbScaleDiv));
-            image = image.scaled(thumbSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-        }
+        // 生成缩略图（缓存感知，自适应目标长边 800px）
+        QImage thumb = ImageUtils::generateDisplayThumbnail(path);
+        if (thumb.isNull())
+            continue;
 
-        QPixmap pix = QPixmap::fromImage(image);
+        QPixmap pix = QPixmap::fromImage(thumb);
         auto *item = new ImageItem(pix, sceneSize);
         item->setItemPen(QPen(Qt::NoPen));
         item->setFilePath(path);
@@ -2910,5 +2916,40 @@ void MainWindow::onAutoLayout()
     if (!errorMsg.isEmpty()) {
         QMessageBox::information(this, tr("Auto Layout"),
                                  tr("Layout completed with warnings:\n%1").arg(errorMsg));
+    }
+}
+
+// ========== 项目加载后异步刷新图片缩略图（缓存感知） ==========
+
+void MainWindow::refreshImageItemsFromCache(const QList<QGraphicsItem *> &items)
+{
+    for (auto *it : items) {
+        auto *imgItem = dynamic_cast<ImageItem *>(it);
+        if (!imgItem || imgItem->filePath().isEmpty())
+            continue;
+        if (!QFile::exists(imgItem->filePath()))
+            continue;
+
+        // 异步任务仅为从缓存加载 PNG（≤1ms 磁盘读取），项目刚加载完
+        // 图元不会被立即删除，无需弱引用保护
+        ImageItem *target = imgItem;
+        QString path = imgItem->filePath();
+
+        auto *watcher = new QFutureWatcher<QImage>(this);
+        connect(watcher, &QFutureWatcher<QImage>::finished, this, [watcher, target]() {
+            QImage cached = watcher->resultAt(0);
+            if (cached.isNull()
+                || !target->scene()) // belt-and-suspenders: scene 才持有 item 生命周期
+                return;
+            target->setPixmap(QPixmap::fromImage(cached));
+            target->update();
+            watcher->deleteLater();
+        });
+
+        watcher->setFuture(QtConcurrent::run(
+            [](const QString &p) -> QImage {
+                return ImageCacheManager::instance().loadIfCached(p);
+            },
+            path));
     }
 }

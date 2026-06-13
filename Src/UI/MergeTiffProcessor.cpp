@@ -11,5 +11,5 @@ QString MergeTiffProcessor::name() const
 
 // void MergeTiffProcessor::process(ImageUtils::ImportResult &result)
 // {
-//     qDebug() << result.path;
+//     atDebug() << result.path;
 // }

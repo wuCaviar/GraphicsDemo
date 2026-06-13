@@ -74,6 +74,22 @@ void AppConfig::loadConfig()
         }
     }
 
+    // <Cache> 子元素
+    QDomElement cacheEl = root.firstChildElement(QStringLiteral("Cache"));
+    if (!cacheEl.isNull()) {
+        QDomElement pathEl = cacheEl.firstChildElement(QStringLiteral("Path"));
+        if (!pathEl.isNull() && !pathEl.text().trimmed().isEmpty())
+            m_cachePath = pathEl.text().trimmed();
+
+        QDomElement maxEl = cacheEl.firstChildElement(QStringLiteral("MaxSizeMB"));
+        if (!maxEl.isNull()) {
+            bool ok = false;
+            qint64 mb = maxEl.text().toLongLong(&ok);
+            if (ok && mb > 0)
+                m_maxCacheSizeBytes = mb * 1024 * 1024;
+        }
+    }
+
     qInfo() << "[AppConfig] Loaded from config.xml"
             << "\n  ripExe:" << m_ripExePath << "\n  ripConfig:" << m_ripConfigPath
             << "\n  iccBase:" << iccProfileBasePath();
@@ -120,6 +136,19 @@ void AppConfig::saveConfig() const
     marginEl.setAttribute(QStringLiteral("Top"), m_canvasMarginTop);
     marginEl.setAttribute(QStringLiteral("Bottom"), m_canvasMarginBottom);
     canvasEl.appendChild(marginEl);
+
+    // <Cache>
+    QDomElement cacheEl = doc.createElement(QStringLiteral("Cache"));
+    root.appendChild(cacheEl);
+
+    QDomElement cachePathEl = doc.createElement(QStringLiteral("Path"));
+    cachePathEl.appendChild(doc.createTextNode(m_cachePath));
+    cacheEl.appendChild(cachePathEl);
+
+    QDomElement cacheMaxEl = doc.createElement(QStringLiteral("MaxSizeMB"));
+    cacheMaxEl.appendChild(
+        doc.createTextNode(QString::number(m_maxCacheSizeBytes / (1024 * 1024))));
+    cacheEl.appendChild(cacheMaxEl);
 
     QFile file(cfgPath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {

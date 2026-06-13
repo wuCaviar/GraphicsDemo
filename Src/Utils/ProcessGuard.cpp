@@ -3,6 +3,8 @@
 #include <QDebug>
 #include <QVariant>
 
+#include "atDefine.h"
+
 ProcessGuard::ProcessGuard(QObject *parent) : QObject(parent) { }
 
 bool ProcessGuard::isProcessRunning(const QString &program) const
@@ -31,7 +33,7 @@ void ProcessGuard::addProcess(const QString &program, const QStringList &argumen
     connect(proc, &QProcess::errorOccurred, this, &ProcessGuard::onProcessError);
 
     proc->start(program, arguments);
-    qDebug() << "ProcessGuard: started" << program;
+    atDebug() << "ProcessGuard: started" << program;
 }
 
 void ProcessGuard::stopAll()
@@ -43,7 +45,7 @@ void ProcessGuard::stopAll()
         proc->terminate(); // 尝试优雅退出
         // 如果程序不响应terminate，析构时会kill，通常足够
     }
-    qDebug() << "ProcessGuard: stopping all guarded processes";
+    atDebug() << "ProcessGuard: stopping all guarded processes";
 }
 
 void ProcessGuard::setMaxRestarts(int max)
@@ -64,15 +66,15 @@ void ProcessGuard::onProcessFinished(int exitCode, QProcess::ExitStatus exitStat
 
     const bool stopping = proc->property("stopping").toBool();
     if (stopping) {
-        qDebug() << "ProcessGuard: process" << proc->property("program").toString()
-                 << "stopped intentionally, won't restart";
+        atDebug() << "ProcessGuard: process" << proc->property("program").toString()
+                  << "stopped intentionally, won't restart";
         return;
     }
 
     // 意外退出（包括正常退出和崩溃），尝试重启
-    qDebug() << "ProcessGuard: process" << proc->property("program").toString()
-             << "exited unexpectedly with code" << exitCode
-             << (exitStatus == QProcess::CrashExit ? "(crash)" : "(normal)");
+    atDebug() << "ProcessGuard: process" << proc->property("program").toString()
+              << "exited unexpectedly with code" << exitCode
+              << (exitStatus == QProcess::CrashExit ? "(crash)" : "(normal)");
     scheduleRestart(proc);
 }
 
@@ -84,7 +86,7 @@ void ProcessGuard::onProcessError(QProcess::ProcessError error)
 
     // 只对启动失败进行重启处理，其他错误交给 finished 信号
     if (error == QProcess::FailedToStart) {
-        qDebug() << "ProcessGuard: failed to start" << proc->property("program").toString();
+        atDebug() << "ProcessGuard: failed to start" << proc->property("program").toString();
         scheduleRestart(proc);
     }
 }
@@ -112,7 +114,7 @@ void ProcessGuard::scheduleRestart(QProcess *process)
     QTimer::singleShot(m_restartDelay, process, [this, process, program, args]() {
         if (process->property("stopping").toBool())
             return;
-        qDebug() << "ProcessGuard: restarting" << program;
+        atDebug() << "ProcessGuard: restarting" << program;
         process->start(program, args);
     });
 }

@@ -62,6 +62,16 @@ void NetWorkUtils::doRipVersion()
     GET_AND_EMIT(NETWORK_ROOT_RIPVERSION, RequestRipVersion);
 }
 
+void NetWorkUtils::doExit()
+{
+    GET_AND_EMIT(NETWORK_ROOT_EXIT, RequestExit);
+}
+
+void NetWorkUtils::doCancelRip()
+{
+    GET_AND_EMIT(NETWORK_ROOT_CANCELRIP, RequestCancelRip);
+}
+
 void NetWorkUtils::timerEvent(QTimerEvent *event)
 {
     int id = event->timerId();

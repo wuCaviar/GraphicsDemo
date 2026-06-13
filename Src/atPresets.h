@@ -1,5 +1,5 @@
-#ifndef ATHCPRES_H
-#define ATHCPRES_H
+#ifndef ATPRESETS_H
+#define ATPRESETS_H
 
 #include <QtGlobal>
 
@@ -11,6 +11,7 @@ struct CanvasSizePreset
     qreal heightMM;
 };
 
+// 常用尺寸预设列表，包含国际标准尺寸和常见照片尺寸，最后一项为自定义选项
 static const CanvasSizePreset kCanvasPresets[] = {
     { "A3 (297 × 420 mm)", 297, 420 },
     { "A4 (210 × 297 mm)", 210, 297 },
@@ -31,11 +32,11 @@ static const CanvasSizePreset kCanvasPresets[] = {
     { "Custom", 0, 0 },
 };
 
-// 固定 DPI 预设
+// 导出固定 DPI 预设
 static const int kDpiValues[] = { 150, 240, 300, 360, 397, 450, 508, 600, 720 };
 
-// RIP固定DPI预设
+// RIP固定 DPI 预设
 static const int X_DPIValues[] = { 240, 360, 720 };
 static const int Y_DPIValues[] = { 600, 1200, 1800, 2400, 3000, 3600 };
 
-#endif // ATHCPRES_H
+#endif // ATPRESETS_H
