@@ -1,7 +1,7 @@
 
 TEMPLATE = app
 
-QT += core gui widgets network xml concurrent openglwidgets
+QT += core gui widgets network xml concurrent
 
 TARGET = ATGraphics
 
@@ -43,6 +43,9 @@ HEADERS += \
     UI/GeneralPage.h \
     UI/CanvasPage.h \
     UI/TaskHistoryPopup.h \
+    UI/MenuBarBuilder.h \
+    UI/ToolBarDirector.h \
+    UI/StatusBarDirector.h \
     Items/IGraphicsItem.h \
     Items/RectItem.h \
     Items/EllipseItem.h \
@@ -64,9 +67,34 @@ HEADERS += \
     Utils/ColorUtils.h \
     Utils/AlignmentUtils.h \
     Utils/LayoutEngine.h \
+    Utils/SessionFile.h \
     NetWork/QHttp.h \
     Action/QAtActionBase.h \
+    Action/ActionContext.h \
+    Action/QAtFileAction.h \
+    Action/QAtEditAction.h \
+    Action/QAtArrangeAction.h \
+    Action/QAtViewAction.h \
+    Action/QAtDialogAction.h \
     Action/QAtDrawAction.h \
+    Action/FileActions.h \
+    Action/EditActions.h \
+    Action/ArrangeActions.h \
+    Action/ViewActions.h \
+    Action/DialogActions.h \
+    Core/QAtService.h \
+    Core/AppContext.h \
+    Page/QAtPage.h \
+    Page/QAtCanvasPage.h \
+    Page/QAtDataTablePage.h \
+    Core/PageManager.h \
+    Core/ThemeService.h \
+    Core/ClipboardService.h \
+    Service/ProgressService.h \
+    Service/NetworkService.h \
+    Service/ProcessService.h \
+    Service/ProjectService.h \
+    Service/UndoService.h \
     CommonDefs.h \
     QCommonDefs.h \
     Utils/NetWorkDefs.h \
@@ -100,6 +128,9 @@ SOURCES += \
     UI/GeneralPage.cpp \
     UI/CanvasPage.cpp \
     UI/TaskHistoryPopup.cpp \
+    UI/MenuBarBuilder.cpp \
+    UI/ToolBarDirector.cpp \
+    UI/StatusBarDirector.cpp \
     Items/IGraphicsItem.cpp \
     Items/RectItem.cpp \
     Items/EllipseItem.cpp \
@@ -121,9 +152,30 @@ SOURCES += \
     Utils/ColorUtils.cpp \
     Utils/AlignmentUtils.cpp \
     Utils/LayoutEngine.cpp \
+    Utils/SessionFile.cpp \
     NetWork/QHttp.cpp \
     Action/QAtActionBase.cpp \
+    Action/ActionContext.cpp \
+    Action/QAtEditAction.cpp \
+    Action/QAtArrangeAction.cpp \
+    Action/QAtViewAction.cpp \
     Action/QAtDrawAction.cpp \
+    Action/FileActions.cpp \
+    Action/EditActions.cpp \
+    Action/ArrangeActions.cpp \
+    Action/ViewActions.cpp \
+    Action/DialogActions.cpp \
+    Core/AppContext.cpp \
+    Core/PageManager.cpp \
+    Core/ThemeService.cpp \
+    Core/ClipboardService.cpp \
+    Page/QAtCanvasPage.cpp \
+    Page/QAtDataTablePage.cpp \
+    Service/ProgressService.cpp \
+    Service/NetworkService.cpp \
+    Service/ProcessService.cpp \
+    Service/ProjectService.cpp \
+    Service/UndoService.cpp \
     Utils/NetWorkUtils.cpp \
     Utils/ProjectFile.cpp \
     Tiff/tifffile.cpp \
@@ -148,11 +200,14 @@ INCLUDEPATH += \
     $$PWD/App \
     $$PWD/UI \
     $$PWD/Action \
+    $$PWD/Page \
     $$PWD/Items \
     $$PWD/Commands \
     $$PWD/Utils \
     $$PWD/NetWork \
     $$PWD/Tiff \
+    $$PWD/Core \
+    $$PWD/Service \
     $$PWD/../Libs \
     $$PWD/../Libs/Common \
     $$PWD/../Libs/ColorTrans \

@@ -53,3 +53,24 @@ void QAtActionBase::_onUpdateState(bool& isEnabled, bool& isChecked, bool& isVis
     Q_UNUSED(isChecked);
     Q_UNUSED(isVisible);
 }
+
+QAction* QAtActionBase::createQAction(QObject *parent)
+{
+    QAction *act = new QAction(parent);
+    act->setIcon(_icon());
+    act->setText(_text());
+    act->setToolTip(_tooltip());
+    act->setShortcut(_shortcut());
+    act->setCheckable(_isCheckable());
+    return act;
+}
+
+void QAtActionBase::updateQAction(QAction *act)
+{
+    if (!act) return;
+    bool enabled = true, checked = false, visible = true;
+    _onUpdateState(enabled, checked, visible);
+    act->setEnabled(enabled);
+    act->setChecked(checked);
+    act->setVisible(visible);
+}

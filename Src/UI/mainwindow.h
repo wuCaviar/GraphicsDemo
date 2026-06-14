@@ -12,6 +12,8 @@
 #include "atDefine.h"
 
 #include <QMainWindow>
+#include <QTabWidget>
+#include <QTabBar>
 #include <QMap>
 #include <QUndoStack>
 #include <QProgressBar>
@@ -27,6 +29,8 @@ class AlignLayoutDialog;
 class AutoLayoutDialog;
 class LayoutEngine;
 class TaskHistoryPopup;
+class ToolBarDirector;
+class StatusBarDirector;
 
 #ifdef USE_LEGACY_EXPORT
 class TiffExportEngine;
@@ -114,9 +118,14 @@ private:
     void _initPropertyPanel();
     void _initRulers();
     void _initConnections();
+    void _bindViewConnections(); // rebind on tab switch
     void _initStatusBar();
     void _initNetWork();
     void _initProcess();
+    // New architecture initialization (P1-P7)
+    void _initServices();
+    void _initPages();
+    void _initActions();
     void _updateUndoRedoActions();
 
     // 窗口状态持久化
@@ -146,9 +155,14 @@ private:
 
     Ui::MainWindow *ui;
 
-    QAtGraphicsView *m_pView = nullptr;
-    PropertyPanel *m_pPropertyPanel = nullptr;
-    QUndoStack *m_undoStack = nullptr;
+    QTabWidget     *m_tabWidget   = nullptr;  // P9: multi-canvas tab container
+    QAtGraphicsView *m_pView       = nullptr;
+    PropertyPanel   *m_pPropertyPanel = nullptr;
+    QUndoStack      *m_undoStack   = nullptr;
+
+    // P6: UI builders for page-type-aware behavior
+    ToolBarDirector   *m_toolBarDirector   = nullptr;
+    StatusBarDirector *m_statusBarDirector = nullptr;
 
     NetWorkUtils *m_pNetWorkUtils = nullptr;
 
@@ -164,6 +178,16 @@ private:
 
     QString m_currentProjectPath; // 当前工程文件路径，空表示未保存
     bool m_projectModified = false; // 工程文件是否已修改（未保存）
+
+    // P9: per-tab project state
+    struct TabProjectState {
+        QString projectPath;
+        bool    modified = false;
+    };
+    QMap<class QAtCanvasPage*, TabProjectState> m_tabStates;
+
+    TabProjectState& _activeTabState();
+    const TabProjectState& _activeTabState() const;
 
     ImageUtils::ImageImportPipeline m_importSinglePipeline; // 单图导入处理管线
     ImageUtils::ImageImportPipeline m_importMultiPipeline; // 批量导入处理管线
@@ -224,6 +248,9 @@ private:
     // 状态栏辅助
     QPointF m_lastScenePos; // 最近一次鼠标场景坐标
     void _updatePosLabel(const QPointF &scenePos); // 根据单位模式更新坐标标签
+    void saveSession();
+    void loadSession();
+    void _syncViewState();     // sync ruler / propertyPanel / labels from active view
     void _updateCanvasLabel(); // 根据单位模式更新画布尺寸标签
     void _updateToolLabel(); // 根据当前工具更新工具标签
 };

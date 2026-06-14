@@ -31,7 +31,7 @@ win32 {
         LIBS += -lopencv_world4100
     }
 } else:macx {
-    LIBS += -lopencv_core -lopencv_imgproc -lopencv_imgcodecs -lopencv_highgui
+    LIBS += -lopencv_core -lopencv_imgproc -lopencv_imgcodecs
 }
 
 # libjpeg-turbo（静态库）

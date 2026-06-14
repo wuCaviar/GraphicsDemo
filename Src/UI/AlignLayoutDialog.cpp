@@ -279,6 +279,23 @@ void AlignLayoutDialog::onSelectionChanged()
     refreshSelectionInfo();
 }
 
+void AlignLayoutDialog::setScene(QGraphicsScene *scene)
+{
+    if (m_scene == scene)
+        return;
+    if (m_scene)
+        disconnect(m_scene, &QGraphicsScene::selectionChanged, this, &AlignLayoutDialog::onSelectionChanged);
+    m_scene = scene;
+    if (m_scene)
+        connect(m_scene, &QGraphicsScene::selectionChanged, this, &AlignLayoutDialog::onSelectionChanged);
+    refreshSelectionInfo();
+}
+
+void AlignLayoutDialog::setUndoStack(QUndoStack *undoStack)
+{
+    m_undoStack = undoStack;
+}
+
 void AlignLayoutDialog::refreshSelectionInfo()
 {
     if (!m_scene)

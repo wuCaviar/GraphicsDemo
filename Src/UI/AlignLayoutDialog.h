@@ -21,7 +21,15 @@ public:
     explicit AlignLayoutDialog(QGraphicsScene *scene, QUndoStack *undoStack,
                                QWidget *parent = nullptr);
 
+    void setScene(QGraphicsScene *scene);
+    void setUndoStack(QUndoStack *undoStack);
     void refreshSelectionInfo();
+
+    // Session persistence — exposed for session serialization
+    static qreal hSpacing()    { return s_hSpacing; }
+    static void setHSpacing(qreal v) { s_hSpacing = v; }
+    static qreal vSpacing()    { return s_vSpacing; }
+    static void setVSpacing(qreal v) { s_vSpacing = v; }
 
 private slots:
     void onAlignClicked();
