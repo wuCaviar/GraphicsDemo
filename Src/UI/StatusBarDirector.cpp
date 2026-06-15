@@ -1,8 +1,10 @@
 #include "StatusBarDirector.h"
 #include "AppContext.h"
 #include "QAtCanvasPage.h"
+#include "qatgraphicsview.h"
 
 #include <QLabel>
+#include <QLineEdit>
 #include <QSlider>
 #include <Qt>
 
@@ -12,26 +14,41 @@ StatusBarDirector::StatusBarDirector(QObject *parent)
 }
 
 void StatusBarDirector::setPositionLabel(QLabel *label)  { m_posLabel = label; }
-void StatusBarDirector::setZoomControls(QLabel *label, QSlider *slider)
+void StatusBarDirector::setZoomControls(QLabel *label, QLineEdit *edit, QSlider *slider)
 {
-    m_zoomLabel = label;
+    m_zoomLabel  = label;
+    m_zoomEdit   = edit;
     m_zoomSlider = slider;
 }
 void StatusBarDirector::setCanvasLabel(QLabel *label)    { m_canvasLabel = label; }
 void StatusBarDirector::setToolLabel(QLabel *label)      { m_toolLabel = label; }
 
+void StatusBarDirector::applyZoomFromEdit()
+{
+    if (!m_zoomEdit) return;
+    auto *p = AppContext::get().activeCanvasPage();
+    if (!p || !p->view()) return;
+
+    bool ok = false;
+    int pct = m_zoomEdit->text().replace(QLatin1Char('%'), QString()).trimmed().toInt(&ok);
+    if (!ok || pct < 1) {
+        // Reset to current value on invalid input
+        onZoomChanged(p->view()->zoomLevel());
+        return;
+    }
+    qreal level = qBound(0.01, pct / 100.0, 32.0);
+    p->view()->setZoomLevel(level);
+}
+
 void StatusBarDirector::onPageSwitched(const QString &, const QString &pageType)
 {
-    // Disconnect old page signals
     auto pages = AppContext::get().allPages();
     for (auto *p : pages) {
         auto *cp = qobject_cast<QAtCanvasPage*>(p);
-        if (cp) {
+        if (cp)
             cp->disconnect(this);
-        }
     }
 
-    // Bind to new active canvas page
     if (pageType == QStringLiteral("canvas")) {
         auto *p = AppContext::get().activeCanvasPage();
         if (p) {
@@ -55,11 +72,17 @@ void StatusBarDirector::onMousePositionChanged(const QPointF &scenePos)
 
 void StatusBarDirector::onZoomChanged(qreal level)
 {
+    int pct = qRound(level * 100.0);
     if (m_zoomLabel)
-        m_zoomLabel->setText(QString::number(qRound(level * 100.0)) + QStringLiteral("%"));
+        m_zoomLabel->setText(QString::number(pct) + QStringLiteral("%"));
+    if (m_zoomEdit) {
+        m_zoomEdit->blockSignals(true);
+        m_zoomEdit->setText(QString::number(pct));
+        m_zoomEdit->blockSignals(false);
+    }
     if (m_zoomSlider) {
         m_zoomSlider->blockSignals(true);
-        m_zoomSlider->setValue(qRound(level * 100.0));
+        m_zoomSlider->setValue(pct);
         m_zoomSlider->blockSignals(false);
     }
 }

@@ -54,6 +54,7 @@ void QAtCanvasPage::_initLayout()
         m_hRuler->updateRuler();
         m_vRuler->updateRuler();
     });
+
 }
 
 // ==================== Constructors ====================

@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QMap>
+#include <QPointer>
 #include <QString>
 #include <QStringList>
 #include <QList>
@@ -15,6 +16,7 @@ class QAction;
 class QAtPage;
 class QAtCanvasPage;
 class QAtService;
+class AlignWidget;
 
 class ClipboardService;
 class ThemeService;
@@ -81,6 +83,10 @@ public:
     void setMaybeSaveProject(SaveCallback cb);
     bool maybeSaveProject();
 
+    // AlignWidget reference for AlignWidgetAction
+    void setAlignWidget(AlignWidget *widget);
+    AlignWidget* alignWidget() const;
+
     // Action callbacks for operations that need MainWindow-specific logic
     using ActionCallback = std::function<bool(const QString &actionToken)>;
     void setActionCallback(ActionCallback cb);
@@ -100,6 +106,9 @@ private:
     mutable QMap<QString, QAction*> m_qActions;
     // token → category (populated at registration)
     QMap<QString, QString> m_actionCategories;
+
+    // AlignWidget
+    QPointer<AlignWidget> m_alignWidget;
 
     // Project state
     QString m_projectPath;

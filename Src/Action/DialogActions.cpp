@@ -1,5 +1,11 @@
 #include "DialogActions.h"
 #include "AppContext.h"
+#include "AppConfig.h"
+#include "AlignWidget.h"
+#include "NetworkService.h"
+#include "ProcessService.h"
+#include "SettingsDialog.h"
+#include "PreferencesDialog.h"
 
 #include <QMessageBox>
 #include <QApplication>
@@ -23,11 +29,18 @@ QString AlignWidgetAction::_text()
 
 void SettingsAction::_execute()
 {
-    AppContext::get().invokeActionCallback(token());
+    SettingsDialog dlg(qApp->activeWindow());
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    auto &ctx = AppContext::get();
+    if (ctx.process()->isProcessRunning(AppConfig::instance().ripExePath()))
+        ctx.network()->doRipVersion();
 }
 void PreferencesAction::_execute()
 {
-    AppContext::get().invokeActionCallback(token());
+    PreferencesDialog dlg(qApp->activeWindow());
+    dlg.exec();
 }
 
 void AboutAction::_execute()
@@ -38,5 +51,10 @@ void AboutAction::_execute()
 
 void AlignWidgetAction::_execute()
 {
-    AppContext::get().invokeActionCallback(token());
+    auto *w = AppContext::get().alignWidget();
+    if (!w)
+        return;
+    w->refreshSelectionInfo();
+    w->show();
+    w->raise();
 }

@@ -5,6 +5,7 @@
 #include <QPointF>
 
 class QLabel;
+class QLineEdit;
 class QSlider;
 class QToolButton;
 enum class Tool;
@@ -17,9 +18,12 @@ public:
     explicit StatusBarDirector(QObject *parent = nullptr);
 
     void setPositionLabel(QLabel *label);
-    void setZoomControls(QLabel *label, QSlider *slider);
+    void setZoomControls(QLabel *label, QLineEdit *edit, QSlider *slider);
     void setCanvasLabel(QLabel *label);
     void setToolLabel(QLabel *label);
+
+    // Apply zoom from the line edit (called on Return / focus loss)
+    void applyZoomFromEdit();
 
 public slots:
     void onPageSwitched(const QString &pageId, const QString &pageType);
@@ -28,11 +32,12 @@ public slots:
     void onToolChanged(Tool tool);
 
 private:
-    QLabel  *m_posLabel    = nullptr;
-    QLabel  *m_zoomLabel   = nullptr;
-    QSlider *m_zoomSlider  = nullptr;
-    QLabel  *m_canvasLabel = nullptr;
-    QLabel  *m_toolLabel   = nullptr;
+    QLabel    *m_posLabel    = nullptr;
+    QLabel    *m_zoomLabel   = nullptr;
+    QLineEdit *m_zoomEdit    = nullptr;
+    QSlider   *m_zoomSlider  = nullptr;
+    QLabel    *m_canvasLabel = nullptr;
+    QLabel    *m_toolLabel   = nullptr;
 };
 
 #endif // STATUSBARDIRECTOR_H

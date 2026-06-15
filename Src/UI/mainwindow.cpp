@@ -187,7 +187,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     // P6: Wire StatusBarDirector for signal rebinding on page switch
     m_statusBarDirector = new StatusBarDirector(this);
     m_statusBarDirector->setPositionLabel(m_posLabel);
-    m_statusBarDirector->setZoomControls(m_zoomLabel, m_zoomSlider);
+    m_statusBarDirector->setZoomControls(m_zoomLabel, m_zoomEdit, m_zoomSlider);
     m_statusBarDirector->setCanvasLabel(m_canvasLabel);
     m_statusBarDirector->setToolLabel(m_toolLabel);
     connect(&AppContext::get(), &AppContext::pageSwitched, m_statusBarDirector,
@@ -464,32 +464,40 @@ void MainWindow::_initMenuBar()
     if (ungroupAct)
         arrMenu->addAction(ungroupAct);
     arrMenu->addSeparator();
-    arrMenu->addAction(tr("Align && Layout..."), this, &MainWindow::onAlignLayoutDialog)
-        ->setToolTip(tr("Open the Align & Layout dialog"));
+    {
+        QAction *act = AppContext::get().getQAction(QStringLiteral("AlignLayoutDialog"));
+        if (act) arrMenu->addAction(act);
+    }
     arrMenu->addSeparator();
     QAction *fitCanvasAct =
         arrMenu->addAction(tr("Fit Canvas to Selection"), this, &MainWindow::onFitCanvasToItems);
     fitCanvasAct->setToolTip(tr("Resize the canvas to fit the selected items"));
     arrMenu->addSeparator();
     QMenu *rotateMenu = arrMenu->addMenu(tr("Rotate"));
-    rotateMenu
-        ->addAction(QIcon(":/icons/icons/rotate-cw.svg"), tr("90\u00b0 Clockwise"), this,
-                    [this]() { rotateSelectedItems(90.0); })
-        ->setToolTip(tr("Rotate selected items 90 degrees clockwise"));
-    rotateMenu
-        ->addAction(QIcon(":/icons/icons/rotate-ccw.svg"), tr("90\u00b0 Counter-clockwise"), this,
-                    [this]() { rotateSelectedItems(-90.0); })
-        ->setToolTip(tr("Rotate selected items 90 degrees counter-clockwise"));
-    rotateMenu->addAction(tr("180\u00b0"), this, [this]() { rotateSelectedItems(180.0); })
-        ->setToolTip(tr("Rotate selected items 180 degrees"));
+    {
+        QAction *act = AppContext::get().getQAction(QStringLiteral("RotateCW"));
+        if (act) rotateMenu->addAction(act);
+    }
+    {
+        QAction *act = AppContext::get().getQAction(QStringLiteral("RotateCCW"));
+        if (act) rotateMenu->addAction(act);
+    }
+    {
+        QAction *act = AppContext::get().getQAction(QStringLiteral("Rotate180"));
+        if (act) rotateMenu->addAction(act);
+    }
 
     // ---- 设置 ----
     QMenu *settingsMenu = menu->addMenu(tr("&Settings"));
-    settingsMenu->addAction(tr("&RIP Settings..."), this, &MainWindow::onSettings)
-        ->setToolTip(tr("Configure RIP settings"));
+    {
+        QAction *act = AppContext::get().getQAction(QStringLiteral("Settings"));
+        if (act) settingsMenu->addAction(act);
+    }
     settingsMenu->addSeparator();
-    settingsMenu->addAction(tr("&Preferences..."), this, &MainWindow::onPreferences)
-        ->setToolTip(tr("Open application preferences"));
+    {
+        QAction *act = AppContext::get().getQAction(QStringLiteral("Preferences"));
+        if (act) settingsMenu->addAction(act);
+    }
 
     // ---- 视图 ----
     QMenu *viewMenu = menu->addMenu(tr("&View"));
@@ -499,8 +507,10 @@ void MainWindow::_initMenuBar()
 
     // ---- 帮助 ----
     QMenu *helpMenu = menu->addMenu(tr("&Help"));
-    helpMenu->addAction(tr("&About..."), this, &MainWindow::onAbout)
-        ->setToolTip(tr("About this application"));
+    {
+        QAction *act = AppContext::get().getQAction(QStringLiteral("About"));
+        if (act) helpMenu->addAction(act);
+    }
 
     // 网格显示/隐藏
     m_gridAction = AppContext::get().getQAction(QStringLiteral("ToggleGrid"));
@@ -644,10 +654,10 @@ void MainWindow::_initToolBar()
     alignToolBar->setIconSize(QSize(20, 20));
     addToolBar(Qt::TopToolBarArea, alignToolBar);
 
-    QAction *alignLayoutAct =
-        alignToolBar->addAction(QIcon(":/icons/icons/align-layout.svg"), tr("Align && Layout..."));
-    alignLayoutAct->setToolTip(tr("Open Align & Layout dialog"));
-    connect(alignLayoutAct, &QAction::triggered, this, &MainWindow::onAlignLayoutDialog);
+    {
+        QAction *act = AppContext::get().getQAction(QStringLiteral("AlignLayoutDialog"));
+        if (act) alignToolBar->addAction(act);
+    }
 
     alignToolBar->addSeparator();
 
@@ -661,17 +671,15 @@ void MainWindow::_initToolBar()
 
     alignToolBar->addSeparator();
 
-    // 顺时针旋转 90°
-    QAction *rotateCWAct =
-        alignToolBar->addAction(QIcon(":/icons/icons/rotate-cw.svg"), tr("Rotate 90\u00b0 CW"));
-    rotateCWAct->setToolTip(tr("Rotate 90\u00b0 clockwise"));
-    connect(rotateCWAct, &QAction::triggered, this, [this]() { rotateSelectedItems(90.0); });
-
-    // 逆时针旋转 90°
-    QAction *rotateCCWAct =
-        alignToolBar->addAction(QIcon(":/icons/icons/rotate-ccw.svg"), tr("Rotate 90\u00b0 CCW"));
-    rotateCCWAct->setToolTip(tr("Rotate 90\u00b0 counter-clockwise"));
-    connect(rotateCCWAct, &QAction::triggered, this, [this]() { rotateSelectedItems(-90.0); });
+    // 旋转
+    {
+        QAction *act = AppContext::get().getQAction(QStringLiteral("RotateCW"));
+        if (act) alignToolBar->addAction(act);
+    }
+    {
+        QAction *act = AppContext::get().getQAction(QStringLiteral("RotateCCW"));
+        if (act) alignToolBar->addAction(act);
+    }
 
     alignToolBar->addSeparator();
 
@@ -704,6 +712,7 @@ void MainWindow::_initPropertyPanel()
     m_alignLayoutDlg->setAllowedAreas(Qt::RightDockWidgetArea); // 仅允许停靠在右侧
     addDockWidget(Qt::RightDockWidgetArea, m_alignLayoutDlg);
     m_alignLayoutDlg->hide();
+    AppContext::get().setAlignWidget(m_alignLayoutDlg);
 }
 
 void MainWindow::_initConnections()
@@ -783,7 +792,9 @@ void MainWindow::_bindViewConnections()
             [this](const QPointF &pos) { _updatePosLabel(pos); });
     connect(m_pView, &QAtGraphicsView::zoomChanged, this, [this](qreal level) {
         int pct = qRound(level * 100);
-        m_zoomLabel->setText(tr("%1%").arg(pct));
+        m_zoomEdit->blockSignals(true);
+        m_zoomEdit->setText(QString::number(pct));
+        m_zoomEdit->blockSignals(false);
         m_zoomSlider->blockSignals(true);
         m_zoomSlider->setValue(pct);
         m_zoomSlider->blockSignals(false);
@@ -807,21 +818,30 @@ void MainWindow::_initStatusBar()
 
     m_pProgressMgr = new ProgressManager(this);
 
+    // 缩放编辑框
+    m_zoomEdit = new QLineEdit(QStringLiteral("100"));
+    m_zoomEdit->setFixedWidth(48);
+    m_zoomEdit->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    m_zoomEdit->setToolTip(tr("Enter zoom percentage (1–3200)"));
+    connect(m_zoomEdit, &QLineEdit::editingFinished, m_statusBarDirector,
+            &StatusBarDirector::applyZoomFromEdit);
+    connect(m_zoomEdit, &QLineEdit::returnPressed, m_statusBarDirector,
+            &StatusBarDirector::applyZoomFromEdit);
+
     // 缩放标签
-    m_zoomLabel = new QLabel(tr("100%"));
-    m_zoomLabel->setMinimumWidth(60);
-    m_zoomLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    m_zoomLabel = new QLabel(tr("%"));
+    m_zoomLabel->setMaximumWidth(20);
+    m_zoomLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
     // 缩放滑块
     m_zoomSlider = new QSlider(Qt::Horizontal);
-    m_zoomSlider->setRange(1, 5000);
+    m_zoomSlider->setRange(1, 3200);
     m_zoomSlider->setValue(100);
     m_zoomSlider->setFixedWidth(120);
     m_zoomSlider->setTickPosition(QSlider::TicksBelow);
     m_zoomSlider->setTickInterval(50);
     m_zoomSlider->setToolTip(tr("Adjust zoom level"));
     connect(m_zoomSlider, &QSlider::valueChanged, this, [this](int value) {
-        // Use current m_pView (reassigned on tab switch)
         if (m_pView)
             m_pView->setZoomLevel(value / 100.0);
     });
@@ -886,6 +906,7 @@ void MainWindow::_initStatusBar()
     bar->addPermanentWidget(taskContainer);
     bar->addPermanentWidget(m_pProgressMgr->bar());
     bar->addPermanentWidget(createStatusSeparator(bar));
+    bar->addPermanentWidget(m_zoomEdit);
     bar->addPermanentWidget(m_zoomLabel);
     bar->addPermanentWidget(m_zoomSlider);
     bar->addPermanentWidget(createStatusSeparator(bar));
@@ -926,7 +947,7 @@ void MainWindow::_initServices()
     // Wire callbacks
     ctx.setMaybeSaveProject([this]() { return _maybeSaveProject(); });
 
-    // Route new Action tokens to existing working slots
+    // Route remaining Action tokens that still need MainWindow-level resources
     ctx.setActionCallback([this](const QString &token) {
         static const QMap<QString, void (MainWindow::*)()> map = {
             { QStringLiteral("New"), &MainWindow::onNew },
@@ -934,28 +955,11 @@ void MainWindow::_initServices()
             { QStringLiteral("SaveProject"), &MainWindow::onSaveProject },
             { QStringLiteral("ImportImage"), &MainWindow::onImportImage },
             { QStringLiteral("ExportImage"), &MainWindow::onExportImage },
-            { QStringLiteral("Settings"), &MainWindow::onSettings },
-            { QStringLiteral("Preferences"), &MainWindow::onPreferences },
-            { QStringLiteral("About"), &MainWindow::onAbout },
-            { QStringLiteral("AlignLayoutDialog"), &MainWindow::onAlignLayoutDialog },
             { QStringLiteral("AutoLayout"), &MainWindow::onAutoLayout },
         };
         auto it = map.find(token);
         if (it != map.end()) {
             (this->*(it.value()))();
-            return true;
-        }
-        // Lambda-based callbacks for actions with parameters
-        if (token == QStringLiteral("RotateCW")) {
-            rotateSelectedItems(90.0);
-            return true;
-        }
-        if (token == QStringLiteral("RotateCCW")) {
-            rotateSelectedItems(-90.0);
-            return true;
-        }
-        if (token == QStringLiteral("Rotate180")) {
-            rotateSelectedItems(180.0);
             return true;
         }
         return false;
@@ -1142,13 +1146,13 @@ QDockWidget *MainWindow::_addCanvasDockInternal(QAtCanvasPage *page, const QStri
     dock->setWidget(page);
     dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
     dock->setAllowedAreas(Qt::LeftDockWidgetArea);
-    // Track close: warn about data loss
+    // Tab switch / float / close detection via visibility changes
     connect(dock, &QDockWidget::visibilityChanged, this, [this, dock](bool visible) {
-        if (!visible) {
-            // Only handle actual close (not tab-switch hide)
-            // Tab switches also toggle visibility — check if dock was removed
-            if (m_canvasDocks.contains(dock))
-                return; // still in list, just hidden by tab switch
+        if (visible) {
+            // Dock became visible — if it's a tab switch (dock is in our list),
+            // activate it immediately so the user doesn't need an extra click
+            if (m_canvasDocks.contains(dock) && m_activeCanvasDock != dock)
+                _onCanvasDockActivated(dock);
         }
     });
 
@@ -1248,10 +1252,6 @@ void MainWindow::_onCanvasDockActivated(QDockWidget *dock)
     QAtGraphicsView *newView = page->view();
     QUndoStack *newStack = page->undoStack();
 
-    // Clear property panel
-    if (m_pPropertyPanel)
-        m_pPropertyPanel->setItem(nullptr);
-
     // Rebind view signals
     if (m_pView != newView) {
         if (m_pView) {
@@ -1279,7 +1279,9 @@ void MainWindow::_onCanvasDockActivated(QDockWidget *dock)
         if (m_pView) {
             qreal zoom = m_pView->zoomLevel();
             int pct = qRound(zoom * 100);
-            m_zoomLabel->setText(tr("%1%").arg(pct));
+            m_zoomEdit->blockSignals(true);
+            m_zoomEdit->setText(QString::number(pct));
+            m_zoomEdit->blockSignals(false);
             m_zoomSlider->blockSignals(true);
             m_zoomSlider->setValue(pct);
             m_zoomSlider->blockSignals(false);
@@ -1302,6 +1304,12 @@ void MainWindow::_onCanvasDockActivated(QDockWidget *dock)
         auto *oldPage = qobject_cast<QAtCanvasPage *>(oldDock->widget());
         if (oldPage)
             _updateCanvasDockTitle(oldPage);
+    }
+
+    // Restore property panel from the newly active canvas's selection
+    if (m_pView && m_pPropertyPanel) {
+        auto items = ::filterSelectableItems(m_pView->scene()->selectedItems());
+        m_pPropertyPanel->setItem(items.size() == 1 ? items.first() : nullptr);
     }
 }
 
@@ -1673,6 +1681,9 @@ void MainWindow::loadSession()
     // Clear autosave path — user should pick a real save location on next save
     if (isAutoSave)
         m_projectPath.clear();
+    if (!m_projectPath.isEmpty())
+        setWindowTitle(
+            tr("AT Drawing Tools - %1").arg(QFileInfo(m_projectPath).completeBaseName()));
     SessionFile::remove();
 }
 
@@ -1984,6 +1995,8 @@ void MainWindow::onOpenProject()
             canvasPage->view()->setEnabled(true);
             canvasPage->setRulerPpi(ppi);
             canvasPage->updateRulers();
+            if (bundle.info.zoom > 0)
+                canvasPage->view()->setZoomLevel(bundle.info.zoom);
             _updateCanvasDockTitle(canvasPage);
             continue;
         }
@@ -1993,6 +2006,8 @@ void MainWindow::onOpenProject()
             m_pProgressMgr->startTask(tr("Load %1").arg(tabTitle), bundle.tasks.size());
         canvasPage->view()->setEnabled(false);
 
+        qreal zoom = bundle.info.zoom > 0 ? bundle.info.zoom : 1.0;
+
         auto *watcher = new QFutureWatcher<DeserializedItem>(this);
         QPointer<QAtCanvasPage> pagePtr(canvasPage);
 
@@ -2000,7 +2015,7 @@ void MainWindow::onOpenProject()
                 [this, taskId](int v) { m_pProgressMgr->updateTask(taskId, v); });
 
         connect(watcher, &QFutureWatcher<DeserializedItem>::finished, this,
-                [this, watcher, taskId, ppi, pagePtr]() {
+                [this, watcher, taskId, ppi, zoom, pagePtr]() {
                     m_pProgressMgr->finishTask(taskId);
                     if (!pagePtr) {
                         watcher->deleteLater();
@@ -2018,6 +2033,7 @@ void MainWindow::onOpenProject()
                         pagePtr->scene()->addItem(item);
 
                     pagePtr->view()->setEnabled(true);
+                    pagePtr->view()->setZoomLevel(zoom);
                     m_tabStates[pagePtr].modified = false;
                     _updateCanvasDockTitle(pagePtr);
 
@@ -2086,6 +2102,7 @@ void MainWindow::onSaveProject()
         snap.info.width = canvas->canvasSize().width();
         snap.info.height = canvas->canvasSize().height();
         snap.info.dpi = canvas->isDpiLocked() ? canvas->canvasDpiX() : 0.0;
+        snap.info.zoom = page->view() ? page->view()->zoomLevel() : 1.0;
 
         auto items = ::filterSelectableItems(page->scene()->items());
         snap.inputs.reserve(items.size());
@@ -2196,6 +2213,21 @@ void MainWindow::onSaveProject()
 
 void MainWindow::onImportImage()
 {
+    // Capture active canvas page before any modal dialog — modal dialogs
+    // run an event loop, and focus-return can trigger _onCanvasDockActivated
+    // which reassigns m_pView / m_undoStack to a different canvas.
+    if (!m_pView || !m_pView->canvasItem())
+        return;
+
+    QAtGraphicsView *view = m_pView;
+    QUndoStack *undoStack = m_undoStack;
+    QPointer<QAtCanvasPage> page(qobject_cast<QAtCanvasPage *>(_currentCanvasPage()));
+    if (!page)
+        return;
+    CanvasItem *canvas = page->canvasItem();
+    if (!canvas)
+        return;
+
     const QStringList paths =
         QFileDialog::getOpenFileNames(this, tr("Import Images"), QString(),
                                       tr("Images (*.tif *.tiff *.png *.jpg *.jpeg *.bmp);;"
@@ -2207,30 +2239,22 @@ void MainWindow::onImportImage()
     if (paths.isEmpty())
         return;
 
-    if (!m_pView->canvasItem())
-        return;
-
     if (paths.size() == 1)
-        importSingleImage(paths);
+        importSingleImage(paths, view, undoStack, page, canvas);
     else
-        importMultipleImages(paths);
+        importMultipleImages(paths, view, undoStack, page, canvas);
 }
 
-void MainWindow::importSingleImage(const QStringList &paths)
+void MainWindow::importSingleImage(const QStringList &paths,
+                                   QAtGraphicsView *view, QUndoStack *undoStack,
+                                   QPointer<QAtCanvasPage> page, CanvasItem *canvas)
 {
-    CanvasItem *canvas = m_pView->canvasItem();
-
     FitCanvasDlg dlg;
     dlg.setParam(canvas->canvasSize());
     if (dlg.exec() != QDialog::Accepted)
         return;
     FitCanvasType fitType = dlg.fitType();
     double fitVal = dlg.fitValue();
-
-    // Capture view/scene/undoStack before async operations (multi-canvas safe)
-    QAtGraphicsView *view = m_pView;
-    QUndoStack *undoStack = m_undoStack;
-    QPointer<QAtCanvasPage> page(qobject_cast<QAtCanvasPage *>(_currentCanvasPage()));
 
     const QString taskId = m_pProgressMgr->startTask(tr("Import"), paths.size());
 
@@ -2366,10 +2390,10 @@ void MainWindow::importSingleImage(const QStringList &paths)
     atDebug() << "Started import task for" << paths.size() << "images";
 }
 
-void MainWindow::importMultipleImages(const QStringList &paths)
+void MainWindow::importMultipleImages(const QStringList &paths,
+                                     QAtGraphicsView *view, QUndoStack *undoStack,
+                                     QPointer<QAtCanvasPage> page, CanvasItem *canvas)
 {
-    CanvasItem *canvas = m_pView->canvasItem();
-
     ImageArrangementDialog dlg;
     dlg.setFilePaths(paths);
     if (dlg.exec() != QDialog::Accepted)
@@ -2384,11 +2408,6 @@ void MainWindow::importMultipleImages(const QStringList &paths)
         return;
     FitCanvasType fitType = fitDlg.fitType();
     double fitVal = fitDlg.fitValue();
-
-    // Capture view/scene/undoStack before async operations (multi-canvas safe)
-    QAtGraphicsView *view = m_pView;
-    QUndoStack *undoStack = m_undoStack;
-    QPointer<QAtCanvasPage> page(qobject_cast<QAtCanvasPage *>(_currentCanvasPage()));
 
     const QString taskId = m_pProgressMgr->startTask(tr("Import"), ordered.size());
 
@@ -2816,42 +2835,6 @@ void MainWindow::exportWithEngine(const QString &json, const QString &outputPath
 // ============================================================
 // 对齐与分布面板
 // ============================================================
-void MainWindow::onAlignLayoutDialog()
-{
-    m_alignLayoutDlg->refreshSelectionInfo();
-    m_alignLayoutDlg->show();
-    m_alignLayoutDlg->raise();
-}
-
-// ============================================================
-// 设置对话框
-// ============================================================
-void MainWindow::onSettings()
-{
-    SettingsDialog dlg(this);
-    if (dlg.exec() != QDialog::Accepted)
-        return;
-
-    getToolInfo();
-}
-
-void MainWindow::onPreferences()
-{
-    PreferencesDialog dlg(this);
-    dlg.exec();
-}
-
-void MainWindow::onAbout()
-{
-    QString strText = QString(tr("<h3>AT Drawing Tools</h3>"
-                                 "<p>Current Version: %1</p>"
-                                 "<p>    Rip Version: %2</p>"))
-                          .arg(qApp->applicationVersion())
-                          .arg(RipVersion);
-
-    QMessageBox::about(this, tr("About AT Drawing Tools"), strText);
-}
-
 // ============================================================
 // 对齐（菜单快捷入口）
 // ============================================================
@@ -3155,88 +3138,8 @@ void MainWindow::onResizeCanvas()
 }
 
 // ============================================================
-// 批量旋转选中图元 — 绕图元中心(单选)或组中心(多选)旋转
+// 选择过滤
 // ============================================================
-void MainWindow::rotateSelectedItems(qreal angleDelta)
-{
-    auto items = filterSelectableItems();
-    if (items.isEmpty())
-        return;
-
-    // 过滤掉不支持旋转的图元（如图片）
-    QList<QGraphicsItem *> rotatableItems;
-    for (auto *item : items) {
-        auto *igi = dynamic_cast<IGraphicsItem *>(item);
-        if (igi && (igi->propertyFlags() & IGraphicsItem::HasRotation))
-            rotatableItems << item;
-    }
-    if (rotatableItems.isEmpty())
-        return;
-
-    items = rotatableItems;
-
-    if (items.size() == 1) {
-        // 单个图元：绕自身中心旋转（RotationChangeCommand 已内置中心补偿）
-        auto *item = items.first();
-        qreal oldRotation = item->rotation();
-        qreal newRotation = oldRotation + angleDelta;
-        m_undoStack->push(
-            new RotationChangeCommand(item, oldRotation, newRotation, m_pView->scene()));
-    } else {
-        // 多个图元：绕组中心整体旋转
-        // 1. 计算组中心（所有图元场景包围矩形的并集中心）
-        QRectF groupSceneRect;
-        for (auto *item : items) {
-            QRectF itemSceneRect = item->mapToScene(item->boundingRect()).boundingRect();
-            groupSceneRect = groupSceneRect.united(itemSceneRect);
-        }
-        QPointF groupCenter = groupSceneRect.center();
-
-        // 2. 对每个图元：先绕自身中心旋转，再绕组中心公转
-        m_undoStack->beginMacro(tr("Rotate %1\u00b0").arg(angleDelta, 0, 'f', 0));
-
-        QList<QGraphicsItem *> moveItems;
-        QList<QPointF> oldPositions;
-        QList<QPointF> newPositions;
-
-        for (auto *item : items) {
-            qreal oldRotation = item->rotation();
-            qreal newRotation = oldRotation + angleDelta;
-
-            // 推入旋转命令（含中心补偿：旋转后图元中心位置不变）
-            m_undoStack->push(
-                new RotationChangeCommand(item, oldRotation, newRotation, m_pView->scene()));
-
-            // 旋转命令 redo 后，图元中心仍位于旋转前的场景位置
-            // 记录中心补偿后的位置（公转前的位置）
-            QPointF posAfterCenterComp = item->pos();
-
-            // 计算绕组中心的公转位移
-            QPointF currentCenter = item->mapToScene(item->boundingRect().center());
-            QLineF line(groupCenter, currentCenter);
-            line.setAngle(line.angle() + angleDelta);
-            QPointF orbitedCenter = line.p2();
-            QPointF orbitalDelta = orbitedCenter - currentCenter;
-            item->setPos(item->pos() + orbitalDelta);
-
-            moveItems << item;
-            oldPositions << posAfterCenterComp; // 公转前位置
-            newPositions << item->pos(); // 公转后最终位置
-        }
-
-        // 公转位移变更作为一个命令
-        if (!moveItems.isEmpty()) {
-            m_undoStack->push(
-                new MoveItemsCommand(moveItems, oldPositions, newPositions, m_pView->scene()));
-        }
-
-        m_undoStack->endMacro();
-    }
-
-    // 旋转后需要更新 ResizeHandleItem
-    m_pView->scheduleResizeHandleUpdate();
-}
-
 QList<QGraphicsItem *> MainWindow::filterSelectableItems() const
 {
     return ::filterSelectableItems(m_pView->scene()->selectedItems());

@@ -4,6 +4,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QScrollBar>
+#include <QEvent>
 #include <QtMath>
 #include <cmath>
 
@@ -63,6 +64,15 @@ QSize RulerBar::sizeHint() const
     return minimumSizeHint();
 }
 
+void RulerBar::changeEvent(QEvent *event)
+{
+    if (event->type() == QEvent::StyleChange
+        || event->type() == QEvent::PaletteChange) {
+        update();
+    }
+    QWidget::changeEvent(event);
+}
+
 void RulerBar::updateRuler()
 {
     if (!m_pView)
@@ -72,8 +82,6 @@ void RulerBar::updateRuler()
     m_scale = transform.m11();
 
     // 计算画布原点 (0,0) 在刻度尺上的屏幕像素位置
-    // mapFromScene → viewport 坐标，再 mapToParent → QGraphicsView widget 坐标
-    // 刻度尺 widget 与 QGraphicsView widget 在同一 grid layout 中对齐
     QPoint vpOrigin = m_pView->mapFromScene(QPointF(0, 0));
     QPoint widgetOrigin = m_pView->viewport()->mapToParent(vpOrigin);
     if (m_orientation == Horizontal) {
@@ -96,30 +104,23 @@ void RulerBar::setMousePosition(const QPointF &scenePos)
 
 qreal RulerBar::toDisplayValue(qreal scenePixels) const
 {
-    // 始终返回 mm
     return scenePixels / (m_ppi / 25.4);
 }
 
 qreal RulerBar::sceneToScreen(qreal scenePos) const
 {
-    // 场景坐标 scenePos → 刻度尺上的屏幕像素位置
-    // 画布原点 (0,0) 在屏幕位置 m_originPx
-    // 偏移 = scenePos * m_scale（缩放后的像素偏移）
     return m_originPx + scenePos * m_scale;
 }
 
 void RulerBar::calcInterval(qreal &interval, qreal &subInterval) const
 {
-    // 目标主刻度屏幕间距：80px，保证标签不重叠
     static constexpr qreal kTargetSpacing = 80.0;
 
-    // mm 模式：先计算 mm 单位的间隔，再转换为场景像素
     const qreal pixelsPerMm = m_ppi / 25.4;
     const qreal mmScreenPx = pixelsPerMm * m_scale;
     const qreal idealMm = kTargetSpacing / mmScreenPx;
     const qreal intervalMm = roundToNiceNumber(idealMm);
 
-    // 次刻度间隔（mm 单位）
     qreal subMm;
     qreal intPart;
     qreal frac = std::modf(intervalMm, &intPart);
@@ -141,7 +142,6 @@ void RulerBar::calcInterval(qreal &interval, qreal &subInterval) const
 
 QString RulerBar::formatLabel(qreal value) const
 {
-    // mm 模式：智能格式化
     if (qFuzzyCompare(value, qRound(value)))
         return QString::number(qRound(value));
     if (qAbs(value) >= 1.0)
@@ -154,25 +154,43 @@ void RulerBar::paintEvent(QPaintEvent *)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, false);
 
+    // Derive all colors from the widget's palette (set by QSS).
+    // QSS QWidget rule sets Window + WindowText; we derive the rest
+    // programmatically so rulers always match the active stylesheet.
+    const QPalette &pal = palette();
+    QColor bg = pal.color(QPalette::Window);
+    QColor fg = pal.color(QPalette::WindowText);
+
+    // bgAlt = bg shifted ~5% toward black
+    QColor bgAlt = bg.darker(108);
+    // mid = halfway between bg and fg
+    QColor mid = QColor::fromRgb(
+        (bg.red() + fg.red()) / 2,
+        (bg.green() + fg.green()) / 2,
+        (bg.blue() + fg.blue()) / 2);
+    // dark = fg at ~60% opacity over bg (visible but subdued)
+    QColor dark = QColor::fromRgb(
+        (bg.red() * 2 + fg.red()) / 3,
+        (bg.green() * 2 + fg.green()) / 3,
+        (bg.blue() * 2 + fg.blue()) / 3);
+
+    QColor borderColor = mid.lighter(115);
+    QColor unitColor = mid;
+
     // 渐变背景
     QLinearGradient gradient;
     if (m_orientation == Horizontal) {
         gradient = QLinearGradient(0, 0, 0, kRulerSize);
-        gradient.setColorAt(0, QColor(248, 248, 248));
-        gradient.setColorAt(1, QColor(235, 235, 235));
+        gradient.setColorAt(0, bg);
+        gradient.setColorAt(1, bgAlt);
     } else {
         gradient = QLinearGradient(0, 0, kRulerSize, 0);
-        gradient.setColorAt(0, QColor(248, 248, 248));
-        gradient.setColorAt(1, QColor(235, 235, 235));
+        gradient.setColorAt(0, bg);
+        gradient.setColorAt(1, bgAlt);
     }
     painter.fillRect(rect(), gradient);
 
-    // 刻度线颜色
-    QColor tickColor(120, 120, 120);
-    QColor minorTickColor(170, 170, 170);
-    QColor textColor(80, 80, 80);
-
-    QPen pen(tickColor);
+    QPen pen(dark);
     pen.setWidthF(1.0);
     painter.setPen(pen);
 
@@ -185,20 +203,17 @@ void RulerBar::paintEvent(QPaintEvent *)
     calcInterval(interval, subInterval);
 
     if (m_orientation == Horizontal) {
-        // 水平刻度尺
-        // 计算可见区域对应的场景坐标范围
-        qreal visibleLeft  = -m_originPx / m_scale;                   // 刻度尺左边缘对应的场景坐标
-        qreal visibleRight = (width() - m_originPx) / m_scale;        // 刻度尺右边缘对应的场景坐标
+        qreal visibleLeft  = -m_originPx / m_scale;
+        qreal visibleRight = (width() - m_originPx) / m_scale;
 
         qreal firstTick    = qFloor(visibleLeft / interval) * interval;
         qreal firstSubTick = qFloor(visibleLeft / subInterval) * subInterval;
 
         // 绘制次刻度
-        pen.setColor(minorTickColor);
+        pen.setColor(mid);
         pen.setWidthF(0.5);
         painter.setPen(pen);
         for (qreal pos = firstSubTick; pos <= visibleRight + subInterval; pos += subInterval) {
-            // 跳过主刻度位置
             if (qFuzzyIsNull(std::fmod(pos + interval * 0.5, interval)))
                 continue;
             qreal screenX = sceneToScreen(pos);
@@ -208,7 +223,7 @@ void RulerBar::paintEvent(QPaintEvent *)
         }
 
         // 绘制主刻度和标签
-        pen.setColor(tickColor);
+        pen.setColor(dark);
         pen.setWidthF(1.0);
         painter.setPen(pen);
         for (qreal pos = firstTick; pos <= visibleRight + interval; pos += interval) {
@@ -216,11 +231,9 @@ void RulerBar::paintEvent(QPaintEvent *)
             if (screenX < -10 || screenX > width() + 10)
                 continue;
 
-            // 主刻度线
             painter.drawLine(QPointF(screenX, kRulerSize), QPointF(screenX, kRulerSize - 10));
 
-            // 刻度标签
-            painter.setPen(textColor);
+            painter.setPen(fg);
             qreal displayVal = toDisplayValue(pos);
             painter.drawText(QRectF(screenX - 25, 0, 50, kRulerSize - 11),
                              Qt::AlignCenter, formatLabel(displayVal));
@@ -228,29 +241,27 @@ void RulerBar::paintEvent(QPaintEvent *)
         }
 
         // 底部分隔线
-        QPen borderPen(QColor(200, 200, 200));
+        QPen borderPen(borderColor);
         borderPen.setWidthF(1.0);
         painter.setPen(borderPen);
         painter.drawLine(0, kRulerSize - 1, width(), kRulerSize - 1);
 
         // 单位标识（右下角）
-        painter.setPen(QColor(140, 140, 140));
+        painter.setPen(unitColor);
         QFont unitFont("SF Pro Display", 7);
         painter.setFont(unitFont);
         QString unitLabel = QStringLiteral("mm");
         painter.drawText(QRectF(width() - 24, kRulerSize - 14, 22, 12),
                          Qt::AlignRight | Qt::AlignBottom, unitLabel);
 
-        // 鼠标位置指示器（红色三角 + 线）
+        // 鼠标位置指示器
         if (m_mousePos >= 0) {
             qreal screenX = sceneToScreen(m_mousePos);
             if (screenX >= 0 && screenX <= width()) {
-                // 红色指示线
                 QPen indicatorPen(QColor(220, 50, 50), 1.0);
                 painter.setPen(indicatorPen);
                 painter.drawLine(QPointF(screenX, 0), QPointF(screenX, kRulerSize - 1));
 
-                // 红色三角标记
                 QPainterPath tri;
                 tri.moveTo(screenX - 4, 0);
                 tri.lineTo(screenX + 4, 0);
@@ -268,7 +279,7 @@ void RulerBar::paintEvent(QPaintEvent *)
         qreal firstSubTick = qFloor(visibleTop / subInterval) * subInterval;
 
         // 绘制次刻度
-        pen.setColor(minorTickColor);
+        pen.setColor(mid);
         pen.setWidthF(0.5);
         painter.setPen(pen);
         for (qreal pos = firstSubTick; pos <= visibleBottom + subInterval; pos += subInterval) {
@@ -281,7 +292,7 @@ void RulerBar::paintEvent(QPaintEvent *)
         }
 
         // 绘制主刻度和标签
-        pen.setColor(tickColor);
+        pen.setColor(dark);
         pen.setWidthF(1.0);
         painter.setPen(pen);
         for (qreal pos = firstTick; pos <= visibleBottom + interval; pos += interval) {
@@ -289,12 +300,10 @@ void RulerBar::paintEvent(QPaintEvent *)
             if (screenY < -10 || screenY > height() + 10)
                 continue;
 
-            // 主刻度线
             painter.drawLine(QPointF(kRulerSize, screenY), QPointF(kRulerSize - 10, screenY));
 
-            // 绘制旋转文字标签
             painter.save();
-            painter.setPen(textColor);
+            painter.setPen(fg);
             qreal displayVal = toDisplayValue(pos);
             painter.translate(kRulerSize - 11, screenY);
             painter.rotate(-90);
@@ -304,13 +313,13 @@ void RulerBar::paintEvent(QPaintEvent *)
         }
 
         // 右侧分隔线
-        QPen borderPen(QColor(200, 200, 200));
+        QPen borderPen(borderColor);
         borderPen.setWidthF(1.0);
         painter.setPen(borderPen);
         painter.drawLine(kRulerSize - 1, 0, kRulerSize - 1, height());
 
         // 单位标识（右下角）
-        painter.setPen(QColor(140, 140, 140));
+        painter.setPen(unitColor);
         QFont unitFont("SF Pro Display", 7);
         painter.setFont(unitFont);
         QString unitLabel = QStringLiteral("mm");
@@ -328,7 +337,6 @@ void RulerBar::paintEvent(QPaintEvent *)
                 painter.setPen(indicatorPen);
                 painter.drawLine(QPointF(0, screenY), QPointF(kRulerSize - 1, screenY));
 
-                // 红色三角标记
                 QPainterPath tri;
                 tri.moveTo(0, screenY - 4);
                 tri.lineTo(0, screenY + 4);

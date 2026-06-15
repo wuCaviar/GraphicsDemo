@@ -31,6 +31,8 @@
 #include <QUndoStack>
 #include <QWheelEvent>
 #include <QtMath>
+#include <QEvent>
+#include <cmath>
 
 #include <tiff.h>
 #include <tiffio.h>
@@ -105,7 +107,7 @@ void QAtGraphicsView::resetCanvas(const QSizeF &size)
 
 void QAtGraphicsView::setZoomLevel(qreal level)
 {
-    level = qBound(0.01, level, 50.0);
+    level = qBound(0.01, level, 32.0);
     if (qFuzzyCompare(m_zoomLevel, level))
         return;
 
@@ -129,7 +131,7 @@ void QAtGraphicsView::fitToCanvas()
     scale(0.9, 0.9);
 
     qreal actualScale = transform().m11();
-    m_zoomLevel = qBound(0.1, actualScale, 5.0);
+    m_zoomLevel = qBound(0.01, actualScale, 32.0);
 
     emit zoomChanged(m_zoomLevel);
 }
@@ -550,21 +552,46 @@ void QAtGraphicsView::setGridVisible(bool visible)
     viewport()->update();
 }
 
+bool QAtGraphicsView::isDarkTheme() const
+{
+    const QPalette &pal = palette();
+    return pal.color(QPalette::Window).value()
+         < pal.color(QPalette::WindowText).value();
+}
+
+void QAtGraphicsView::changeEvent(QEvent *event)
+{
+    if (event->type() == QEvent::StyleChange
+        || event->type() == QEvent::PaletteChange) {
+        viewport()->update();
+    }
+    QGraphicsView::changeEvent(event);
+}
+
 void QAtGraphicsView::drawBackground(QPainter *painter, const QRectF &rect)
 {
-    painter->fillRect(rect, m_scene->backgroundBrush().color());
+    // Derive colors from palette so grid adapts to QSS theme changes
+    const QPalette &pal = palette();
+    QColor sceneBg = pal.color(QPalette::Window);
+    // Slightly tinted grid lines relative to background
+    QColor canvasBg = pal.color(QPalette::Base);
+    if (canvasBg == sceneBg || canvasBg == QPalette().color(QPalette::Base))
+        canvasBg = Qt::white;
+
+    painter->fillRect(rect, sceneBg);
 
     if (!m_pCanvas)
         return;
 
     QRectF canvasRect = m_pCanvas->rect();
+    painter->fillRect(canvasRect, canvasBg);
 
-    painter->fillRect(canvasRect, Qt::white);
-
+    // Shadow (subtle, alpha-blended with bg)
+    QColor shadowColor = sceneBg.darker(130);
+    shadowColor.setAlpha(60);
     QRectF rightShadow(canvasRect.right(), canvasRect.top() + 3, 6, canvasRect.height() - 3);
     QRectF bottomShadow(canvasRect.left() + 3, canvasRect.bottom(), canvasRect.width() - 3, 6);
     QRectF cornerShadow(canvasRect.right(), canvasRect.bottom(), 6, 6);
-    QColor shadowColor(60, 60, 60, 80);
     painter->fillRect(rightShadow, shadowColor);
     painter->fillRect(bottomShadow, shadowColor);
     painter->fillRect(cornerShadow, shadowColor);
@@ -574,25 +601,28 @@ void QAtGraphicsView::drawBackground(QPainter *painter, const QRectF &rect)
         if (!gridRect.isValid())
             return;
 
-        qreal baseInterval = 10.0;
-        if (m_zoomLevel < 0.2)
-            baseInterval = 100;
-        else if (m_zoomLevel < 0.5)
-            baseInterval = 50;
-        else if (m_zoomLevel < 1.0)
-            baseInterval = 20;
-        else if (m_zoomLevel < 2.0)
-            baseInterval = 10;
-        else if (m_zoomLevel < 4.0)
-            baseInterval = 10;
-        else
-            baseInterval = 5;
+        // Grid spacing in scene pixels, stepped by zoom level.
+        // At high zoom the grid densifies; at low zoom it coarsens.
+        static constexpr qreal kTargetScreenPx = 50.0; // target grid cell ~50 screen px
+        qreal baseInterval = kTargetScreenPx / m_zoomLevel;
+        // Snap to nice 1-2-5 multiples
+        qreal mag = std::pow(10.0, std::floor(std::log10(baseInterval)));
+        qreal norm = baseInterval / mag;
+        if (norm < 1.5)      baseInterval = 1.0 * mag;
+        else if (norm < 3.5) baseInterval = 2.0 * mag;
+        else if (norm < 7.5) baseInterval = 5.0 * mag;
+        else                 baseInterval = 10.0 * mag;
+        if (baseInterval < 1.0)
+            baseInterval = 1.0;
 
         qreal majorInterval = baseInterval * 5;
 
         painter->setClipRect(gridRect);
 
-        QPen minorPen(QColor(0, 0, 0, 20));
+        // Minor grid — derived from WindowText at low alpha
+        QColor minorColor = pal.color(QPalette::WindowText);
+        minorColor.setAlpha(isDarkTheme() ? 15 : 20);
+        QPen minorPen(minorColor);
         minorPen.setWidthF(0.5);
         painter->setPen(minorPen);
 
@@ -600,29 +630,30 @@ void QAtGraphicsView::drawBackground(QPainter *painter, const QRectF &rect)
         qreal startY = qFloor(gridRect.top() / baseInterval) * baseInterval;
 
         for (qreal x = startX; x <= gridRect.right(); x += baseInterval) {
-            if (qFuzzyCompare(qRound(x / majorInterval) * majorInterval, x))
+            if (std::fmod(std::abs(x), majorInterval) < baseInterval * 0.01)
                 continue;
             painter->drawLine(QPointF(x, gridRect.top()), QPointF(x, gridRect.bottom()));
         }
         for (qreal y = startY; y <= gridRect.bottom(); y += baseInterval) {
-            if (qFuzzyCompare(qRound(y / majorInterval) * majorInterval, y))
+            if (std::fmod(std::abs(y), majorInterval) < baseInterval * 0.01)
                 continue;
             painter->drawLine(QPointF(gridRect.left(), y), QPointF(gridRect.right(), y));
         }
 
-        QPen majorPen(QColor(0, 0, 0, 40));
+        // Major grid
+        QColor majorColor = pal.color(QPalette::WindowText);
+        majorColor.setAlpha(isDarkTheme() ? 30 : 40);
+        QPen majorPen(majorColor);
         majorPen.setWidthF(0.8);
         painter->setPen(majorPen);
 
         qreal majorStartX = qFloor(gridRect.left() / majorInterval) * majorInterval;
         qreal majorStartY = qFloor(gridRect.top() / majorInterval) * majorInterval;
 
-        for (qreal x = majorStartX; x <= gridRect.right(); x += majorInterval) {
+        for (qreal x = majorStartX; x <= gridRect.right(); x += majorInterval)
             painter->drawLine(QPointF(x, gridRect.top()), QPointF(x, gridRect.bottom()));
-        }
-        for (qreal y = majorStartY; y <= gridRect.bottom(); y += majorInterval) {
+        for (qreal y = majorStartY; y <= gridRect.bottom(); y += majorInterval)
             painter->drawLine(QPointF(gridRect.left(), y), QPointF(gridRect.right(), y));
-        }
 
         painter->setClipping(false);
     }

@@ -1,6 +1,7 @@
 #include "ArrangeActions.h"
 #include "AppContext.h"
 #include "QAtCanvasPage.h"
+#include "qatgraphicsview.h"
 #include "IGraphicsItem.h"
 #include "GraphicsItemGroup.h"
 #include "Commands/Commands.h"
@@ -8,6 +9,7 @@
 #include <QGraphicsScene>
 #include <QUndoStack>
 #include <QGraphicsItem>
+#include <QLineF>
 
 // ==================== BringToFrontAction ====================
 QIcon BringToFrontAction::_icon()
@@ -158,6 +160,78 @@ void FitCanvasToItemsAction::_execute()
     page->setCanvasSize(newSize);
 }
 
+// ==================== Rotate helper ====================
+static void rotateSelectedItemsBy(qreal angleDelta)
+{
+    auto *page = AppContext::get().activeCanvasPage();
+    if (!page || !page->scene() || !page->undoStack())
+        return;
+    auto *sc = page->scene();
+    auto *us = page->undoStack();
+    auto *view = page->view();
+
+    auto items = ::filterSelectableItems(sc->selectedItems());
+    if (items.isEmpty())
+        return;
+
+    QList<QGraphicsItem *> rotatableItems;
+    for (auto *item : items) {
+        auto *igi = dynamic_cast<IGraphicsItem *>(item);
+        if (igi && (igi->propertyFlags() & IGraphicsItem::HasRotation))
+            rotatableItems << item;
+    }
+    if (rotatableItems.isEmpty())
+        return;
+
+    items = rotatableItems;
+
+    if (items.size() == 1) {
+        auto *item = items.first();
+        qreal oldRotation = item->rotation();
+        qreal newRotation = oldRotation + angleDelta;
+        us->push(new RotationChangeCommand(item, oldRotation, newRotation, sc));
+    } else {
+        QRectF groupSceneRect;
+        for (auto *item : items) {
+            QRectF itemSceneRect = item->mapToScene(item->boundingRect()).boundingRect();
+            groupSceneRect = groupSceneRect.united(itemSceneRect);
+        }
+        QPointF groupCenter = groupSceneRect.center();
+
+        us->beginMacro(QObject::tr("Rotate %1°").arg(angleDelta, 0, 'f', 0));
+
+        QList<QGraphicsItem *> moveItems;
+        QList<QPointF> oldPositions;
+        QList<QPointF> newPositions;
+
+        for (auto *item : items) {
+            qreal oldRotation = item->rotation();
+            qreal newRotation = oldRotation + angleDelta;
+            us->push(new RotationChangeCommand(item, oldRotation, newRotation, sc));
+
+            QPointF posAfterCenterComp = item->pos();
+            QPointF currentCenter = item->mapToScene(item->boundingRect().center());
+            QLineF line(groupCenter, currentCenter);
+            line.setAngle(line.angle() + angleDelta);
+            QPointF orbitedCenter = line.p2();
+            QPointF orbitalDelta = orbitedCenter - currentCenter;
+            item->setPos(item->pos() + orbitalDelta);
+
+            moveItems << item;
+            oldPositions << posAfterCenterComp;
+            newPositions << item->pos();
+        }
+
+        if (!moveItems.isEmpty())
+            us->push(new MoveItemsCommand(moveItems, oldPositions, newPositions, sc));
+
+        us->endMacro();
+    }
+
+    if (view)
+        view->scheduleResizeHandleUpdate();
+}
+
 // ==================== RotateCWAction ====================
 QIcon RotateCWAction::_icon()
 {
@@ -169,7 +243,7 @@ QString RotateCWAction::_text()
 }
 void RotateCWAction::_execute()
 {
-    AppContext::get().invokeActionCallback(token());
+    rotateSelectedItemsBy(90.0);
 }
 
 // ==================== RotateCCWAction ====================
@@ -183,7 +257,7 @@ QString RotateCCWAction::_text()
 }
 void RotateCCWAction::_execute()
 {
-    AppContext::get().invokeActionCallback(token());
+    rotateSelectedItemsBy(-90.0);
 }
 
 // ==================== Rotate180Action ====================
@@ -193,7 +267,7 @@ QString Rotate180Action::_text()
 }
 void Rotate180Action::_execute()
 {
-    AppContext::get().invokeActionCallback(token());
+    rotateSelectedItemsBy(180.0);
 }
 
 // ==================== AutoLayoutAction ====================

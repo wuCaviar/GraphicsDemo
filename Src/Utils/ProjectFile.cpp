@@ -111,6 +111,7 @@ void ProjectFile::_writeCanvasToXml(QDomDocument &doc, QDomElement &parent, int 
     addProp(QStringLiteral("Width"), bundle.info.width);
     addProp(QStringLiteral("Height"), bundle.info.height);
     addProp(QStringLiteral("Dpi"), bundle.info.dpi);
+    addProp(QStringLiteral("Zoom"), bundle.info.zoom);
 
     QDomElement itemsEl = doc.createElement(QStringLiteral("Items"));
     canvasEl.appendChild(itemsEl);
@@ -281,6 +282,10 @@ bool ProjectFile::_parseCanvasElement(const QDomElement &canvasEl, CanvasDeseria
     bundle.info.width = canvasEl.firstChildElement(QStringLiteral("Width")).text().toDouble();
     bundle.info.height = canvasEl.firstChildElement(QStringLiteral("Height")).text().toDouble();
     bundle.info.dpi = canvasEl.firstChildElement(QStringLiteral("Dpi")).text().toDouble();
+    // Zoom is optional (added in v2.1); default 1.0 for backward compat
+    bundle.info.zoom = canvasEl.firstChildElement(QStringLiteral("Zoom")).text().toDouble();
+    if (bundle.info.zoom <= 0)
+        bundle.info.zoom = 1.0;
 
     QDomElement itemsEl = canvasEl.firstChildElement(QStringLiteral("Items"));
     if (itemsEl.isNull())

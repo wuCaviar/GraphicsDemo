@@ -1,6 +1,7 @@
 #include "AppContext.h"
 #include "PageManager.h"
 #include "QAtService.h"
+#include "AlignWidget.h"
 
 #include "ClipboardService.h"
 #include "ThemeService.h"
@@ -209,6 +210,18 @@ bool AppContext::isProjectModified() const
 void AppContext::setProjectModified(bool modified)
 {
     m_projectModified = modified;
+}
+
+// ==================== AlignWidget ====================
+
+void AppContext::setAlignWidget(AlignWidget *widget)
+{
+    m_alignWidget = widget;
+}
+
+AlignWidget* AppContext::alignWidget() const
+{
+    return m_alignWidget;
 }
 
 // ==================== 回调 ====================

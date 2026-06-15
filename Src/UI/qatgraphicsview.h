@@ -80,12 +80,14 @@ protected:
     void keyReleaseEvent(QKeyEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
     void drawBackground(QPainter *painter, const QRectF &rect) override;
+    void changeEvent(QEvent *event) override;
 
 private:
     void finishDrawing();
     void cancelDrawing();
     void initCanvas(const QSizeF &size);
     void scrollToCanvasOrigin();
+    bool isDarkTheme() const;
 
     GraphicsScene *m_scene = nullptr;
     QUndoStack *m_undoStack = nullptr;

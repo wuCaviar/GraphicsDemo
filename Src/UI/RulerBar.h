@@ -33,6 +33,7 @@ public slots:
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void changeEvent(QEvent *event) override;
 
 private:
     // 将场景像素坐标转换为 mm 显示值

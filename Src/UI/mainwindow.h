@@ -19,8 +19,10 @@
 #include <QProgressBar>
 #include <QTimer>
 #include <QFuture>
+#include <QPointer>
 
 class QLabel;
+class QLineEdit;
 class QPushButton;
 class QSlider;
 class QToolBar;
@@ -65,12 +67,8 @@ private slots:
     void onSaveProject();
     void onImportImage();
     void onExportImage();
-    void onAlignLayoutDialog();
     void onFitCanvasToItems();
     void onResizeCanvas();
-    void onSettings();
-    void onPreferences();
-    void onAbout();
     void onAlignLeft();
     void onAlignRight();
     void onAlignTop();
@@ -121,13 +119,15 @@ private:
     void loadWindowState();
     void saveWindowState();
 
-    void importSingleImage(const QStringList &paths);
-    void importMultipleImages(const QStringList &paths);
+    void importSingleImage(const QStringList &paths, QAtGraphicsView *view, QUndoStack *undoStack,
+                           QPointer<QAtCanvasPage> page, CanvasItem *canvas);
+    void importMultipleImages(const QStringList &paths, QAtGraphicsView *view, QUndoStack *undoStack,
+                              QPointer<QAtCanvasPage> page, CanvasItem *canvas);
 
     // DPI 锁定已移除 — 画布使用固定 150 PPI，允许任意 DPI 图片导入
 
     QList<QGraphicsItem *> filterSelectableItems() const;
-    void rotateSelectedItems(qreal angleDelta);
+
 
     bool _maybeSaveProject(); // 提示保存整个工程，返回 false 表示用户取消操作
     bool _maybeCloseCanvas(QAtCanvasPage *page); // 提示关闭画布（图元将丢失），返回 false 表示取消
@@ -240,6 +240,7 @@ private:
     // 状态栏控件
     QLabel *m_posLabel = nullptr;
     QLabel *m_zoomLabel = nullptr;
+    QLineEdit *m_zoomEdit = nullptr;
     QLabel *m_canvasLabel = nullptr;
     QLabel *m_toolLabel = nullptr;
     QSlider *m_zoomSlider = nullptr;

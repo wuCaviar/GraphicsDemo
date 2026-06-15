@@ -15,6 +15,7 @@ struct CanvasInfo
     double width = 1920.0;
     double height = 1080.0;
     double dpi = 96.0;
+    double zoom = 1.0;
 };
 
 // ---- CMYK 颜色数据（用于 XML 中精确存储） ----
