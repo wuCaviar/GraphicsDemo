@@ -16,9 +16,9 @@ public:
     QString description() const override;
 
     QString projectPath() const;
-    void    setProjectPath(const QString &path);
-    bool    isModified() const;
-    void    setModified(bool m);
+    void setProjectPath(const QString &path);
+    bool isModified() const;
+    void setModified(bool m);
 
 signals:
     void projectPathChanged(const QString &path);
@@ -26,7 +26,7 @@ signals:
 
 private:
     QString m_path;
-    bool    m_modified = false;
+    bool m_modified = false;
 };
 
 #endif // PROJECTSERVICE_H

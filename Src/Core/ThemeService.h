@@ -21,7 +21,7 @@ public:
     void shutdown() override;
 
     QString currentTheme() const;
-    void    setTheme(const QString &name);
+    void setTheme(const QString &name);
     QStringList availableThemes() const;
 
 signals:

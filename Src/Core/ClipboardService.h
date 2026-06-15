@@ -21,15 +21,19 @@ public:
     QString serviceId() const override { return QStringLiteral("clipboard"); }
     QString description() const override;
 
-    void copy(const QList<QGraphicsItem*> &items);
-    void cut(const QList<QGraphicsItem*> &items, QGraphicsScene *scene,
+    void copy(const QList<QGraphicsItem *> &items);
+    void cut(const QList<QGraphicsItem *> &items, QGraphicsScene *scene,
              class QUndoStack *undoStack);
-    QList<QGraphicsItem*> paste(QGraphicsScene *scene, class QUndoStack *undoStack);
+    QList<QGraphicsItem *> paste(QGraphicsScene *scene, class QUndoStack *undoStack);
 
     static QString mimeType();
 
 private:
-    struct SerializedItem { quint32 len; QByteArray data; };
+    struct SerializedItem
+    {
+        quint32 len;
+        QByteArray data;
+    };
 };
 
 #endif // CLIPBOARDSERVICE_H

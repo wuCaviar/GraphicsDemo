@@ -96,51 +96,27 @@ QByteArray ProjectFile::decrypt(const QByteArray &data, const QByteArray &key)
 
 // ---- save (from pre-serialized items) --------------------------------------
 
-bool ProjectFile::saveFromSerialized(const QString &filePath, const ProjectInfo &info,
-                                     const CanvasInfo &canvas, const QList<SerializedItem> &items)
+void ProjectFile::_writeCanvasToXml(QDomDocument &doc, QDomElement &parent, int index,
+                                    const CanvasSaveBundle &bundle)
 {
-    m_lastError.clear();
-
-    // Build XML document
-    QDomDocument doc;
-    QDomProcessingInstruction pi = doc.createProcessingInstruction(
-        QStringLiteral("xml"), QStringLiteral("version=\"1.0\" encoding=\"UTF-8\""));
-    doc.appendChild(pi);
-
-    QDomElement root = doc.createElement(QStringLiteral("Project"));
-    doc.appendChild(root);
-
-    // <Information>
-    QDomElement infoEl = doc.createElement(QStringLiteral("Information"));
-    root.appendChild(infoEl);
-    auto addTextElem = [&](const QString &tag, const QString &value) {
-        QDomElement el = doc.createElement(tag);
-        el.appendChild(doc.createTextNode(value));
-        infoEl.appendChild(el);
-    };
-    addTextElem(QStringLiteral("Name"), info.name);
-    addTextElem(QStringLiteral("Version"), info.version);
-    addTextElem(QStringLiteral("Author"), info.author);
-    addTextElem(QStringLiteral("Description"), info.description);
-
-    // <Canvas>
     QDomElement canvasEl = doc.createElement(QStringLiteral("Canvas"));
-    root.appendChild(canvasEl);
-    auto addCanvasProp = [&](const QString &tag, double value) {
+    canvasEl.setAttribute(QStringLiteral("index"), index);
+    parent.appendChild(canvasEl);
+
+    auto addProp = [&](const QString &tag, double value) {
         QDomElement el = doc.createElement(tag);
         el.appendChild(doc.createTextNode(QString::number(value, 'f', 2)));
         canvasEl.appendChild(el);
     };
-    addCanvasProp(QStringLiteral("Width"), canvas.width);
-    addCanvasProp(QStringLiteral("Height"), canvas.height);
-    addCanvasProp(QStringLiteral("Dpi"), canvas.dpi);
+    addProp(QStringLiteral("Width"), bundle.info.width);
+    addProp(QStringLiteral("Height"), bundle.info.height);
+    addProp(QStringLiteral("Dpi"), bundle.info.dpi);
 
-    // <Items>
     QDomElement itemsEl = doc.createElement(QStringLiteral("Items"));
     canvasEl.appendChild(itemsEl);
 
     int id = 0;
-    for (const auto &si : items) {
+    for (const auto &si : bundle.items) {
         QDomElement itemEl = doc.createElement(QStringLiteral("Item"));
         itemEl.setAttribute(QStringLiteral("ID"), ++id);
         itemEl.setAttribute(QStringLiteral("Type"), si.itemType);
@@ -155,7 +131,6 @@ bool ProjectFile::saveFromSerialized(const QString &filePath, const ProjectInfo 
             itemEl.appendChild(dataEl);
         }
 
-        // CMYK 颜色数据（可选，旧代码读取时忽略未知属性）
         if (si.cmyk.hasPen) {
             itemEl.setAttribute(QStringLiteral("PenC"), si.cmyk.penC);
             itemEl.setAttribute(QStringLiteral("PenM"), si.cmyk.penM);
@@ -184,11 +159,56 @@ bool ProjectFile::saveFromSerialized(const QString &filePath, const ProjectInfo 
 
         itemsEl.appendChild(itemEl);
     }
+}
 
+void ProjectFile::_writeSingleCanvasToXml(QDomDocument &doc, QDomElement &parent,
+                                          const CanvasInfo &info,
+                                          const QList<SerializedItem> &items)
+{
+    CanvasSaveBundle bundle;
+    bundle.info = info;
+    bundle.items = items;
+    _writeCanvasToXml(doc, parent, 0, bundle);
+}
+
+bool ProjectFile::saveMulti(const QString &filePath, const ProjectInfo &info,
+                            const QList<CanvasSaveBundle> &canvases)
+{
+    m_lastError.clear();
+
+    QDomDocument doc;
+    QDomProcessingInstruction pi = doc.createProcessingInstruction(
+        QStringLiteral("xml"), QStringLiteral("version=\"1.0\" encoding=\"UTF-8\""));
+    doc.appendChild(pi);
+
+    QDomElement root = doc.createElement(QStringLiteral("Project"));
+    root.setAttribute(QStringLiteral("version"), QStringLiteral("2"));
+    doc.appendChild(root);
+
+    // <Information>
+    QDomElement infoEl = doc.createElement(QStringLiteral("Information"));
+    root.appendChild(infoEl);
+    auto addTextElem = [&](const QString &tag, const QString &value) {
+        QDomElement el = doc.createElement(tag);
+        el.appendChild(doc.createTextNode(value));
+        infoEl.appendChild(el);
+    };
+    addTextElem(QStringLiteral("Name"), info.name);
+    addTextElem(QStringLiteral("Version"), info.version);
+    addTextElem(QStringLiteral("Author"), info.author);
+    addTextElem(QStringLiteral("Description"), info.description);
+
+    // <Canvases> (v2 multi-canvas wrapper)
+    QDomElement canvasesEl = doc.createElement(QStringLiteral("Canvases"));
+    root.appendChild(canvasesEl);
+
+    for (int i = 0; i < canvases.size(); ++i)
+        _writeCanvasToXml(doc, canvasesEl, i, canvases[i]);
+
+    // Encrypt and write (key derived from filename to survive rename)
     QByteArray xmlData = doc.toByteArray();
-
-    // Encrypt and write
-    QByteArray key = QByteArrayLiteral("ATGraphics") + info.name.toUtf8();
+    QByteArray key =
+        QByteArrayLiteral("ATGraphics") + QFileInfo(filePath).completeBaseName().toUtf8();
     QByteArray encrypted = encrypt(xmlData, key);
 
     QFile file(filePath);
@@ -204,13 +224,123 @@ bool ProjectFile::saveFromSerialized(const QString &filePath, const ProjectInfo 
     return true;
 }
 
-// ---- parse for deserialize -------------------------------------------------
-
-bool ProjectFile::parseForDeserialize(const QString &filePath, ProjectInfo &info,
-                                      CanvasInfo &canvas, QList<DeserialTask> &tasks)
+bool ProjectFile::saveFromSerialized(const QString &filePath, const ProjectInfo &info,
+                                     const CanvasInfo &canvas, const QList<SerializedItem> &items)
 {
     m_lastError.clear();
-    tasks.clear();
+
+    // Build XML document
+    QDomDocument doc;
+    QDomProcessingInstruction pi = doc.createProcessingInstruction(
+        QStringLiteral("xml"), QStringLiteral("version=\"1.0\" encoding=\"UTF-8\""));
+    doc.appendChild(pi);
+
+    QDomElement root = doc.createElement(QStringLiteral("Project"));
+    doc.appendChild(root);
+
+    // <Information>
+    QDomElement infoEl = doc.createElement(QStringLiteral("Information"));
+    root.appendChild(infoEl);
+    auto addTextElem = [&](const QString &tag, const QString &value) {
+        QDomElement el = doc.createElement(tag);
+        el.appendChild(doc.createTextNode(value));
+        infoEl.appendChild(el);
+    };
+    addTextElem(QStringLiteral("Name"), info.name);
+    addTextElem(QStringLiteral("Version"), info.version);
+    addTextElem(QStringLiteral("Author"), info.author);
+    addTextElem(QStringLiteral("Description"), info.description);
+
+    // <Canvas> — legacy single-canvas format
+    _writeSingleCanvasToXml(doc, root, canvas, items);
+
+    QByteArray xmlData = doc.toByteArray();
+
+    // Encrypt and write (key derived from filename to survive rename)
+    QByteArray key =
+        QByteArrayLiteral("ATGraphics") + QFileInfo(filePath).completeBaseName().toUtf8();
+    QByteArray encrypted = encrypt(xmlData, key);
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly)) {
+        m_lastError = QStringLiteral("Cannot write file: %1").arg(filePath);
+        return false;
+    }
+
+    file.write(kFileMagic);
+    file.write(encrypted);
+    file.close();
+
+    return true;
+}
+
+// ---- parse helpers ----------------------------------------------------------
+
+bool ProjectFile::_parseCanvasElement(const QDomElement &canvasEl, CanvasDeserialBundle &bundle)
+{
+    bundle.info.width = canvasEl.firstChildElement(QStringLiteral("Width")).text().toDouble();
+    bundle.info.height = canvasEl.firstChildElement(QStringLiteral("Height")).text().toDouble();
+    bundle.info.dpi = canvasEl.firstChildElement(QStringLiteral("Dpi")).text().toDouble();
+
+    QDomElement itemsEl = canvasEl.firstChildElement(QStringLiteral("Items"));
+    if (itemsEl.isNull())
+        return true; // empty canvas — no items
+
+    QDomNodeList itemNodes = itemsEl.elementsByTagName(QStringLiteral("Item"));
+    for (int i = 0; i < itemNodes.count(); ++i) {
+        QDomElement el = itemNodes.at(i).toElement();
+
+        DeserialTask task;
+        task.itemType = el.attribute(QStringLiteral("Type")).toInt();
+        task.zValue = el.attribute(QStringLiteral("Z")).toDouble();
+        task.posX = el.attribute(QStringLiteral("X")).toDouble();
+        task.posY = el.attribute(QStringLiteral("Y")).toDouble();
+        task.rotation = el.attribute(QStringLiteral("Rot")).toDouble();
+
+        QDomElement dataEl = el.firstChildElement(QStringLiteral("Data"));
+        if (!dataEl.isNull())
+            task.base64Data = dataEl.text().toLatin1();
+
+        if (el.hasAttribute(QStringLiteral("PenC"))) {
+            task.cmyk.hasPen = true;
+            task.cmyk.penC = el.attribute(QStringLiteral("PenC")).toDouble();
+            task.cmyk.penM = el.attribute(QStringLiteral("PenM")).toDouble();
+            task.cmyk.penY = el.attribute(QStringLiteral("PenY")).toDouble();
+            task.cmyk.penK = el.attribute(QStringLiteral("PenK")).toDouble();
+        }
+        if (el.hasAttribute(QStringLiteral("BrushC"))) {
+            task.cmyk.hasBrush = true;
+            task.cmyk.brushC = el.attribute(QStringLiteral("BrushC")).toDouble();
+            task.cmyk.brushM = el.attribute(QStringLiteral("BrushM")).toDouble();
+            task.cmyk.brushY = el.attribute(QStringLiteral("BrushY")).toDouble();
+            task.cmyk.brushK = el.attribute(QStringLiteral("BrushK")).toDouble();
+        }
+        QDomElement gradEl = el.firstChildElement(QStringLiteral("GradientCmyk"));
+        if (!gradEl.isNull()) {
+            QDomNodeList stops = gradEl.elementsByTagName(QStringLiteral("Stop"));
+            for (int j = 0; j < stops.count(); ++j) {
+                QDomElement stopEl = stops.at(j).toElement();
+                double pos = stopEl.attribute(QStringLiteral("Pos")).toDouble();
+                double c = stopEl.attribute(QStringLiteral("C")).toDouble();
+                double m = stopEl.attribute(QStringLiteral("M")).toDouble();
+                double y = stopEl.attribute(QStringLiteral("Y")).toDouble();
+                double k = stopEl.attribute(QStringLiteral("K")).toDouble();
+                task.cmyk.gradient[pos] = { c, m, y, k, true };
+            }
+        }
+
+        bundle.tasks.append(task);
+    }
+    return true;
+}
+
+// ---- parse for deserialize -------------------------------------------------
+
+bool ProjectFile::parseMulti(const QString &filePath, ProjectInfo &info,
+                             QList<CanvasDeserialBundle> &canvases)
+{
+    m_lastError.clear();
+    canvases.clear();
 
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) {
@@ -263,65 +393,41 @@ bool ProjectFile::parseForDeserialize(const QString &filePath, ProjectInfo &info
         info.description = infoEl.firstChildElement(QStringLiteral("Description")).text();
     }
 
-    // <Canvas>
-    QDomElement canvasEl = root.firstChildElement(QStringLiteral("Canvas"));
-    if (!canvasEl.isNull()) {
-        canvas.width = canvasEl.firstChildElement(QStringLiteral("Width")).text().toDouble();
-        canvas.height = canvasEl.firstChildElement(QStringLiteral("Height")).text().toDouble();
-        canvas.dpi = canvasEl.firstChildElement(QStringLiteral("Dpi")).text().toDouble();
-    }
-
-    // <Items> → extract DeserialTask list
-    QDomElement itemsEl = canvasEl.firstChildElement(QStringLiteral("Items"));
-    if (!itemsEl.isNull()) {
-        QDomNodeList itemNodes = itemsEl.elementsByTagName(QStringLiteral("Item"));
-        for (int i = 0; i < itemNodes.count(); ++i) {
-            QDomElement el = itemNodes.at(i).toElement();
-
-            DeserialTask task;
-            task.itemType = el.attribute(QStringLiteral("Type")).toInt();
-            task.zValue = el.attribute(QStringLiteral("Z")).toDouble();
-            task.posX = el.attribute(QStringLiteral("X")).toDouble();
-            task.posY = el.attribute(QStringLiteral("Y")).toDouble();
-            task.rotation = el.attribute(QStringLiteral("Rot")).toDouble();
-
-            QDomElement dataEl = el.firstChildElement(QStringLiteral("Data"));
-            if (!dataEl.isNull())
-                task.base64Data = dataEl.text().toLatin1();
-
-            // CMYK 颜色数据（可选属性，旧文件中不存在时保持默认值）
-            if (el.hasAttribute(QStringLiteral("PenC"))) {
-                task.cmyk.hasPen = true;
-                task.cmyk.penC = el.attribute(QStringLiteral("PenC")).toDouble();
-                task.cmyk.penM = el.attribute(QStringLiteral("PenM")).toDouble();
-                task.cmyk.penY = el.attribute(QStringLiteral("PenY")).toDouble();
-                task.cmyk.penK = el.attribute(QStringLiteral("PenK")).toDouble();
-            }
-            if (el.hasAttribute(QStringLiteral("BrushC"))) {
-                task.cmyk.hasBrush = true;
-                task.cmyk.brushC = el.attribute(QStringLiteral("BrushC")).toDouble();
-                task.cmyk.brushM = el.attribute(QStringLiteral("BrushM")).toDouble();
-                task.cmyk.brushY = el.attribute(QStringLiteral("BrushY")).toDouble();
-                task.cmyk.brushK = el.attribute(QStringLiteral("BrushK")).toDouble();
-            }
-            QDomElement gradEl = el.firstChildElement(QStringLiteral("GradientCmyk"));
-            if (!gradEl.isNull()) {
-                QDomNodeList stops = gradEl.elementsByTagName(QStringLiteral("Stop"));
-                for (int j = 0; j < stops.count(); ++j) {
-                    QDomElement stopEl = stops.at(j).toElement();
-                    double pos = stopEl.attribute(QStringLiteral("Pos")).toDouble();
-                    double c = stopEl.attribute(QStringLiteral("C")).toDouble();
-                    double m = stopEl.attribute(QStringLiteral("M")).toDouble();
-                    double y = stopEl.attribute(QStringLiteral("Y")).toDouble();
-                    double k = stopEl.attribute(QStringLiteral("K")).toDouble();
-                    task.cmyk.gradient[pos] = { c, m, y, k, true };
-                }
-            }
-
-            tasks.append(task);
+    // Check format: v2 has <Canvases> wrapper, v1 has direct <Canvas>
+    QDomElement canvasesEl = root.firstChildElement(QStringLiteral("Canvases"));
+    if (!canvasesEl.isNull()) {
+        // v2: multiple <Canvas> elements inside <Canvases>
+        QDomNodeList canvasNodes = canvasesEl.elementsByTagName(QStringLiteral("Canvas"));
+        for (int i = 0; i < canvasNodes.count(); ++i) {
+            CanvasDeserialBundle bundle;
+            if (_parseCanvasElement(canvasNodes.at(i).toElement(), bundle))
+                canvases.append(bundle);
+        }
+    } else {
+        // v1: single <Canvas> directly under <Project>
+        QDomElement canvasEl = root.firstChildElement(QStringLiteral("Canvas"));
+        if (!canvasEl.isNull()) {
+            CanvasDeserialBundle bundle;
+            if (_parseCanvasElement(canvasEl, bundle))
+                canvases.append(bundle);
         }
     }
 
+    return true;
+}
+
+bool ProjectFile::parseForDeserialize(const QString &filePath, ProjectInfo &info,
+                                      CanvasInfo &canvas, QList<DeserialTask> &tasks)
+{
+    QList<CanvasDeserialBundle> canvases;
+    if (!parseMulti(filePath, info, canvases))
+        return false;
+
+    tasks.clear();
+    if (!canvases.isEmpty()) {
+        canvas = canvases.first().info;
+        tasks = canvases.first().tasks;
+    }
     return true;
 }
 

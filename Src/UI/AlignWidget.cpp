@@ -1,4 +1,4 @@
-#include "AlignLayoutDialog.h"
+#include "AlignWidget.h"
 #include "AlignmentUtils.h"
 #include "CanvasItem.h"
 #include "Commands.h"
@@ -15,14 +15,13 @@
 // ============================================================
 // Static persisted state
 // ============================================================
-qreal AlignLayoutDialog::s_hSpacing = 0.0;
-qreal AlignLayoutDialog::s_vSpacing = 0.0;
+qreal AlignWidget::s_hSpacing = 0.0;
+qreal AlignWidget::s_vSpacing = 0.0;
 
 // ============================================================
 // Helper: create an icon-only button from resource path
 // ============================================================
-static QPushButton *makeBtn(const QString &iconPath, const QString &tooltip,
-                            QWidget *parent)
+static QPushButton *makeBtn(const QString &iconPath, const QString &tooltip, QWidget *parent)
 {
     auto *btn = new QPushButton(parent);
     btn->setIcon(QIcon(iconPath));
@@ -41,12 +40,11 @@ static QPushButton *makeBtn(const QString &iconPath, const QString &tooltip,
 // ============================================================
 // Constructor
 // ============================================================
-AlignLayoutDialog::AlignLayoutDialog(QGraphicsScene *scene,
-                                     QUndoStack *undoStack, QWidget *parent)
+AlignWidget::AlignWidget(QGraphicsScene *scene, QUndoStack *undoStack, QWidget *parent)
     : QDockWidget(parent), m_scene(scene), m_undoStack(undoStack)
 {
     setWindowTitle(tr("Align & Distribute"));
-    setAllowedAreas(Qt::RightDockWidgetArea | Qt::LeftDockWidgetArea);
+    setAllowedAreas(Qt::RightDockWidgetArea);
 
     auto *container = new QWidget(this);
     setWidget(container);
@@ -57,7 +55,7 @@ AlignLayoutDialog::AlignLayoutDialog(QGraphicsScene *scene,
 // ============================================================
 // UI Setup
 // ============================================================
-void AlignLayoutDialog::setupUI(QWidget *container)
+void AlignWidget::setupUI(QWidget *container)
 {
     auto *mainLayout = new QVBoxLayout(container);
     mainLayout->setContentsMargins(4, 4, 4, 4);
@@ -71,18 +69,13 @@ void AlignLayoutDialog::setupUI(QWidget *container)
 
     auto *hAlignRow = new QHBoxLayout;
     hAlignRow->setSpacing(2);
-    m_hAlignLeft =
-        makeBtn(ICON("align-left"), tr("Align left edges"), container);
-    m_hAlignCenter = makeBtn(ICON("align-hcenter"),
-                             tr("Align horizontal centers"), container);
-    m_hAlignRight =
-        makeBtn(ICON("align-right"), tr("Align right edges"), container);
-    m_hAlignStretch =
-        makeBtn(ICON("align-stretch-h"),
-                tr("Stretch to same width, align left & right"), container);
+    m_hAlignLeft = makeBtn(ICON("align-left"), tr("Align left edges"), container);
+    m_hAlignCenter = makeBtn(ICON("align-hcenter"), tr("Align horizontal centers"), container);
+    m_hAlignRight = makeBtn(ICON("align-right"), tr("Align right edges"), container);
+    m_hAlignStretch = makeBtn(ICON("align-stretch-h"),
+                              tr("Stretch to same width, align left & right"), container);
     m_hAlignProp =
-        makeBtn(ICON("align-prop-h"),
-                tr("Stretch horizontally, scale proportionally"), container);
+        makeBtn(ICON("align-prop-h"), tr("Stretch horizontally, scale proportionally"), container);
     hAlignRow->addWidget(m_hAlignLeft);
     hAlignRow->addWidget(m_hAlignCenter);
     hAlignRow->addWidget(m_hAlignRight);
@@ -93,16 +86,12 @@ void AlignLayoutDialog::setupUI(QWidget *container)
 
     auto *hDistRow = new QHBoxLayout;
     hDistRow->setSpacing(2);
-    m_hDistLeft =
-        makeBtn(ICON("dist-left"), tr("Left edges equally spaced"), container);
-    m_hDistCenter = makeBtn(ICON("dist-hcenter"),
-                            tr("Horizontal centers equally spaced"), container);
-    m_hDistRight = makeBtn(ICON("dist-right"), tr("Right edges equally spaced"),
-                           container);
-    m_hDistEqualGap =
-        makeBtn(ICON("dist-hequal"), tr("Equal horizontal gaps"), container);
-    m_hDistCustom = makeBtn(ICON("dist-hcustom"),
-                            tr("Custom horizontal gap spacing"), container);
+    m_hDistLeft = makeBtn(ICON("dist-left"), tr("Left edges equally spaced"), container);
+    m_hDistCenter =
+        makeBtn(ICON("dist-hcenter"), tr("Horizontal centers equally spaced"), container);
+    m_hDistRight = makeBtn(ICON("dist-right"), tr("Right edges equally spaced"), container);
+    m_hDistEqualGap = makeBtn(ICON("dist-hequal"), tr("Equal horizontal gaps"), container);
+    m_hDistCustom = makeBtn(ICON("dist-hcustom"), tr("Custom horizontal gap spacing"), container);
     hDistRow->addWidget(m_hDistLeft);
     hDistRow->addWidget(m_hDistCenter);
     hDistRow->addWidget(m_hDistRight);
@@ -135,16 +124,12 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     auto *vAlignRow = new QHBoxLayout;
     vAlignRow->setSpacing(2);
     m_vAlignTop = makeBtn(ICON("align-top"), tr("Align top edges"), container);
-    m_vAlignCenter =
-        makeBtn(ICON("align-vcenter"), tr("Align vertical centers"), container);
-    m_vAlignBottom =
-        makeBtn(ICON("align-bottom"), tr("Align bottom edges"), container);
-    m_vAlignStretch =
-        makeBtn(ICON("align-stretch-v"),
-                tr("Stretch to same height, align top & bottom"), container);
+    m_vAlignCenter = makeBtn(ICON("align-vcenter"), tr("Align vertical centers"), container);
+    m_vAlignBottom = makeBtn(ICON("align-bottom"), tr("Align bottom edges"), container);
+    m_vAlignStretch = makeBtn(ICON("align-stretch-v"),
+                              tr("Stretch to same height, align top & bottom"), container);
     m_vAlignProp =
-        makeBtn(ICON("align-prop-v"),
-                tr("Stretch vertically, scale proportionally"), container);
+        makeBtn(ICON("align-prop-v"), tr("Stretch vertically, scale proportionally"), container);
     vAlignRow->addWidget(m_vAlignTop);
     vAlignRow->addWidget(m_vAlignCenter);
     vAlignRow->addWidget(m_vAlignBottom);
@@ -155,16 +140,11 @@ void AlignLayoutDialog::setupUI(QWidget *container)
 
     auto *vDistRow = new QHBoxLayout;
     vDistRow->setSpacing(2);
-    m_vDistTop =
-        makeBtn(ICON("dist-top"), tr("Top edges equally spaced"), container);
-    m_vDistCenter = makeBtn(ICON("dist-vcenter"),
-                            tr("Vertical centers equally spaced"), container);
-    m_vDistBottom = makeBtn(ICON("dist-bottom"),
-                            tr("Bottom edges equally spaced"), container);
-    m_vDistEqualGap =
-        makeBtn(ICON("dist-vequal"), tr("Equal vertical gaps"), container);
-    m_vDistCustom = makeBtn(ICON("dist-vcustom"),
-                            tr("Custom vertical gap spacing"), container);
+    m_vDistTop = makeBtn(ICON("dist-top"), tr("Top edges equally spaced"), container);
+    m_vDistCenter = makeBtn(ICON("dist-vcenter"), tr("Vertical centers equally spaced"), container);
+    m_vDistBottom = makeBtn(ICON("dist-bottom"), tr("Bottom edges equally spaced"), container);
+    m_vDistEqualGap = makeBtn(ICON("dist-vequal"), tr("Equal vertical gaps"), container);
+    m_vDistCustom = makeBtn(ICON("dist-vcustom"), tr("Custom vertical gap spacing"), container);
     vDistRow->addWidget(m_vDistTop);
     vDistRow->addWidget(m_vDistCenter);
     vDistRow->addWidget(m_vDistBottom);
@@ -194,10 +174,8 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     auto *pageLayout = new QHBoxLayout(pageGroup);
     pageLayout->setContentsMargins(4, 8, 4, 4);
     pageLayout->setSpacing(2);
-    m_pageHCenter = makeBtn(ICON("page-hcenter"),
-                            tr("Center horizontally on canvas"), container);
-    m_pageVCenter = makeBtn(ICON("page-vcenter"),
-                            tr("Center vertically on canvas"), container);
+    m_pageHCenter = makeBtn(ICON("page-hcenter"), tr("Center horizontally on canvas"), container);
+    m_pageVCenter = makeBtn(ICON("page-vcenter"), tr("Center vertically on canvas"), container);
     pageLayout->addWidget(m_pageHCenter);
     pageLayout->addWidget(m_pageVCenter);
     pageLayout->addStretch();
@@ -211,92 +189,68 @@ void AlignLayoutDialog::setupUI(QWidget *container)
     mainLayout->addLayout(bottomRow);
 
     // ---- Signal connections ----
-    connect(m_hAlignLeft, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onAlignClicked);
-    connect(m_hAlignCenter, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onAlignClicked);
-    connect(m_hAlignRight, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onAlignClicked);
-    connect(m_hAlignStretch, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onAlignClicked);
-    connect(m_hAlignProp, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onAlignClicked);
-    connect(m_vAlignTop, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onAlignClicked);
-    connect(m_vAlignCenter, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onAlignClicked);
-    connect(m_vAlignBottom, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onAlignClicked);
-    connect(m_vAlignStretch, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onAlignClicked);
-    connect(m_vAlignProp, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onAlignClicked);
+    connect(m_hAlignLeft, &QPushButton::clicked, this, &AlignWidget::onAlignClicked);
+    connect(m_hAlignCenter, &QPushButton::clicked, this, &AlignWidget::onAlignClicked);
+    connect(m_hAlignRight, &QPushButton::clicked, this, &AlignWidget::onAlignClicked);
+    connect(m_hAlignStretch, &QPushButton::clicked, this, &AlignWidget::onAlignClicked);
+    connect(m_hAlignProp, &QPushButton::clicked, this, &AlignWidget::onAlignClicked);
+    connect(m_vAlignTop, &QPushButton::clicked, this, &AlignWidget::onAlignClicked);
+    connect(m_vAlignCenter, &QPushButton::clicked, this, &AlignWidget::onAlignClicked);
+    connect(m_vAlignBottom, &QPushButton::clicked, this, &AlignWidget::onAlignClicked);
+    connect(m_vAlignStretch, &QPushButton::clicked, this, &AlignWidget::onAlignClicked);
+    connect(m_vAlignProp, &QPushButton::clicked, this, &AlignWidget::onAlignClicked);
 
-    connect(m_hDistLeft, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onDistributeClicked);
-    connect(m_hDistCenter, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onDistributeClicked);
-    connect(m_hDistRight, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onDistributeClicked);
-    connect(m_hDistEqualGap, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onDistributeClicked);
-    connect(m_hDistCustom, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onDistributeClicked);
-    connect(m_vDistTop, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onDistributeClicked);
-    connect(m_vDistCenter, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onDistributeClicked);
-    connect(m_vDistBottom, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onDistributeClicked);
-    connect(m_vDistEqualGap, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onDistributeClicked);
-    connect(m_vDistCustom, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onDistributeClicked);
+    connect(m_hDistLeft, &QPushButton::clicked, this, &AlignWidget::onDistributeClicked);
+    connect(m_hDistCenter, &QPushButton::clicked, this, &AlignWidget::onDistributeClicked);
+    connect(m_hDistRight, &QPushButton::clicked, this, &AlignWidget::onDistributeClicked);
+    connect(m_hDistEqualGap, &QPushButton::clicked, this, &AlignWidget::onDistributeClicked);
+    connect(m_hDistCustom, &QPushButton::clicked, this, &AlignWidget::onDistributeClicked);
+    connect(m_vDistTop, &QPushButton::clicked, this, &AlignWidget::onDistributeClicked);
+    connect(m_vDistCenter, &QPushButton::clicked, this, &AlignWidget::onDistributeClicked);
+    connect(m_vDistBottom, &QPushButton::clicked, this, &AlignWidget::onDistributeClicked);
+    connect(m_vDistEqualGap, &QPushButton::clicked, this, &AlignWidget::onDistributeClicked);
+    connect(m_vDistCustom, &QPushButton::clicked, this, &AlignWidget::onDistributeClicked);
 
-    connect(m_pageHCenter, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onPageCenterClicked);
-    connect(m_pageVCenter, &QPushButton::clicked, this,
-            &AlignLayoutDialog::onPageCenterClicked);
+    connect(m_pageHCenter, &QPushButton::clicked, this, &AlignWidget::onPageCenterClicked);
+    connect(m_pageVCenter, &QPushButton::clicked, this, &AlignWidget::onPageCenterClicked);
 
-    connect(m_hSpacingSpin,
-            QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+    connect(m_hSpacingSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             [](double val) { s_hSpacing = val; });
-    connect(m_vSpacingSpin,
-            QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+    connect(m_vSpacingSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             [](double val) { s_vSpacing = val; });
 
     if (m_scene) {
-        connect(m_scene, &QGraphicsScene::selectionChanged, this,
-                &AlignLayoutDialog::onSelectionChanged);
+        connect(m_scene, &QGraphicsScene::selectionChanged, this, &AlignWidget::onSelectionChanged);
     }
 }
 
 // ============================================================
 // Selection info
 // ============================================================
-void AlignLayoutDialog::onSelectionChanged()
+void AlignWidget::onSelectionChanged()
 {
     refreshSelectionInfo();
 }
 
-void AlignLayoutDialog::setScene(QGraphicsScene *scene)
+void AlignWidget::setScene(QGraphicsScene *scene)
 {
     if (m_scene == scene)
         return;
     if (m_scene)
-        disconnect(m_scene, &QGraphicsScene::selectionChanged, this, &AlignLayoutDialog::onSelectionChanged);
+        disconnect(m_scene, &QGraphicsScene::selectionChanged, this,
+                   &AlignWidget::onSelectionChanged);
     m_scene = scene;
     if (m_scene)
-        connect(m_scene, &QGraphicsScene::selectionChanged, this, &AlignLayoutDialog::onSelectionChanged);
+        connect(m_scene, &QGraphicsScene::selectionChanged, this, &AlignWidget::onSelectionChanged);
     refreshSelectionInfo();
 }
 
-void AlignLayoutDialog::setUndoStack(QUndoStack *undoStack)
+void AlignWidget::setUndoStack(QUndoStack *undoStack)
 {
     m_undoStack = undoStack;
 }
 
-void AlignLayoutDialog::refreshSelectionInfo()
+void AlignWidget::refreshSelectionInfo()
 {
     if (!m_scene)
         return;
@@ -304,17 +258,17 @@ void AlignLayoutDialog::refreshSelectionInfo()
     m_selectionInfoLabel->setText(tr("Selected: %1 item(s)").arg(count));
 }
 
-QList<QGraphicsItem *> AlignLayoutDialog::filterSelectableItems() const
+QList<QGraphicsItem *> AlignWidget::filterSelectableItems() const
 {
     if (!m_scene)
-        return {};
+        return { };
     return ::filterSelectableItems(m_scene->selectedItems());
 }
 
 // ============================================================
 // Handlers
 // ============================================================
-void AlignLayoutDialog::onAlignClicked()
+void AlignWidget::onAlignClicked()
 {
     auto *btn = qobject_cast<QPushButton *>(sender());
     if (!btn)
@@ -357,7 +311,7 @@ void AlignLayoutDialog::onAlignClicked()
     refreshSelectionInfo();
 }
 
-void AlignLayoutDialog::onDistributeClicked()
+void AlignWidget::onDistributeClicked()
 {
     auto *btn = qobject_cast<QPushButton *>(sender());
     if (!btn)
@@ -406,7 +360,7 @@ void AlignLayoutDialog::onDistributeClicked()
     refreshSelectionInfo();
 }
 
-void AlignLayoutDialog::onPageCenterClicked()
+void AlignWidget::onPageCenterClicked()
 {
     auto *btn = qobject_cast<QPushButton *>(sender());
     if (!btn)
@@ -427,7 +381,7 @@ void AlignLayoutDialog::onPageCenterClicked()
 // ============================================================
 // Apply operations
 // ============================================================
-bool AlignLayoutDialog::applyAlign(AlignmentUtils::AlignDirection direction)
+bool AlignWidget::applyAlign(AlignmentUtils::AlignDirection direction)
 {
     auto items = filterSelectableItems();
     if (items.size() < 2)
@@ -437,14 +391,13 @@ bool AlignLayoutDialog::applyAlign(AlignmentUtils::AlignDirection direction)
     if (!result.valid)
         return false;
 
-    m_undoStack->push(new AlignItemsCommand(
-        items, result.oldPositions, result.newPositions,
-        AlignmentUtils::alignDirectionName(direction), m_scene));
+    m_undoStack->push(new AlignItemsCommand(items, result.oldPositions, result.newPositions,
+                                            AlignmentUtils::alignDirectionName(direction),
+                                            m_scene));
     return true;
 }
 
-bool AlignLayoutDialog::applyStretchAlign(
-    AlignmentUtils::AlignDirection direction)
+bool AlignWidget::applyStretchAlign(AlignmentUtils::AlignDirection direction)
 {
     auto items = filterSelectableItems();
     if (items.size() < 2)
@@ -455,14 +408,12 @@ bool AlignLayoutDialog::applyStretchAlign(
         return false;
 
     m_undoStack->push(new StretchAlignItemsCommand(
-        items, result.oldPositions, result.newPositions, result.oldGeometries,
-        result.newGeometries, AlignmentUtils::alignDirectionName(direction),
-        m_scene));
+        items, result.oldPositions, result.newPositions, result.oldGeometries, result.newGeometries,
+        AlignmentUtils::alignDirectionName(direction), m_scene));
     return true;
 }
 
-bool AlignLayoutDialog::applyPageCenter(
-    AlignmentUtils::AlignDirection direction)
+bool AlignWidget::applyPageCenter(AlignmentUtils::AlignDirection direction)
 {
     auto items = filterSelectableItems();
     if (items.isEmpty())
@@ -473,15 +424,14 @@ bool AlignLayoutDialog::applyPageCenter(
     if (!result.valid)
         return false;
 
-    m_undoStack->push(new AlignItemsCommand(
-        items, result.oldPositions, result.newPositions,
-        AlignmentUtils::alignDirectionName(direction), m_scene));
+    m_undoStack->push(new AlignItemsCommand(items, result.oldPositions, result.newPositions,
+                                            AlignmentUtils::alignDirectionName(direction),
+                                            m_scene));
     return true;
 }
 
-bool AlignLayoutDialog::applyDistribute(
-    AlignmentUtils::DistributeDirection direction,
-    const AlignmentUtils::DistributeParams &params)
+bool AlignWidget::applyDistribute(AlignmentUtils::DistributeDirection direction,
+                                  const AlignmentUtils::DistributeParams &params)
 {
     auto items = filterSelectableItems();
     if (items.size() < 2)
@@ -491,8 +441,8 @@ bool AlignLayoutDialog::applyDistribute(
     if (!result.valid)
         return false;
 
-    m_undoStack->push(new AlignItemsCommand(
-        items, result.oldPositions, result.newPositions,
-        AlignmentUtils::distributeDirectionName(direction), m_scene));
+    m_undoStack->push(new AlignItemsCommand(items, result.oldPositions, result.newPositions,
+                                            AlignmentUtils::distributeDirectionName(direction),
+                                            m_scene));
     return true;
 }

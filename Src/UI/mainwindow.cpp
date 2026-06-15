@@ -1,7 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
-#include "AlignLayoutDialog.h"
+#include "AlignWidget.h"
 #include "AutoLayoutDialog.h"
 #include "LayoutEngine.h"
 #include "AlignmentUtils.h"
@@ -25,7 +25,6 @@
 #include "PreferencesDialog.h"
 #include "RectItem.h"
 #include "ResizeHandleItem.h"
-#include "RulerBar.h"
 #include "TextItem.h"
 #ifdef USE_LEGACY_EXPORT
 #    include "TiffExportEngine.h"
@@ -56,6 +55,7 @@
 #include "ToolBarDirector.h"
 #include "StatusBarDirector.h"
 #include "SessionFile.h"
+#include "RecoveryManager.h"
 
 // ExportEngine API（新导出路径）
 #include <ExportEngine/ExportEngine.h>
@@ -72,6 +72,7 @@
 #include <QFutureWatcher>
 #include <QCloseEvent>
 #include <QDataStream>
+#include <QDir>
 #include <QFile>
 #include <QFileDialog>
 #include <QFrame>
@@ -95,15 +96,17 @@
 #include <QSlider>
 #include <QStyle>
 #include <QSplitter>
+#include <QStandardPaths>
 #include <QStatusBar>
 #include <QToolBar>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QThreadPool>
+#include <QLocale>
 
-MainWindow::TabProjectState& MainWindow::_activeTabState()
+MainWindow::TabProjectState &MainWindow::_activeTabState()
 {
-    auto *page = qobject_cast<QAtCanvasPage*>(m_tabWidget ? m_tabWidget->currentWidget() : nullptr);
+    auto *page = _currentCanvasPage();
     if (!page) {
         static TabProjectState s;
         return s;
@@ -111,17 +114,16 @@ MainWindow::TabProjectState& MainWindow::_activeTabState()
     return m_tabStates[page];
 }
 
-const MainWindow::TabProjectState& MainWindow::_activeTabState() const
+const MainWindow::TabProjectState &MainWindow::_activeTabState() const
 {
-    auto *page = qobject_cast<QAtCanvasPage*>(m_tabWidget ? m_tabWidget->currentWidget() : nullptr);
+    auto *page = const_cast<MainWindow *>(this)->_currentCanvasPage();
     if (!page) {
         static const TabProjectState s;
         return s;
     }
-    return const_cast<MainWindow*>(this)->m_tabStates[page];
+    return const_cast<MainWindow *>(this)->m_tabStates[page];
 }
 
-static const char *kMimeFormat = "application/x-graphicsdemo-items";
 namespace {
 QFrame *createStatusSeparator(QWidget *parent)
 {
@@ -139,14 +141,26 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 {
     ui->setupUi(this);
 
+    // 创建工程文档模型（逐步替代散落的 m_projectPath/m_projectModified/m_tabStates）
+    m_document = new ProjectDocument(this);
+
     // New architecture: create canvas page (owns view + scene + undoStack)
     _initPages();
+
+    // Install event filter for tracking canvas dock focus changes
+    qApp->installEventFilter(this);
+
+    // Register services and actions BEFORE menu/toolbar so they can use AppContext::getQAction()
+    _initServices();
+    _initActions();
 
     _initWidget();
     _initPropertyPanel();
     _initRulers();
     _initMenuBar();
     _initToolBar();
+    // Sync all lazily-created QActions with current state
+    AppContext::get().refreshAllActions();
     _initConnections();
     _initStatusBar();
     _initProcess();
@@ -158,12 +172,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         QToolBar *fileEditBar = findChild<QToolBar *>("FileEditToolBar");
         QToolBar *drawBar = findChild<QToolBar *>("DrawingToolBar");
         QToolBar *alignBar = findChild<QToolBar *>("AlignToolBar");
-        if (fileEditBar) m_toolBarDirector->addToolBar(fileEditBar); // always visible
-        if (drawBar)     m_toolBarDirector->addToolBar(drawBar, { QStringLiteral("canvas") });
-        if (alignBar)    m_toolBarDirector->addToolBar(alignBar, { QStringLiteral("canvas") });
+        if (fileEditBar)
+            m_toolBarDirector->addToolBar(fileEditBar); // always visible
+        if (drawBar)
+            m_toolBarDirector->addToolBar(drawBar, { QStringLiteral("canvas") });
+        if (alignBar)
+            m_toolBarDirector->addToolBar(alignBar, { QStringLiteral("canvas") });
     }
-    connect(&AppContext::get(), &AppContext::pageSwitched,
-            m_toolBarDirector, &ToolBarDirector::onPageSwitched);
+    connect(&AppContext::get(), &AppContext::pageSwitched, m_toolBarDirector,
+            &ToolBarDirector::onPageSwitched);
     // Apply initial visibility for the already-active page
     m_toolBarDirector->applyVisibility(PageManager::get().activePageType());
 
@@ -173,15 +190,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     m_statusBarDirector->setZoomControls(m_zoomLabel, m_zoomSlider);
     m_statusBarDirector->setCanvasLabel(m_canvasLabel);
     m_statusBarDirector->setToolLabel(m_toolLabel);
-    connect(&AppContext::get(), &AppContext::pageSwitched,
-            m_statusBarDirector, &StatusBarDirector::onPageSwitched);
+    connect(&AppContext::get(), &AppContext::pageSwitched, m_statusBarDirector,
+            &StatusBarDirector::onPageSwitched);
     // Trigger initial binding for the already-active page
     m_statusBarDirector->onPageSwitched(AppContext::get().activePageId(),
-                                         PageManager::get().activePageType());
-
-    // New architecture: services and actions
-    _initServices();
-    _initActions();
+                                        PageManager::get().activePageType());
 
     // Sync PPI and labels from the initial canvas
     _syncViewState();
@@ -194,6 +207,74 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     // 加载窗口状态（工具栏位置、可见性等）
     loadWindowState();
+
+    // 检查是否有上次崩溃退出快照（正常退出后此文件应由上次启动清除）
+    // 若残留 → 说明上次异常退出，弹出恢复对话框
+    if (RecoveryManager::instance().hasQuitSnapshot()) {
+        auto snap = RecoveryManager::instance().loadQuitSnapshot();
+        if (snap.isValid && !snap.canvases.isEmpty()) {
+            int totalItems = 0;
+            for (const auto &c : snap.canvases)
+                totalItems += c.tasks.size();
+
+            QLocale locale;
+            QString strTime = locale.toString(snap.timestamp, QLocale::ShortFormat);
+            QMessageBox::StandardButton btn = QMessageBox::question(
+                this, tr("Recovery"),
+                tr("ATGraphics did not exit cleanly last time.\n\n"
+                   "Project: %1\n"
+                   "Canvases: %2\n"
+                   "Items: %3\n"
+                   "Time: %4\n\n"
+                   "Recover?")
+                    .arg(snap.projectPath.isEmpty() ? tr("Untitled") : snap.projectPath)
+                    .arg(snap.canvases.size())
+                    .arg(totalItems)
+                    .arg(strTime),
+                QMessageBox::Yes | QMessageBox::No);
+            if (btn == QMessageBox::Yes) {
+                // 加载退出快照数据 — 匹配现有 Tab 或动态创建新 Tab
+                for (int ci = 0; ci < snap.canvases.size(); ++ci) {
+                    auto &bundle = snap.canvases[ci];
+
+                    // 如果快照画布多于现有 Tab，动态创建新页
+                    QAtCanvasPage *page = nullptr;
+                    if (ci < _canvasCount()) {
+                        page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(ci));
+                    } else {
+                        QSizeF sz(bundle.info.width > 0 ? bundle.info.width : 1920,
+                                  bundle.info.height > 0 ? bundle.info.height : 1080);
+                        qreal ppi = bundle.info.dpi > 0 ? bundle.info.dpi : 150.0;
+                        page = new QAtCanvasPage(QStringLiteral("recovery-%1").arg(ci + 1), sz, ppi,
+                                                 this);
+                        AppContext::get().registerPage(page);
+                        _addCanvasDockInternal(page, page->title());
+                        m_tabStates[page].modified = false;
+                    }
+                    if (!page)
+                        continue;
+
+                    qreal ppi = bundle.info.dpi > 0 ? bundle.info.dpi : 150.0;
+                    page->setCanvasSize(QSizeF(bundle.info.width, bundle.info.height));
+                    if (auto *c = page->canvasItem()) {
+                        c->setPpi(ppi);
+                        if (bundle.info.dpi > 0)
+                            c->setCanvasDpi(bundle.info.dpi, bundle.info.dpi);
+                    }
+                    for (const auto &task : bundle.tasks) {
+                        auto di = deserializeItemWorker(task);
+                        auto *item = createItemFromDeserialized(di);
+                        if (item)
+                            page->scene()->addItem(item);
+                    }
+                    m_tabStates[page].modified = true;
+                    _updateCanvasDockTitle(page);
+                }
+                m_projectModified = true;
+            }
+        }
+        RecoveryManager::instance().discardQuitSnapshot();
+    }
 }
 
 MainWindow::~MainWindow()
@@ -276,31 +357,9 @@ void MainWindow::_initWidget()
 
 void MainWindow::_initRulers()
 {
-    m_hRuler = new RulerBar(RulerBar::Horizontal, this);
-    m_vRuler = new RulerBar(RulerBar::Vertical, this);
-
-    if (m_pView) m_hRuler->setGraphicsView(m_pView);
-    if (m_pView) m_vRuler->setGraphicsView(m_pView);
-
-    auto *cornerWidget = new QWidget(this);
-    cornerWidget->setFixedSize(30, 30);
-
-    auto *centralWidget = new QWidget(this);
-    auto *mainLayout = new QGridLayout(centralWidget);
-    mainLayout->setSpacing(0);
-    mainLayout->setContentsMargins(0, 0, 0, 0);
-
-    mainLayout->addWidget(cornerWidget, 0, 0);
-    mainLayout->addWidget(m_hRuler, 0, 1);
-    mainLayout->addWidget(m_vRuler, 1, 0);
-
-    // P9: use QTabWidget (multi-canvas) or raw view (single-canvas fallback)
-    if (m_tabWidget)
-        mainLayout->addWidget(m_tabWidget, 1, 1);
-    else
-        mainLayout->addWidget(m_pView, 1, 1);
-
-    setCentralWidget(centralWidget);
+    // Rulers are now owned by each QAtCanvasPage (one canvas = one ruler pair).
+    // The central widget is a placeholder — canvas dock widgets occupy the dock areas.
+    // Nothing else needed here.
 }
 
 void MainWindow::_initMenuBar()
@@ -310,10 +369,11 @@ void MainWindow::_initMenuBar()
     // ---- 文件 ----
     QMenu *fileMenu = menu->addMenu(tr("&File"));
 
-    QAction *newAct = fileMenu->addAction(QIcon(":/icons/icons/file-new.svg"), tr("&New..."));
+    QAction *newAct =
+        fileMenu->addAction(QIcon(":/icons/icons/file-new.svg"), tr("&New Project..."));
     newAct->setShortcut(QKeySequence::New);
-    newAct->setToolTip(tr("Create a new canvas"));
-    connect(newAct, &QAction::triggered, this, &MainWindow::onNew);
+    newAct->setToolTip(tr("Create a new project"));
+    connect(newAct, &QAction::triggered, this, &MainWindow::onNewProject);
 
     fileMenu->addSeparator();
 
@@ -353,65 +413,56 @@ void MainWindow::_initMenuBar()
     // ---- 编辑 ----
     QMenu *editMenu = menu->addMenu(tr("&Edit"));
 
-    m_undoAction = editMenu->addAction(QIcon(":/icons/icons/edit-undo.svg"), tr("&Undo"));
-    m_undoAction->setShortcut(QKeySequence::Undo);
-    m_undoAction->setToolTip(tr("Undo the last action"));
-    connect(m_undoAction, &QAction::triggered, this, &MainWindow::onUndo);
+    QAction *undoAct = AppContext::get().getQAction(QStringLiteral("Undo"));
+    if (undoAct)
+        editMenu->addAction(undoAct);
 
-    m_redoAction = editMenu->addAction(QIcon(":/icons/icons/edit-redo.svg"), tr("&Redo"));
-    m_redoAction->setShortcut(QKeySequence::Redo);
-    m_redoAction->setToolTip(tr("Redo the last undone action"));
-    connect(m_redoAction, &QAction::triggered, this, &MainWindow::onRedo);
+    QAction *redoAct = AppContext::get().getQAction(QStringLiteral("Redo"));
+    if (redoAct)
+        editMenu->addAction(redoAct);
 
     editMenu->addSeparator();
 
-    QAction *cutAct = editMenu->addAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cu&t"));
-    cutAct->setShortcut(QKeySequence::Cut);
-    cutAct->setToolTip(tr("Cut the selected items to clipboard"));
-    connect(cutAct, &QAction::triggered, this, &MainWindow::onCut);
+    QAction *cutAct = AppContext::get().getQAction(QStringLiteral("Cut"));
+    if (cutAct)
+        editMenu->addAction(cutAct);
 
-    QAction *copyAct = editMenu->addAction(QIcon(":/icons/icons/edit-copy.svg"), tr("&Copy"));
-    copyAct->setShortcut(QKeySequence::Copy);
-    copyAct->setToolTip(tr("Copy the selected items to clipboard"));
-    connect(copyAct, &QAction::triggered, this, &MainWindow::onCopy);
+    QAction *copyAct = AppContext::get().getQAction(QStringLiteral("Copy"));
+    if (copyAct)
+        editMenu->addAction(copyAct);
 
-    QAction *pasteAct = editMenu->addAction(QIcon(":/icons/icons/edit-paste.svg"), tr("&Paste"));
-    pasteAct->setShortcut(QKeySequence::Paste);
-    pasteAct->setToolTip(tr("Paste items from clipboard"));
-    connect(pasteAct, &QAction::triggered, this, &MainWindow::onPaste);
+    QAction *pasteAct = AppContext::get().getQAction(QStringLiteral("Paste"));
+    if (pasteAct)
+        editMenu->addAction(pasteAct);
 
     editMenu->addSeparator();
 
-    QAction *deleteAct = editMenu->addAction(QIcon(":/icons/icons/edit-delete.svg"), tr("&Delete"));
-    deleteAct->setShortcut(QKeySequence::Delete);
-    deleteAct->setToolTip(tr("Delete the selected items"));
-    connect(deleteAct, &QAction::triggered, this, &MainWindow::onDelete);
+    QAction *deleteAct = AppContext::get().getQAction(QStringLiteral("Delete"));
+    if (deleteAct)
+        editMenu->addAction(deleteAct);
 
-    QAction *selectAllAct =
-        editMenu->addAction(QIcon(":/icons/icons/edit-select-all.svg"), tr("Select &All"));
-    selectAllAct->setShortcut(QKeySequence::SelectAll);
-    selectAllAct->setToolTip(tr("Select all items on the canvas"));
-    connect(selectAllAct, &QAction::triggered, this, &MainWindow::onSelectAll);
+    QAction *selectAllAct = AppContext::get().getQAction(QStringLiteral("SelectAll"));
+    if (selectAllAct)
+        editMenu->addAction(selectAllAct);
+
+    // Refresh action states when Edit menu is about to show
+    connect(editMenu, &QMenu::aboutToShow, []() { AppContext::get().refreshAllActions(); });
 
     // ---- 排列 ----
     QMenu *arrMenu = menu->addMenu(tr("&Arrange"));
-    arrMenu
-        ->addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring Forward"), this,
-                    &MainWindow::onBringToFront)
-        ->setToolTip(tr("Bring selected items forward one step"));
-    arrMenu
-        ->addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send Backward"), this,
-                    &MainWindow::onSendToBack)
-        ->setToolTip(tr("Send selected items backward one step"));
+    QAction *bringAct = AppContext::get().getQAction(QStringLiteral("BringToFront"));
+    if (bringAct)
+        arrMenu->addAction(bringAct);
+    QAction *sendAct = AppContext::get().getQAction(QStringLiteral("SendToBack"));
+    if (sendAct)
+        arrMenu->addAction(sendAct);
     arrMenu->addSeparator();
-    QAction *groupAct = arrMenu->addAction(QIcon(":/icons/icons/group.svg"), tr("&Group"));
-    groupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
-    groupAct->setToolTip(tr("Group selected items together"));
-    connect(groupAct, &QAction::triggered, this, &MainWindow::onGroup);
-    QAction *ungroupAct = arrMenu->addAction(QIcon(":/icons/icons/ungroup.svg"), tr("&Ungroup"));
-    ungroupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
-    ungroupAct->setToolTip(tr("Ungroup selected items"));
-    connect(ungroupAct, &QAction::triggered, this, &MainWindow::onUngroup);
+    QAction *groupAct = AppContext::get().getQAction(QStringLiteral("Group"));
+    if (groupAct)
+        arrMenu->addAction(groupAct);
+    QAction *ungroupAct = AppContext::get().getQAction(QStringLiteral("Ungroup"));
+    if (ungroupAct)
+        arrMenu->addAction(ungroupAct);
     arrMenu->addSeparator();
     arrMenu->addAction(tr("Align && Layout..."), this, &MainWindow::onAlignLayoutDialog)
         ->setToolTip(tr("Open the Align & Layout dialog"));
@@ -452,30 +503,24 @@ void MainWindow::_initMenuBar()
         ->setToolTip(tr("About this application"));
 
     // 网格显示/隐藏
-    m_gridAction = viewMenu->addAction(tr("Show Grid"));
-    m_gridAction->setCheckable(true);
-    m_gridAction->setChecked(true);
-    m_gridAction->setToolTip(tr("Show or hide the grid"));
-    connect(m_gridAction, &QAction::toggled, this,
-            [this](bool checked) { if (m_pView) m_pView->setGridVisible(checked); });
+    m_gridAction = AppContext::get().getQAction(QStringLiteral("ToggleGrid"));
+    if (m_gridAction)
+        viewMenu->addAction(m_gridAction);
 
     _initThemeMenu(viewMenu);
 
     viewMenu->addSeparator();
     // 缩放适配
-    QAction *fitAct = new QAction(QIcon(":/icons/icons/view-fit.svg"), tr("Fit to Canvas"), this);
-    fitAct->setToolTip(tr("Fit the view to the canvas"));
-    connect(fitAct, &QAction::triggered, this, [this]() { if (m_pView) m_pView->fitToCanvas(); });
-    viewMenu->addAction(fitAct);
+    QAction *fitAct = AppContext::get().getQAction(QStringLiteral("FitToCanvas"));
+    if (fitAct)
+        viewMenu->addAction(fitAct);
 
-    QAction *resetZoomAct =
-        new QAction(QIcon(":/icons/icons/view-zoom-reset.svg"), tr("Reset Zoom (0)"), this);
-    resetZoomAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
-    resetZoomAct->setToolTip(tr("Reset zoom to 100%"));
-    connect(resetZoomAct, &QAction::triggered, this, [this]() { if (m_pView) m_pView->setZoomLevel(1.0); });
-    viewMenu->addAction(resetZoomAct);
+    QAction *resetZoomAct = AppContext::get().getQAction(QStringLiteral("ResetZoom"));
+    if (resetZoomAct)
+        viewMenu->addAction(resetZoomAct);
 
-    _updateUndoRedoActions();
+    // Refresh action states when View menu is about to show
+    connect(viewMenu, &QMenu::aboutToShow, []() { AppContext::get().refreshAllActions(); });
 }
 
 void MainWindow::_initThemeMenu(QMenu *viewMenu)
@@ -556,31 +601,14 @@ void MainWindow::_initToolBar()
 
     fileEditBar->addSeparator();
 
-    fileEditBar->addAction(m_undoAction);
-    fileEditBar->addAction(m_redoAction);
+    fileEditBar->addAction(AppContext::get().getQAction(QStringLiteral("Undo")));
+    fileEditBar->addAction(AppContext::get().getQAction(QStringLiteral("Redo")));
 
     fileEditBar->addSeparator();
 
-    // Cut 按钮
-    QAction *cutAct = new QAction(QIcon(":/icons/icons/edit-cut.svg"), tr("Cut"), this);
-    cutAct->setShortcut(QKeySequence::Cut);
-    cutAct->setToolTip(tr("Cut the selected items to clipboard"));
-    connect(cutAct, &QAction::triggered, this, &MainWindow::onCut);
-    fileEditBar->addAction(cutAct);
-
-    // Copy 按钮
-    QAction *copyAct = new QAction(QIcon(":/icons/icons/edit-copy.svg"), tr("Copy"), this);
-    copyAct->setShortcut(QKeySequence::Copy);
-    copyAct->setToolTip(tr("Copy the selected items to clipboard"));
-    connect(copyAct, &QAction::triggered, this, &MainWindow::onCopy);
-    fileEditBar->addAction(copyAct);
-
-    // Paste 按钮
-    QAction *pasteAct = new QAction(QIcon(":/icons/icons/edit-paste.svg"), tr("Paste"), this);
-    pasteAct->setShortcut(QKeySequence::Paste);
-    pasteAct->setToolTip(tr("Paste items from clipboard"));
-    connect(pasteAct, &QAction::triggered, this, &MainWindow::onPaste);
-    fileEditBar->addAction(pasteAct);
+    fileEditBar->addAction(AppContext::get().getQAction(QStringLiteral("Cut")));
+    fileEditBar->addAction(AppContext::get().getQAction(QStringLiteral("Copy")));
+    fileEditBar->addAction(AppContext::get().getQAction(QStringLiteral("Paste")));
 
     // 绘图工具栏 - 停靠在左侧
     QToolBar *drawBar = new QToolBar(tr("Drawing Tools"), this);
@@ -593,28 +621,20 @@ void MainWindow::_initToolBar()
     auto *actionGroup = new QActionGroup(this);
     actionGroup->setExclusive(true);
 
-    auto addToolAction = [&](const QString &iconPath, const QString &text, Tool tool,
-                             const QString &shortcut = { }) {
-        QAction *act = drawBar->addAction(QIcon(iconPath), text);
-        act->setCheckable(true);
-        act->setToolTip(text);
-        actionGroup->addAction(act);
-        if (!shortcut.isEmpty())
-            act->setShortcut(QKeySequence(shortcut));
-        connect(act, &QAction::triggered, this, [this, tool]() { onToolTriggered(tool); });
-        m_toolActions[tool] = act;
-        return act;
+    // Draw tools from AppContext (each QAtDrawActionBase is checkable, has icon/text)
+    static const QStringList drawToolTokens = {
+        QStringLiteral("SelectTool"),      QStringLiteral("RectTool"),
+        QStringLiteral("EllipseTool"),     QStringLiteral("LineTool"),
+        QStringLiteral("BezierCurveTool"), QStringLiteral("FreehandTool"),
+        QStringLiteral("TextTool")
     };
-
-    auto *selectAct =
-        addToolAction(":/icons/icons/tool-select.svg", tr("Select (V)"), Tool::Select, "V");
-    selectAct->setChecked(true);
-    addToolAction(":/icons/icons/tool-rect.svg", tr("Rectangle (R)"), Tool::Rect, "R");
-    addToolAction(":/icons/icons/tool-ellipse.svg", tr("Ellipse (E)"), Tool::Ellipse, "E");
-    addToolAction(":/icons/icons/tool-line.svg", tr("Line (L)"), Tool::Line, "L");
-    addToolAction(":/icons/icons/tool-curve.svg", tr("Curve (C)"), Tool::BezierCurve, "C");
-    addToolAction(":/icons/icons/tool-freehand.svg", tr("Freehand (F)"), Tool::Freehand, "F");
-    addToolAction(":/icons/icons/tool-text.svg", tr("Text (T)"), Tool::Text, "T");
+    for (const auto &token : drawToolTokens) {
+        QAction *act = AppContext::get().getQAction(token);
+        if (act) {
+            actionGroup->addAction(act);
+            drawBar->addAction(act);
+        }
+    }
 
     // 对齐工具栏
     QToolBar *alignToolBar = new QToolBar(tr("Align"), this);
@@ -632,16 +652,12 @@ void MainWindow::_initToolBar()
     alignToolBar->addSeparator();
 
     // 成组/解组
-    QAction *groupAct = alignToolBar->addAction(QIcon(":/icons/icons/group.svg"), tr("Group"));
-    groupAct->setToolTip(tr("Group selected items (Ctrl+G)"));
-    groupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
-    connect(groupAct, &QAction::triggered, this, &MainWindow::onGroup);
-
-    QAction *ungroupAct =
-        alignToolBar->addAction(QIcon(":/icons/icons/ungroup.svg"), tr("Ungroup"));
-    ungroupAct->setToolTip(tr("Ungroup selected items (Ctrl+Shift+G)"));
-    ungroupAct->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
-    connect(ungroupAct, &QAction::triggered, this, &MainWindow::onUngroup);
+    QAction *groupAct = AppContext::get().getQAction(QStringLiteral("Group"));
+    if (groupAct)
+        alignToolBar->addAction(groupAct);
+    QAction *ungroupAct = AppContext::get().getQAction(QStringLiteral("Ungroup"));
+    if (ungroupAct)
+        alignToolBar->addAction(ungroupAct);
 
     alignToolBar->addSeparator();
 
@@ -679,12 +695,14 @@ void MainWindow::_initPropertyPanel()
     m_pPropertyPanel = new PropertyPanel(this);
     m_pPropertyPanel->setObjectName("PropertyPanel");
     m_pPropertyPanel->setMinimumWidth(300);
+    m_pPropertyPanel->setAllowedAreas(Qt::RightDockWidgetArea); // 仅允许停靠在右侧
     addDockWidget(Qt::RightDockWidgetArea, m_pPropertyPanel);
 
-    m_alignLayoutDlg = new AlignLayoutDialog(nullptr, nullptr, this);
+    m_alignLayoutDlg = new AlignWidget(nullptr, nullptr, this);
     m_alignLayoutDlg->setObjectName("AlignLayoutDock");
     m_alignLayoutDlg->setMinimumWidth(300);
-    splitDockWidget(m_pPropertyPanel, m_alignLayoutDlg, Qt::Vertical);
+    m_alignLayoutDlg->setAllowedAreas(Qt::RightDockWidgetArea); // 仅允许停靠在右侧
+    addDockWidget(Qt::RightDockWidgetArea, m_alignLayoutDlg);
     m_alignLayoutDlg->hide();
 }
 
@@ -710,59 +728,72 @@ void MainWindow::_initConnections()
 void MainWindow::_bindViewConnections()
 {
     // No active view yet — will be rebound when first canvas is created
-    if (!m_pView) return;
+    if (!m_pView)
+        return;
 
     // View signals — rebound on tab switch
     connect(m_pView, &QAtGraphicsView::selectionChanged, this, &MainWindow::onSelectionChanged);
     connect(m_pView, &QAtGraphicsView::itemAdded, this, &MainWindow::onItemAdded);
-    connect(m_pView, &QAtGraphicsView::bringToFrontRequested, this, &MainWindow::onBringToFront);
-    connect(m_pView, &QAtGraphicsView::sendToBackRequested, this, &MainWindow::onSendToBack);
-    connect(m_pView, &QAtGraphicsView::groupRequested, this, &MainWindow::onGroup);
-    connect(m_pView, &QAtGraphicsView::ungroupRequested, this, &MainWindow::onUngroup);
+    // Context-menu actions route through AppContext actions
+    connect(m_pView, &QAtGraphicsView::bringToFrontRequested, this, []() {
+        auto *a = AppContext::get().getQAction(QStringLiteral("BringToFront"));
+        if (a)
+            a->trigger();
+    });
+    connect(m_pView, &QAtGraphicsView::sendToBackRequested, this, []() {
+        auto *a = AppContext::get().getQAction(QStringLiteral("SendToBack"));
+        if (a)
+            a->trigger();
+    });
+    connect(m_pView, &QAtGraphicsView::groupRequested, this, []() {
+        auto *a = AppContext::get().getQAction(QStringLiteral("Group"));
+        if (a)
+            a->trigger();
+    });
+    connect(m_pView, &QAtGraphicsView::ungroupRequested, this, []() {
+        auto *a = AppContext::get().getQAction(QStringLiteral("Ungroup"));
+        if (a)
+            a->trigger();
+    });
     connect(m_pView, &QAtGraphicsView::fitCanvasToItemsRequested, this,
             &MainWindow::onFitCanvasToItems);
 
-    // Undo stack — rebound on tab switch
-    connect(m_undoStack, &QUndoStack::canUndoChanged, this, [this]() { _updateUndoRedoActions(); });
-    connect(m_undoStack, &QUndoStack::canRedoChanged, this, [this]() { _updateUndoRedoActions(); });
+    // Undo stack — rebound on tab switch (use AppContext refresh)
+    connect(m_undoStack, &QUndoStack::canUndoChanged, this,
+            []() { AppContext::get().refreshAllActions(); });
+    connect(m_undoStack, &QUndoStack::canRedoChanged, this,
+            []() { AppContext::get().refreshAllActions(); });
     connect(m_undoStack, &QUndoStack::indexChanged, this, [this]() {
         m_pView->refreshResizeHandle();
         _updateCanvasLabel();
         _activeTabState().modified = true;
         m_projectModified = true;
+        // Show modified indicator (*) in tab title
+        auto *page = qobject_cast<QAtCanvasPage *>(_currentCanvasPage());
+        if (page)
+            _updateCanvasDockTitle(page);
         if (m_pPropertyPanel && m_pPropertyPanel->currentItem())
             m_pPropertyPanel->setItem(m_pPropertyPanel->currentItem());
     });
 
-    // Scroll bar → ruler sync
-    connect(m_pView->horizontalScrollBar(), &QScrollBar::valueChanged, m_hRuler,
-            &RulerBar::updateRuler);
-    connect(m_pView->verticalScrollBar(), &QScrollBar::valueChanged, m_vRuler,
-            &RulerBar::updateRuler);
+    // Ruler sync is handled internally by each QAtCanvasPage
 
     // Status bar: mouse position & zoom
-    connect(m_pView, &QAtGraphicsView::mousePositionChanged, this, [this](const QPointF &pos) {
-        _updatePosLabel(pos);
-        m_hRuler->setMousePosition(pos);
-        m_vRuler->setMousePosition(pos);
-    });
+    connect(m_pView, &QAtGraphicsView::mousePositionChanged, this,
+            [this](const QPointF &pos) { _updatePosLabel(pos); });
     connect(m_pView, &QAtGraphicsView::zoomChanged, this, [this](qreal level) {
         int pct = qRound(level * 100);
         m_zoomLabel->setText(tr("%1%").arg(pct));
         m_zoomSlider->blockSignals(true);
         m_zoomSlider->setValue(pct);
         m_zoomSlider->blockSignals(false);
-        m_hRuler->updateRuler();
-        m_vRuler->updateRuler();
     });
 
-    // TextItem focus → property panel refresh
+    // Tool changed → sync status bar + refresh action states
     connect(m_pView, &QAtGraphicsView::toolChanged, this, [this](Tool tool) {
         m_currentTool = tool;
         _updateToolLabel();
-        // 同步工具栏按钮状态
-        for (auto it = m_toolActions.begin(); it != m_toolActions.end(); ++it)
-            it.value()->setChecked(it.key() == tool);
+        AppContext::get().refreshAllActions();
     });
 }
 
@@ -791,7 +822,8 @@ void MainWindow::_initStatusBar()
     m_zoomSlider->setToolTip(tr("Adjust zoom level"));
     connect(m_zoomSlider, &QSlider::valueChanged, this, [this](int value) {
         // Use current m_pView (reassigned on tab switch)
-        if (m_pView) m_pView->setZoomLevel(value / 100.0);
+        if (m_pView)
+            m_pView->setZoomLevel(value / 100.0);
     });
 
     // 画布尺寸修改按钮
@@ -806,7 +838,8 @@ void MainWindow::_initStatusBar()
     // 画布尺寸
     m_canvasLabel = new QLabel;
     m_canvasLabel->setMinimumWidth(230);
-    if (m_pView) _updateCanvasLabel();
+    if (m_pView)
+        _updateCanvasLabel();
 
     // 当前工具
     m_toolLabel = new QLabel;
@@ -895,17 +928,17 @@ void MainWindow::_initServices()
 
     // Route new Action tokens to existing working slots
     ctx.setActionCallback([this](const QString &token) {
-        static const QMap<QString, void(MainWindow::*)()> map = {
-            {QStringLiteral("New"),            &MainWindow::onNew},
-            {QStringLiteral("OpenProject"),    &MainWindow::onOpenProject},
-            {QStringLiteral("SaveProject"),    &MainWindow::onSaveProject},
-            {QStringLiteral("ImportImage"),    &MainWindow::onImportImage},
-            {QStringLiteral("ExportImage"),    &MainWindow::onExportImage},
-            {QStringLiteral("Settings"),       &MainWindow::onSettings},
-            {QStringLiteral("Preferences"),    &MainWindow::onPreferences},
-            {QStringLiteral("About"),          &MainWindow::onAbout},
-            {QStringLiteral("AlignLayoutDialog"), &MainWindow::onAlignLayoutDialog},
-            {QStringLiteral("AutoLayout"),     &MainWindow::onAutoLayout},
+        static const QMap<QString, void (MainWindow::*)()> map = {
+            { QStringLiteral("New"), &MainWindow::onNew },
+            { QStringLiteral("OpenProject"), &MainWindow::onOpenProject },
+            { QStringLiteral("SaveProject"), &MainWindow::onSaveProject },
+            { QStringLiteral("ImportImage"), &MainWindow::onImportImage },
+            { QStringLiteral("ExportImage"), &MainWindow::onExportImage },
+            { QStringLiteral("Settings"), &MainWindow::onSettings },
+            { QStringLiteral("Preferences"), &MainWindow::onPreferences },
+            { QStringLiteral("About"), &MainWindow::onAbout },
+            { QStringLiteral("AlignLayoutDialog"), &MainWindow::onAlignLayoutDialog },
+            { QStringLiteral("AutoLayout"), &MainWindow::onAutoLayout },
         };
         auto it = map.find(token);
         if (it != map.end()) {
@@ -934,101 +967,23 @@ void MainWindow::_initServices()
 
 void MainWindow::_initPages()
 {
-    // P9: QTabWidget hosts canvas pages. Each tab = one QAtCanvasPage.
-    m_tabWidget = new QTabWidget(this);
-    m_tabWidget->setTabsClosable(true);
-    m_tabWidget->setMovable(true);
-    m_tabWidget->setDocumentMode(true);
-    m_tabWidget->tabBar()->setExpanding(false);
-    m_tabWidget->tabBar()->setUsesScrollButtons(true);
+    // Canvas pages are now QDockWidgets instead of QTabWidget tabs.
+    // Each canvas can be dragged, floated, and rearranged.
+    // Initially all canvases are tabbed together in the right dock area.
+    setDockNestingEnabled(true);
+    setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::TabPosition::North);
+
+    // Use an empty placeholder as central widget so dock widgets can occupy the space
+    //auto *centralPlaceholder = new QWidget(this);
+    //centralPlaceholder->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    //setCentralWidget(centralPlaceholder);
 
     // Start with no canvas — user creates one via File → New
-    // m_tabWidget is empty until the first canvas is created
+    // m_canvasDocks is empty until the first _addCanvasDock call
 
-    // Tab switch → update active page, rebind connections
-    connect(m_tabWidget, &QTabWidget::currentChanged, this, [this](int) {
-        auto *page = qobject_cast<QAtCanvasPage*>(m_tabWidget->currentWidget());
-        if (!page) return;
-
-        AppContext::get().setActivePage(page->pageId());
-        QAtGraphicsView *newView = page->view();
-        QUndoStack *newStack = page->undoStack();
-
-        // Sync per-tab project state before switching
-        auto &state = _activeTabState();
-        m_projectModified = state.modified;
-        m_currentProjectPath = state.projectPath;
-
-        // Clear property panel so old canvas item properties don't persist
-        if (m_pPropertyPanel)
-            m_pPropertyPanel->setItem(nullptr);
-
-        // Rebind view signals to the new active view
-        if (m_pView != newView) {
-            if (m_pView) {
-                m_pView->disconnect(this);
-                m_undoStack->disconnect(this);
-            }
-            m_pView = newView;
-            m_undoStack = newStack;
-            AppContext::get().undo()->bindUndoStack(m_undoStack);
-            _bindViewConnections();
-            if (m_hRuler) m_hRuler->setGraphicsView(m_pView);
-            if (m_vRuler) m_vRuler->setGraphicsView(m_pView);
-            // Rebinding AlignLayoutDialog
-            if (m_alignLayoutDlg) {
-                m_alignLayoutDlg->setScene(newView->scene());
-                m_alignLayoutDlg->setUndoStack(newStack);
-            }
-
-            // Apply the global current tool to the new view
-            if (m_pView && m_pView->currentTool() != m_currentTool)
-                m_pView->setTool(m_currentTool);
-
-            // Sync zoom indicator from the new view's actual zoom level
-            qreal zoom = m_pView->zoomLevel();
-            int pct = qRound(zoom * 100);
-            m_zoomLabel->setText(tr("%1%").arg(pct));
-            m_zoomSlider->blockSignals(true);
-            m_zoomSlider->setValue(pct);
-            m_zoomSlider->blockSignals(false);
-            m_hRuler->updateRuler();
-            m_vRuler->updateRuler();
-            _updateCanvasLabel();
-            _updatePosLabel(m_lastScenePos);
-
-            // Sync grid action to active view
-            if (m_gridAction)
-                m_gridAction->setChecked(m_pView->isGridVisible());
-
-            // Sync PPI from new view's canvas item
-            if (auto *c = m_pView->canvasItem()) {
-                qreal ppi = c->ppi();
-                if (m_hRuler) m_hRuler->setPpi(ppi);
-                if (m_vRuler) m_vRuler->setPpi(ppi);
-                m_pPropertyPanel->setDisplayPpi(ppi);
-            }
-        }
-    });
-
-    // Tab close → unregister page
-    connect(m_tabWidget, &QTabWidget::tabCloseRequested, this, [this](int index) {
-        auto *page = qobject_cast<QAtCanvasPage*>(m_tabWidget->widget(index));
-        if (page) {
-            // Disconnect signals before removal
-            page->disconnect(this);
-            if (m_statusBarDirector) page->disconnect(m_statusBarDirector);
-            AppContext::get().unregisterPage(page->pageId());
-            m_tabStates.remove(page);
-        }
-        m_tabWidget->removeTab(index);
-        if (m_tabWidget->count() == 0) {
-            m_pView = nullptr;
-            m_undoStack = nullptr;
-            m_currentProjectPath.clear();
-            m_projectModified = false;
-        }
-    });
+    QWidget *widget = takeCentralWidget();
+    if (widget)
+        widget->hide();
 }
 
 void MainWindow::_initActions()
@@ -1084,20 +1039,10 @@ void MainWindow::_initActions()
     ctx.registerAction(QAtActionBasePtr(new SettingsAction));
     ctx.registerAction(QAtActionBasePtr(new PreferencesAction));
     ctx.registerAction(QAtActionBasePtr(new AboutAction));
-    ctx.registerAction(QAtActionBasePtr(new AlignLayoutDialogAction));
+    ctx.registerAction(QAtActionBasePtr(new AlignWidgetAction));
 
     // Initialize undo/redo action state
     ctx.refreshAllActions();
-}
-
-void MainWindow::_updateUndoRedoActions()
-{
-    const bool canUndo = m_undoStack ? m_undoStack->canUndo() : false;
-    const bool canRedo = m_undoStack ? m_undoStack->canRedo() : false;
-    if (m_undoAction)
-        m_undoAction->setEnabled(canUndo);
-    if (m_redoAction)
-        m_redoAction->setEnabled(canRedo);
 }
 
 void MainWindow::_updatePosLabel(const QPointF &scenePos)
@@ -1128,6 +1073,252 @@ void MainWindow::_updateCanvasLabel()
     m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm")
                                .arg(sz.width() * kPxToMm, 0, 'f', 1)
                                .arg(sz.height() * kPxToMm, 0, 'f', 1));
+}
+
+// ============================================================
+// Canvas Dock 管理 (替代 QTabWidget API)
+// ============================================================
+
+QAtCanvasPage *MainWindow::_currentCanvasPage() const
+{
+    return m_activeCanvasDock ? qobject_cast<QAtCanvasPage *>(m_activeCanvasDock->widget())
+                              : nullptr;
+}
+
+QAtCanvasPage *MainWindow::_canvasPageAt(int index) const
+{
+    if (index < 0 || index >= m_canvasDocks.size())
+        return nullptr;
+    return qobject_cast<QAtCanvasPage *>(m_canvasDocks.at(index)->widget());
+}
+
+int MainWindow::_canvasCount() const
+{
+    return m_canvasDocks.size();
+}
+
+int MainWindow::_currentCanvasIndex() const
+{
+    return m_canvasDocks.indexOf(m_activeCanvasDock);
+}
+
+int MainWindow::_indexOfCanvasPage(QAtCanvasPage *page) const
+{
+    for (int i = 0; i < m_canvasDocks.size(); ++i) {
+        if (qobject_cast<QAtCanvasPage *>(m_canvasDocks.at(i)->widget()) == page)
+            return i;
+    }
+    return -1;
+}
+
+void MainWindow::_setCurrentCanvasPage(QAtCanvasPage *page)
+{
+    if (!page)
+        return;
+    for (auto *dock : m_canvasDocks) {
+        if (qobject_cast<QAtCanvasPage *>(dock->widget()) == page) {
+            dock->raise();
+            _onCanvasDockActivated(dock);
+            return;
+        }
+    }
+}
+
+void MainWindow::_setCurrentCanvasIndex(int index)
+{
+    if (index < 0 || index >= m_canvasDocks.size())
+        return;
+    m_canvasDocks.at(index)->raise();
+    _onCanvasDockActivated(m_canvasDocks.at(index));
+}
+
+QDockWidget *MainWindow::_addCanvasDockInternal(QAtCanvasPage *page, const QString &title)
+{
+    if (!page)
+        return nullptr;
+
+    QDockWidget *dock = new QDockWidget(title, this);
+    dock->setObjectName(page->pageId());
+    dock->setWidget(page);
+    dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    dock->setAllowedAreas(Qt::LeftDockWidgetArea);
+    // Track close: warn about data loss
+    connect(dock, &QDockWidget::visibilityChanged, this, [this, dock](bool visible) {
+        if (!visible) {
+            // Only handle actual close (not tab-switch hide)
+            // Tab switches also toggle visibility — check if dock was removed
+            if (m_canvasDocks.contains(dock))
+                return; // still in list, just hidden by tab switch
+        }
+    });
+
+    addDockWidget(Qt::LeftDockWidgetArea, dock);
+    if (!m_canvasDocks.isEmpty()) {
+        tabifyDockWidget(m_canvasDocks.first(), dock);
+    }
+    dock->raise();
+
+    m_canvasDocks.append(dock);
+    _onCanvasDockActivated(dock);
+
+    // Forward QAtCanvasPage signals through the dock widget's child focus
+    if (auto *view = page->view())
+        view->installEventFilter(this);
+
+    return dock;
+}
+
+void MainWindow::_removeCanvasDockInternal(int index)
+{
+    if (index < 0 || index >= m_canvasDocks.size())
+        return;
+    QDockWidget *dock = m_canvasDocks.at(index);
+    QAtCanvasPage *page = qobject_cast<QAtCanvasPage *>(dock->widget());
+
+    // Remove from tracking list
+    m_canvasDocks.removeAt(index);
+
+    if (page) {
+        page->disconnect(this);
+        if (m_statusBarDirector)
+            page->disconnect(m_statusBarDirector);
+        AppContext::get().unregisterPage(page->pageId());
+        m_tabStates.remove(page);
+    }
+
+    // If this was the active dock, update
+    if (m_activeCanvasDock == dock) {
+        m_activeCanvasDock = m_canvasDocks.isEmpty() ? nullptr : m_canvasDocks.first();
+        if (m_activeCanvasDock)
+            _onCanvasDockActivated(m_activeCanvasDock);
+    }
+
+    // Last canvas removed — reset all state
+    if (m_canvasDocks.isEmpty()) {
+        m_pView = nullptr;
+        m_undoStack = nullptr;
+        m_projectPath.clear();
+        m_projectModified = false;
+    }
+
+    removeDockWidget(dock);
+    dock->deleteLater();
+}
+
+void MainWindow::_updateCanvasDockTitle(QAtCanvasPage *page)
+{
+    if (!page)
+        return;
+    int idx = _indexOfCanvasPage(page);
+    if (idx < 0)
+        return;
+    QDockWidget *dock = m_canvasDocks.at(idx);
+    auto &state = m_tabStates[page];
+    QString title;
+    if (!m_projectPath.isEmpty()) {
+        if (_canvasCount() == 1)
+            title = QFileInfo(m_projectPath).completeBaseName();
+        else
+            title =
+                tr("%1 — Canvas %2").arg(QFileInfo(m_projectPath).completeBaseName()).arg(idx + 1);
+    } else {
+        title = page->title();
+    }
+    if (state.modified && !title.endsWith(QStringLiteral(" *")))
+        title += QStringLiteral(" *");
+    dock->setWindowTitle(title);
+}
+
+void MainWindow::_onCanvasDockActivated(QDockWidget *dock)
+{
+    if (!dock || m_activeCanvasDock == dock)
+        return;
+
+    QAtCanvasPage *page = qobject_cast<QAtCanvasPage *>(dock->widget());
+    if (!page)
+        return;
+
+    // Update title of the NEW active tab (add/remove * indicator)
+    _updateCanvasDockTitle(page);
+
+    QDockWidget *oldDock = m_activeCanvasDock;
+    m_activeCanvasDock = dock;
+
+    AppContext::get().setActivePage(page->pageId());
+    QAtGraphicsView *newView = page->view();
+    QUndoStack *newStack = page->undoStack();
+
+    // Clear property panel
+    if (m_pPropertyPanel)
+        m_pPropertyPanel->setItem(nullptr);
+
+    // Rebind view signals
+    if (m_pView != newView) {
+        if (m_pView) {
+            m_pView->disconnect(this);
+            if (m_undoStack)
+                m_undoStack->disconnect(this);
+        }
+        m_pView = newView;
+        m_undoStack = newStack;
+        if (m_undoStack)
+            AppContext::get().undo()->bindUndoStack(m_undoStack);
+        _bindViewConnections();
+
+        // Rebinding AlignLayoutDialog
+        if (m_alignLayoutDlg && newView) {
+            m_alignLayoutDlg->setScene(newView->scene());
+            m_alignLayoutDlg->setUndoStack(newStack);
+        }
+
+        // Apply global tool
+        if (m_pView && m_pView->currentTool() != m_currentTool)
+            m_pView->setTool(m_currentTool);
+
+        // Sync zoom
+        if (m_pView) {
+            qreal zoom = m_pView->zoomLevel();
+            int pct = qRound(zoom * 100);
+            m_zoomLabel->setText(tr("%1%").arg(pct));
+            m_zoomSlider->blockSignals(true);
+            m_zoomSlider->setValue(pct);
+            m_zoomSlider->blockSignals(false);
+        }
+        _updateCanvasLabel();
+        _updatePosLabel(m_lastScenePos);
+
+        AppContext::get().refreshAllActions();
+
+        // Sync PPI
+        if (m_pView && m_pView->canvasItem()) {
+            qreal ppi = m_pView->canvasItem()->ppi();
+            if (m_pPropertyPanel)
+                m_pPropertyPanel->setDisplayPpi(ppi);
+        }
+    }
+
+    // If old dock was visible and is now hidden by tab switch, update its title too
+    if (oldDock) {
+        auto *oldPage = qobject_cast<QAtCanvasPage *>(oldDock->widget());
+        if (oldPage)
+            _updateCanvasDockTitle(oldPage);
+    }
+}
+
+bool MainWindow::eventFilter(QObject *obj, QEvent *event)
+{
+    if (event->type() == QEvent::FocusIn) {
+        QWidget *w = qobject_cast<QWidget *>(obj);
+        while (w) {
+            QDockWidget *dock = qobject_cast<QDockWidget *>(w);
+            if (dock && m_canvasDocks.contains(dock) && m_activeCanvasDock != dock) {
+                _onCanvasDockActivated(dock);
+                break;
+            }
+            w = w->parentWidget();
+        }
+    }
+    return QMainWindow::eventFilter(obj, event);
 }
 
 void MainWindow::_updateToolLabel()
@@ -1161,9 +1352,6 @@ void MainWindow::_updateToolLabel()
     case Tool::Text:
         toolName = tr("Text");
         break;
-    case Tool::Image:
-        toolName = tr("Image");
-        break;
     }
 
     if (toolName.isEmpty())
@@ -1174,46 +1362,135 @@ void MainWindow::_updateToolLabel()
 
 void MainWindow::_syncViewState()
 {
-    if (!m_pView) return;
+    if (!m_pView)
+        return;
     if (auto *c = m_pView->canvasItem()) {
         qreal ppi = c->ppi();
-        if (m_hRuler) m_hRuler->setPpi(ppi);
-        if (m_vRuler) m_vRuler->setPpi(ppi);
-        if (m_pPropertyPanel) m_pPropertyPanel->setDisplayPpi(ppi);
+        auto *page = qobject_cast<QAtCanvasPage *>(_currentCanvasPage());
+        if (page)
+            page->setRulerPpi(ppi);
+        if (m_pPropertyPanel)
+            m_pPropertyPanel->setDisplayPpi(ppi);
     }
     _updateCanvasLabel();
     _updatePosLabel(m_lastScenePos);
 }
 
+// ---- 公共：收集所有画布的序列化数据（含 CMYK） ----
+// 委托给 ProjectDocument::collectBundles()，消除重复序列化逻辑
+QList<CanvasSaveBundle> MainWindow::_collectCanvasBundles() const
+{
+    if (_canvasCount() == 0)
+        return { };
+
+    // 确保 ProjectDocument 已注册所有当前画布（文档滞后于 TabWidget）
+    if (m_document) {
+        m_document->setFilePath(m_projectPath);
+        for (int i = 0; i < _canvasCount(); ++i) {
+            auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+            if (page) {
+                if (!m_document->canvases().contains(page))
+                    m_document->registerCanvas(page);
+                m_document->markCanvasModified(page, m_tabStates.value(page).modified);
+            }
+        }
+        return m_document->collectBundles();
+    }
+
+    // 回退：m_document 尚未初始化（不应发生，但安全兜底）
+    QList<CanvasSaveBundle> bundles;
+    for (int i = 0; i < _canvasCount(); ++i) {
+        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+        if (!page || !page->canvasItem())
+            continue;
+
+        CanvasSaveBundle bundle;
+        bundle.info.width = page->canvasItem()->canvasSize().width();
+        bundle.info.height = page->canvasItem()->canvasSize().height();
+        bundle.info.dpi =
+            page->canvasItem()->isDpiLocked() ? page->canvasItem()->canvasDpiX() : 0.0;
+
+        auto items = ::filterSelectableItems(page->scene()->items());
+        for (auto *item : items) {
+            SerializeInput input;
+            auto *igi = dynamic_cast<IGraphicsItem *>(item);
+            input.itemType = igi ? static_cast<int>(igi->itemType()) : 0;
+            input.zValue = item->zValue();
+            input.posX = item->pos().x();
+            input.posY = item->pos().y();
+            input.rotation = item->rotation();
+            if (igi) {
+                QByteArray binary;
+                QDataStream out(&binary, QIODevice::WriteOnly);
+                out << static_cast<int>(igi->itemType());
+                igi->serialize(out);
+                input.binary = binary;
+
+                if (igi->hasPenCmyk()) {
+                    input.cmyk.hasPen = true;
+                    igi->penCmyk(input.cmyk.penC, input.cmyk.penM, input.cmyk.penY,
+                                 input.cmyk.penK);
+                }
+                if (igi->hasBrushCmyk()) {
+                    input.cmyk.hasBrush = true;
+                    igi->brushCmyk(input.cmyk.brushC, input.cmyk.brushM, input.cmyk.brushY,
+                                   input.cmyk.brushK);
+                }
+                input.cmyk.gradient = igi->gradientStopCmykMap();
+            }
+            bundle.items.append(serializeItemWorker(input));
+        }
+        bundles.append(bundle);
+    }
+    return bundles;
+}
+
 void MainWindow::saveSession()
 {
+    if (_canvasCount() == 0)
+        return;
+
+    // Sync legacy fields to ProjectDocument
+    if (m_document) {
+        m_document->setFilePath(m_projectPath);
+        for (int i = 0; i < _canvasCount(); ++i) {
+            auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+            if (page) {
+                if (!m_document->canvases().contains(page))
+                    m_document->registerCanvas(page);
+                m_document->markCanvasModified(page, m_tabStates.value(page).modified);
+            }
+        }
+    }
+
     SessionInfo info;
-    info.version = 1;
-    info.activeTabIndex = m_tabWidget ? m_tabWidget->currentIndex() : 0;
+    info.version = 2;
+    info.projectPath = m_projectPath;
+    info.activeTabIndex = qMax(0, _currentCanvasIndex());
 
     info.currentTool = m_currentTool;
-    info.ripEnabled  = m_ripEnabled;
-    info.ripXRes     = m_ripXRes;
-    info.ripYRes     = m_ripYRes;
-    info.alignHSpacing = AlignLayoutDialog::hSpacing();
-    info.alignVSpacing = AlignLayoutDialog::vSpacing();
+    info.ripEnabled = m_ripEnabled;
+    info.ripXRes = m_ripXRes;
+    info.ripYRes = m_ripYRes;
+    info.alignHSpacing = AlignWidget::hSpacing();
+    info.alignVSpacing = AlignWidget::vSpacing();
 
-    for (int i = 0; i < m_tabWidget->count(); ++i) {
-        auto *page = qobject_cast<QAtCanvasPage*>(m_tabWidget->widget(i));
-        if (!page) continue;
+    for (int i = 0; i < _canvasCount(); ++i) {
+        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+        if (!page)
+            continue;
 
         SessionTabInfo tab;
         const auto &state = m_tabStates[page];
-        tab.projectPath    = state.projectPath;
-        tab.modified       = state.modified;
+        tab.modified = state.modified;
 
         if (auto *canvas = page->canvasItem()) {
-            tab.canvasWidthPx  = canvas->canvasSize().width();
+            tab.canvasWidthPx = canvas->canvasSize().width();
             tab.canvasHeightPx = canvas->canvasSize().height();
-            tab.ppi            = canvas->ppi();
+            tab.ppi = canvas->ppi();
         }
         if (auto *view = page->view()) {
-            tab.zoomLevel   = view->zoomLevel();
+            tab.zoomLevel = view->zoomLevel();
             tab.gridVisible = view->isGridVisible();
         }
         info.tabs.append(tab);
@@ -1240,6 +1517,13 @@ void MainWindow::loadSession()
     if (info.tabs.isEmpty())
         return;
 
+    // --- Restore project-level path ---
+    m_projectPath = info.projectPath;
+    m_projectModified = false;
+
+    // --- Check if project path is autosave ---
+    bool isAutoSave = m_projectPath.contains(QStringLiteral("/autosave/"));
+
     // --- Rebuild tabs ---
     for (int i = 0; i < info.tabs.size(); ++i) {
         const SessionTabInfo &tab = info.tabs[i];
@@ -1254,125 +1538,128 @@ void MainWindow::loadSession()
 
         auto *canvasPage = new QAtCanvasPage(pageId, canvasSize, tab.ppi, this);
         AppContext::get().registerPage(canvasPage);
-        m_tabStates[canvasPage].projectPath = tab.projectPath;
-        m_tabStates[canvasPage].modified    = tab.modified;
+        m_tabStates[canvasPage].modified = tab.modified;
 
         // Apply view-level state
         if (auto *view = canvasPage->view()) {
             view->setGridVisible(tab.gridVisible);
-            QTimer::singleShot(0, view, [view, zoom = tab.zoomLevel]() {
-                view->setZoomLevel(zoom);
-            });
+            QTimer::singleShot(0, view,
+                               [view, zoom = tab.zoomLevel]() { view->setZoomLevel(zoom); });
         }
 
-        QString title;
-        if (!tab.projectPath.isEmpty()) {
-            QFileInfo fi(tab.projectPath);
-            title = fi.completeBaseName();
-        } else {
-            title = tr("Canvas %1").arg(i + 1);
-        }
-        m_tabWidget->addTab(canvasPage, title);
+        _addCanvasDockInternal(canvasPage, canvasPage->title());
     }
 
     // --- Set active tab ---
-    int activeIdx = qBound(0, info.activeTabIndex, m_tabWidget->count() - 1);
-    m_tabWidget->setCurrentIndex(activeIdx);
+    int activeIdx = qBound(0, info.activeTabIndex, _canvasCount() - 1);
+    _setCurrentCanvasIndex(activeIdx);
 
     // --- Restore global tool ---
     m_currentTool = info.currentTool;
     if (m_pView)
         m_pView->setTool(m_currentTool);
-    for (auto it = m_toolActions.begin(); it != m_toolActions.end(); ++it)
-        it.value()->setChecked(it.key() == m_currentTool);
     _updateToolLabel();
-
-    // --- Sync grid action to active view ---
-    if (m_gridAction && m_pView)
-        m_gridAction->setChecked(m_pView->isGridVisible());
+    AppContext::get().refreshAllActions();
 
     // --- Restore RIP / alignment ---
     m_ripEnabled = info.ripEnabled;
-    m_ripXRes    = info.ripXRes;
-    m_ripYRes    = info.ripYRes;
-    AlignLayoutDialog::setHSpacing(info.alignHSpacing);
-    AlignLayoutDialog::setVSpacing(info.alignVSpacing);
+    m_ripXRes = info.ripXRes;
+    m_ripYRes = info.ripYRes;
+    AlignWidget::setHSpacing(info.alignHSpacing);
+    AlignWidget::setVSpacing(info.alignVSpacing);
 
-    // --- Async load project files ---
-    for (int i = 0; i < m_tabWidget->count(); ++i) {
-        auto *page = qobject_cast<QAtCanvasPage*>(m_tabWidget->widget(i));
-        if (!page) continue;
-
-        const QString &path = m_tabStates[page].projectPath;
-        if (path.isEmpty()) continue;
-
-        if (!QFile::exists(path)) {
-            qWarning() << "[Session] Project file not found:" << path;
-            m_tabStates[page].projectPath.clear();
-            m_tabStates[page].modified = true;
-            continue;
+    // --- Async load project file (single file for all canvases) ---
+    if (m_projectPath.isEmpty()) {
+        // Update tab titles
+        for (int i = 0; i < _canvasCount(); ++i) {
+            auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+            if (page)
+                _updateCanvasDockTitle(page);
         }
+        SessionFile::remove();
+        return;
+    }
 
-        ProjectFile pf;
-        ProjectFile::ProjectInfo projInfo;
-        ProjectFile::CanvasInfo canvasInfo;
-        QList<DeserialTask> tasks;
+    if (!QFile::exists(m_projectPath)) {
+        qWarning() << "[Session] Project file not found:" << m_projectPath;
+        m_projectPath.clear();
+        m_projectModified = true;
+        SessionFile::remove();
+        return;
+    }
 
-        if (!pf.parseForDeserialize(path, projInfo, canvasInfo, tasks)) {
-            qWarning() << "[Session] Failed to parse project:" << path << pf.lastError();
+    // Parse project file → gets all canvases
+    ProjectFile pf;
+    ProjectFile::ProjectInfo projInfo;
+    QList<CanvasDeserialBundle> canvasBundles;
+
+    if (!pf.parseMulti(m_projectPath, projInfo, canvasBundles)) {
+        qWarning() << "[Session] Failed to parse project:" << m_projectPath << pf.lastError();
+        m_projectPath = isAutoSave ? QString() : m_projectPath;
+        m_projectModified = isAutoSave;
+        SessionFile::remove();
+        return;
+    }
+
+    // Match loaded canvases to existing tabs (reuse tabs, update sizes)
+    for (int ci = 0; ci < canvasBundles.size() && ci < _canvasCount(); ++ci) {
+        auto &bundle = canvasBundles[ci];
+        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(ci));
+        if (!page)
             continue;
-        }
 
-        qreal ppi = canvasInfo.dpi > 0 ? canvasInfo.dpi : 150.0;
-        page->setCanvasSize(QSizeF(canvasInfo.width, canvasInfo.height));
+        qreal ppi = bundle.info.dpi > 0 ? bundle.info.dpi : 150.0;
+        page->setCanvasSize(QSizeF(bundle.info.width, bundle.info.height));
         if (auto *c = page->canvasItem()) {
             c->setPpi(ppi);
-            if (canvasInfo.dpi > 0)
-                c->setCanvasDpi(canvasInfo.dpi, canvasInfo.dpi);
+            if (bundle.info.dpi > 0)
+                c->setCanvasDpi(bundle.info.dpi, bundle.info.dpi);
         }
-        m_tabWidget->setTabText(i,
-            projInfo.name.isEmpty() ? page->title() : projInfo.name);
 
-        if (tasks.isEmpty()) {
-            m_tabStates[page].projectPath = path;
-            m_tabStates[page].modified = false;
+        if (bundle.tasks.isEmpty()) {
+            m_tabStates[page].modified = isAutoSave;
+            _updateCanvasDockTitle(page);
             continue;
         }
 
-        const QString taskId = m_pProgressMgr->startTask(
-            tr("Restore %1").arg(projInfo.name), tasks.size());
+        const QString taskId =
+            m_pProgressMgr->startTask(tr("Restore canvas %1").arg(ci + 1), bundle.tasks.size());
         page->view()->setEnabled(false);
 
         auto *watcher = new QFutureWatcher<DeserializedItem>(this);
         QPointer<QAtCanvasPage> pagePtr(page);
 
-        connect(watcher, &QFutureWatcher<DeserializedItem>::progressValueChanged,
-                this, [this, taskId](int v) { m_pProgressMgr->updateTask(taskId, v); });
+        connect(watcher, &QFutureWatcher<DeserializedItem>::progressValueChanged, this,
+                [this, taskId](int v) { m_pProgressMgr->updateTask(taskId, v); });
 
         connect(watcher, &QFutureWatcher<DeserializedItem>::finished, this,
-                [this, watcher, taskId, ppi, path, pagePtr]() {
+                [this, watcher, taskId, ppi, pagePtr, isAutoSave]() {
                     m_pProgressMgr->finishTask(taskId);
-                    if (!pagePtr) { watcher->deleteLater(); return; }
+                    if (!pagePtr) {
+                        watcher->deleteLater();
+                        return;
+                    }
 
-                    QList<QGraphicsItem*> loadedItems;
+                    QList<QGraphicsItem *> loadedItems;
                     auto f = watcher->future();
                     for (int j = 0; j < f.resultCount(); ++j) {
                         auto *item = createItemFromDeserialized(f.resultAt(j));
-                        if (item) loadedItems.append(item);
+                        if (item)
+                            loadedItems.append(item);
                     }
                     for (auto *item : loadedItems)
                         pagePtr->scene()->addItem(item);
 
                     pagePtr->view()->setEnabled(true);
-                    m_tabStates[pagePtr].projectPath = path;
-                    m_tabStates[pagePtr].modified = false;
+                    // Clear autosave path
+                    m_tabStates[pagePtr].modified = isAutoSave;
+                    _updateCanvasDockTitle(pagePtr);
 
-                    if (m_tabWidget && m_tabWidget->currentWidget() == pagePtr) {
-                        m_hRuler->setPpi(ppi);
-                        m_vRuler->setPpi(ppi);
-                        if (m_pPropertyPanel) m_pPropertyPanel->setDisplayPpi(ppi);
-                        m_hRuler->updateRuler();
-                        m_vRuler->updateRuler();
+                    if (_currentCanvasPage() == pagePtr) {
+                        pagePtr->setRulerPpi(ppi);
+                        if (m_pPropertyPanel)
+                            m_pPropertyPanel->setDisplayPpi(ppi);
+                        pagePtr->updateRulers();
                         _updateCanvasLabel();
                         _updatePosLabel(m_lastScenePos);
                     }
@@ -1380,21 +1667,22 @@ void MainWindow::loadSession()
                     watcher->deleteLater();
                 });
 
-        auto f = QtConcurrent::mapped(tasks, deserializeItemWorker);
-        watcher->setFuture(f);
+        watcher->setFuture(QtConcurrent::mapped(bundle.tasks, deserializeItemWorker));
     }
 
+    // Clear autosave path — user should pick a real save location on next save
+    if (isAutoSave)
+        m_projectPath.clear();
     SessionFile::remove();
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
-    // 更新刻度尺
-    if (m_hRuler)
-        m_hRuler->updateRuler();
-    if (m_vRuler)
-        m_vRuler->updateRuler();
+    // 更新刻度尺 (rulers are per-page)
+    auto *page = qobject_cast<QAtCanvasPage *>(_currentCanvasPage());
+    if (page)
+        page->updateRulers();
 }
 
 void MainWindow::setMainWindowVisibility(bool state)
@@ -1423,56 +1711,175 @@ void MainWindow::getToolInfo()
 // ============================================================
 bool MainWindow::_maybeSaveProject()
 {
-    if (!_activeTabState().modified || !m_pView->canvasItem())
+    if (_canvasCount() == 0)
         return true;
 
-    const QString &projectPath = _activeTabState().projectPath;
+    // 检查是否有任何画布被修改
+    bool anyModified = false;
+    for (int i = 0; i < _canvasCount() && !anyModified; ++i) {
+        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+        if (page && m_tabStates[page].modified)
+            anyModified = true;
+    }
+    if (!anyModified)
+        return true;
+
+    QString title = m_projectPath.isEmpty() ? tr("Untitled project")
+                                            : QFileInfo(m_projectPath).completeBaseName();
 
     QMessageBox::StandardButton btn =
         QMessageBox::question(this, tr("Unsaved Changes"),
-                              tr("The current project has unsaved changes.\n"
-                                 "Do you want to save them?"),
+                              tr("The project \"%1\" has unsaved changes.\n"
+                                 "Do you want to save them?")
+                                  .arg(title),
                               QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
     if (btn == QMessageBox::Cancel)
         return false;
-    if (btn == QMessageBox::Yes) {
-        // 如果已有保存路径，直接保存；否则弹出另存为对话框
-        if (!projectPath.isEmpty()) {
-            CanvasItem *canvas = m_pView->canvasItem();
-            if (!canvas)
-                return false;
-            const QString &curPath = _activeTabState().projectPath;
-            ProjectFile::ProjectInfo info;
-            info.name = QFileInfo(curPath).completeBaseName();
-            info.version = QStringLiteral("1.0.0");
-            info.author = QStringLiteral("Caviar");
-            ProjectFile::CanvasInfo canvasInfo;
-            canvasInfo.width = canvas->canvasSize().width();
-            canvasInfo.height = canvas->canvasSize().height();
-            canvasInfo.dpi = canvas->ppi();
-            auto items = ::filterSelectableItems(m_pView->scene()->items());
-            ProjectFile pf;
-            if (!pf.save(curPath, info, canvasInfo, items)) {
-                QMessageBox::warning(this, tr("Save Project"),
-                                     tr("Failed to save:\n%1").arg(pf.lastError()));
-                return false;
+    if (btn == QMessageBox::No) {
+        // Discard all changes
+        for (int i = 0; i < _canvasCount(); ++i) {
+            auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+            if (page) {
+                m_tabStates[page].modified = false;
+                _updateCanvasDockTitle(page);
             }
-            _activeTabState().modified = false;
-            m_projectModified = false;
-        } else {
-            onSaveProject();
-            if (_activeTabState().modified)
-                return false; // 用户取消了保存
+        }
+        m_projectModified = false;
+        return true;
+    }
+    // Yes — save
+    if (m_projectPath.isEmpty()) {
+        // No saved path — prompt for location
+        QString savePath = QFileDialog::getSaveFileName(
+            this, tr("Save Project"), QString(), tr("AT Project Files (*.atp);;All Files (*)"));
+        if (savePath.isEmpty())
+            return false;
+        if (!savePath.endsWith(QLatin1String(".atp"), Qt::CaseInsensitive))
+            savePath.append(QLatin1String(".atp"));
+        m_projectPath = savePath;
+    }
+    // Synchronous save of all canvases
+    return _syncSaveAllCanvases();
+}
+
+// ============================================================
+// 关闭画布标签页警告
+// ============================================================
+bool MainWindow::_maybeCloseCanvas(QAtCanvasPage *page)
+{
+    if (!page || !page->scene())
+        return true;
+
+    // Check if canvas has any items (primitives or images)
+    auto items = ::filterSelectableItems(page->scene()->items());
+    if (items.isEmpty())
+        return true;
+
+    QMessageBox::StandardButton btn =
+        QMessageBox::warning(this, tr("Close Canvas"),
+                             tr("Closing this canvas will permanently lose all drawn\n"
+                                "primitives and image items on this canvas.\n\n"
+                                "They will not be recoverable.\n\n"
+                                "Continue?"),
+                             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    return btn == QMessageBox::Yes;
+}
+
+bool MainWindow::_syncSaveAllCanvases()
+{
+    if (_canvasCount() == 0 || m_projectPath.isEmpty())
+        return false;
+
+    ProjectFile::ProjectInfo projInfo;
+    QFileInfo fi(m_projectPath);
+    projInfo.name = fi.completeBaseName();
+    projInfo.version = QStringLiteral("2.0.0");
+    projInfo.author = QStringLiteral("ATHC");
+
+    auto bundles = _collectCanvasBundles();
+
+    // 原子保存: 先写临时文件，成功后再轮转备份 + 替换
+    {
+        const QString tmpPath = m_projectPath + QStringLiteral(".tmp");
+        ProjectFile pf;
+        if (!pf.saveMulti(tmpPath, projInfo, bundles)) {
+            QMessageBox::warning(this, tr("Save Project"),
+                                 tr("Failed to save:\n%1").arg(pf.lastError()));
+            QFile::remove(tmpPath);
+            return false;
+        }
+        // 只有写入临时文件成功后才轮转备份
+        ProjectDocument::rotateBackups(m_projectPath, 3);
+        QFile::remove(m_projectPath);
+        if (!QFile::rename(tmpPath, m_projectPath)) {
+            QMessageBox::warning(this, tr("Save Project"), tr("Failed to finalize save"));
+            QFile::remove(tmpPath);
+            return false;
         }
     }
+
+    m_projectModified = false;
+    for (int i = 0; i < _canvasCount(); ++i) {
+        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+        if (page) {
+            m_tabStates[page].modified = false;
+            _updateCanvasDockTitle(page);
+        }
+    }
+    setWindowTitle(tr("AT Drawing Tools - %1").arg(projInfo.name));
     return true;
 }
 
 void MainWindow::onNew()
 {
+    // Toolbar: 在当前工程中新建画布（不提示保存）
+    _addCanvasDock(tr("Canvas %1").arg(_canvasCount() + 1),
+                   QStringLiteral("canvas-%1").arg(_canvasCount() + 1));
+}
+
+void MainWindow::onNewProject()
+{
+    // Menubar: 新建工程文件 — 提示用户输入工程文件名称和位置
     if (!_maybeSaveProject())
         return;
 
+    QString path = QFileDialog::getSaveFileName(this, tr("New Project"), QString(),
+                                                tr("AT Project Files (*.atp);;All Files (*)"));
+    if (path.isEmpty())
+        return;
+    if (!path.endsWith(QLatin1String(".atp"), Qt::CaseInsensitive))
+        path.append(QLatin1String(".atp"));
+
+    // 关闭所有现有画布标签
+    if (_canvasCount() > 0) {
+        while (_canvasCount() > 0) {
+            auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(0));
+            if (page) {
+                page->disconnect(this);
+                if (m_statusBarDirector)
+                    page->disconnect(m_statusBarDirector);
+                AppContext::get().unregisterPage(page->pageId());
+                m_tabStates.remove(page);
+            }
+            _removeCanvasDockInternal(0);
+        }
+        m_pView = nullptr;
+        m_undoStack = nullptr;
+    }
+
+    m_projectPath = path;
+    m_projectModified = false;
+
+    QFileInfo fi(path);
+    setWindowTitle(tr("AT Drawing Tools - %1").arg(fi.completeBaseName()));
+
+    // 创建第一个画布
+    _addCanvasDock(fi.completeBaseName(), QStringLiteral("canvas-1"));
+}
+
+// 内部方法：创建画布标签页（共享逻辑）
+void MainWindow::_addCanvasDock(const QString &title, const QString &pageId)
+{
     static constexpr qreal kDefaultPpi = 150.0;
     qreal mmToPx = kDefaultPpi / 25.4;
 
@@ -1483,32 +1890,21 @@ void MainWindow::onNew()
     QSizeF sizeMM = dlg.selectedSizeMM();
     QSizeF canvasSize(std::ceil(sizeMM.width() * mmToPx), std::ceil(sizeMM.height() * mmToPx));
 
-    // P9: create a new canvas tab — QAtCanvasPage creates canvas internally
-    if (!m_tabWidget) return;
-    int n = m_tabWidget->count() + 1;
-    QString id = QStringLiteral("canvas-%1").arg(n);
-    auto *canvasPage = new QAtCanvasPage(id, canvasSize, kDefaultPpi, this);
+    auto *canvasPage = new QAtCanvasPage(pageId, canvasSize, kDefaultPpi, this);
     AppContext::get().registerPage(canvasPage);
-    m_tabWidget->addTab(canvasPage, canvasPage->title());
-    m_tabWidget->setCurrentWidget(canvasPage);
+    _addCanvasDockInternal(canvasPage, title);
+    _setCurrentCanvasPage(canvasPage);
 
-    m_currentProjectPath.clear();
-    m_projectModified = false;
-    // Persist to per-tab state
-    _activeTabState().projectPath.clear();
     _activeTabState().modified = false;
+    _updateCanvasDockTitle(canvasPage);
 
     m_pPropertyPanel->setItem(nullptr);
     m_resizeCanvasBtn->setVisible(true);
-    m_hRuler->setPpi(kDefaultPpi);
-    m_vRuler->setPpi(kDefaultPpi);
     m_pPropertyPanel->setDisplayPpi(kDefaultPpi);
 
     m_pProgressMgr->resetAll();
 
-    // PPI 变化后刷新刻度尺和状态栏
-    m_hRuler->updateRuler();
-    m_vRuler->updateRuler();
+    canvasPage->updateRulers();
     _updateCanvasLabel();
     _updatePosLabel(m_lastScenePos);
 }
@@ -1523,233 +1919,279 @@ void MainWindow::onOpenProject()
     if (path.isEmpty())
         return;
 
-    // ---- 阶段 1：主线程解析 XML（快速） ----
+    // ---- 阶段 1：主线程解析 XML（快速）— 支持多画布 ----
     ProjectFile pf;
-    ProjectFile::ProjectInfo info;
-    ProjectFile::CanvasInfo canvasInfo;
-    QList<DeserialTask> tasks;
+    ProjectFile::ProjectInfo projInfo;
+    QList<CanvasDeserialBundle> canvasBundles;
 
-    if (!pf.parseForDeserialize(path, info, canvasInfo, tasks)) {
+    if (!pf.parseMulti(path, projInfo, canvasBundles)) {
         QMessageBox::warning(this, tr("Open Project"),
                              tr("Failed to open project:\n%1").arg(pf.lastError()));
         return;
     }
 
-    qreal ppi = canvasInfo.dpi > 0 ? canvasInfo.dpi : 150.0;
-
-    // P9: Create a new canvas page for the loaded project
-    if (!m_tabWidget) return;
-    int n = m_tabWidget->count() + 1;
-    QString pageId = QStringLiteral("project-%1").arg(n);
-    auto *canvasPage = new QAtCanvasPage(pageId, this);
-    canvasPage->setCanvasSize(QSizeF(canvasInfo.width, canvasInfo.height));
-    if (auto *c = canvasPage->canvasItem()) {
-        c->setPpi(ppi);
-        if (canvasInfo.dpi > 0)
-            c->setCanvasDpi(canvasInfo.dpi, canvasInfo.dpi);
-    }
-    AppContext::get().registerPage(canvasPage);
-    m_tabWidget->addTab(canvasPage, info.name.isEmpty() ? canvasPage->title() : info.name);
-    m_tabWidget->setCurrentWidget(canvasPage);
-    // tab switch handler sets m_pView/m_undoStack via _bindViewConnections
-
-    if (tasks.isEmpty()) {
-        // Empty project — canvas already initialized
-        canvasPage->view()->setEnabled(true);
-        m_resizeCanvasBtn->setVisible(true);
-        m_hRuler->setPpi(ppi);
-        m_vRuler->setPpi(ppi);
-        m_pPropertyPanel->setDisplayPpi(ppi);
-        m_hRuler->updateRuler();
-        m_vRuler->updateRuler();
-        _updateCanvasLabel();
-        _updatePosLabel(m_lastScenePos);
-        m_currentProjectPath = path;
-        m_projectModified = false;
-        m_tabStates[canvasPage].projectPath = path;
-        m_tabStates[canvasPage].modified = false;
-        m_pProgressMgr->resetAll();
-        setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
+    if (canvasBundles.isEmpty()) {
+        QMessageBox::warning(this, tr("Open Project"), tr("Project contains no canvases."));
         return;
     }
 
-    // ---- 阶段 2：并发 Base64 解码（纯 CPU，不创建 QGraphicsItem） ----
-    const QString taskId = m_pProgressMgr->startTask(tr("Open Project"), tasks.size());
+    // 关闭所有现有画布标签
+    if (_canvasCount() > 0) {
+        while (_canvasCount() > 0) {
+            auto *oldPage = qobject_cast<QAtCanvasPage *>(_canvasPageAt(0));
+            if (oldPage) {
+                oldPage->disconnect(this);
+                if (m_statusBarDirector)
+                    oldPage->disconnect(m_statusBarDirector);
+                AppContext::get().unregisterPage(oldPage->pageId());
+                m_tabStates.remove(oldPage);
+            }
+            _removeCanvasDockInternal(0);
+        }
+        m_pView = nullptr;
+        m_undoStack = nullptr;
+    }
 
-    // Disable view during load
-    canvasPage->view()->setEnabled(false);
+    m_projectPath = path;
+    m_projectModified = false;
 
-    auto *watcher = new QFutureWatcher<DeserializedItem>(this);
+    // ---- 为每个画布创建标签页 ----
+    for (int ci = 0; ci < canvasBundles.size(); ++ci) {
+        auto &bundle = canvasBundles[ci];
+        qreal ppi = bundle.info.dpi > 0 ? bundle.info.dpi : 150.0;
 
-    connect(watcher, &QFutureWatcher<DeserializedItem>::progressValueChanged, this,
-            [this, taskId](int value) { m_pProgressMgr->updateTask(taskId, value); });
+        QString pageId = QStringLiteral("proj-%1-canvas-%2").arg(ci).arg(ci);
+        auto *canvasPage = new QAtCanvasPage(pageId, this);
+        canvasPage->setCanvasSize(QSizeF(bundle.info.width, bundle.info.height));
+        if (auto *c = canvasPage->canvasItem()) {
+            c->setPpi(ppi);
+            if (bundle.info.dpi > 0)
+                c->setCanvasDpi(bundle.info.dpi, bundle.info.dpi);
+        }
+        AppContext::get().registerPage(canvasPage);
+        m_tabStates[canvasPage].modified = false;
 
-    // Capture the new page for async callback
-    QPointer<QAtCanvasPage> pagePtr(canvasPage);
+        QString tabTitle = canvasBundles.size() == 1
+                               ? projInfo.name
+                               : tr("%1 — Canvas %2").arg(projInfo.name).arg(ci + 1);
+        _addCanvasDockInternal(canvasPage, tabTitle);
 
-    connect(watcher, &QFutureWatcher<DeserializedItem>::finished, this,
-            [this, watcher, taskId, info, ppi, path, pagePtr]() {
-                m_pProgressMgr->finishTask(taskId);
+        if (ci == 0)
+            _setCurrentCanvasPage(canvasPage);
 
-                if (!pagePtr) {
-                    watcher->deleteLater();
-                    return;
-                }
+        if (bundle.tasks.isEmpty()) {
+            // Empty canvas — already initialized
+            canvasPage->view()->setEnabled(true);
+            canvasPage->setRulerPpi(ppi);
+            canvasPage->updateRulers();
+            _updateCanvasDockTitle(canvasPage);
+            continue;
+        }
 
-                // Create QGraphicsItems on main thread
-                QList<QGraphicsItem *> loadedItems;
-                auto future = watcher->future();
-                for (int i = 0; i < future.resultCount(); ++i) {
-                    QGraphicsItem *item = createItemFromDeserialized(future.resultAt(i));
-                    if (item)
-                        loadedItems.append(item);
-                }
+        // ---- 并发 Base64 解码 ----
+        const QString taskId =
+            m_pProgressMgr->startTask(tr("Load %1").arg(tabTitle), bundle.tasks.size());
+        canvasPage->view()->setEnabled(false);
 
-                for (auto *item : loadedItems)
-                    pagePtr->scene()->addItem(item);
+        auto *watcher = new QFutureWatcher<DeserializedItem>(this);
+        QPointer<QAtCanvasPage> pagePtr(canvasPage);
 
-                pagePtr->view()->setEnabled(true);
-                m_resizeCanvasBtn->setVisible(true);
+        connect(watcher, &QFutureWatcher<DeserializedItem>::progressValueChanged, this,
+                [this, taskId](int v) { m_pProgressMgr->updateTask(taskId, v); });
 
-                m_hRuler->setPpi(ppi);
-                m_vRuler->setPpi(ppi);
-                m_pPropertyPanel->setDisplayPpi(ppi);
-                m_hRuler->updateRuler();
-                m_vRuler->updateRuler();
-                _updateCanvasLabel();
-                _updatePosLabel(m_lastScenePos);
+        connect(watcher, &QFutureWatcher<DeserializedItem>::finished, this,
+                [this, watcher, taskId, ppi, pagePtr]() {
+                    m_pProgressMgr->finishTask(taskId);
+                    if (!pagePtr) {
+                        watcher->deleteLater();
+                        return;
+                    }
 
-                m_currentProjectPath = path;
-                m_projectModified = false;
-                if (pagePtr) {
-                    m_tabStates[pagePtr].projectPath = path;
+                    QList<QGraphicsItem *> loadedItems;
+                    auto f = watcher->future();
+                    for (int j = 0; j < f.resultCount(); ++j) {
+                        auto *item = createItemFromDeserialized(f.resultAt(j));
+                        if (item)
+                            loadedItems.append(item);
+                    }
+                    for (auto *item : loadedItems)
+                        pagePtr->scene()->addItem(item);
+
+                    pagePtr->view()->setEnabled(true);
                     m_tabStates[pagePtr].modified = false;
-                }
-                setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
+                    _updateCanvasDockTitle(pagePtr);
 
-                // Background thumbnail cache refresh
-                refreshImageItemsFromCache(loadedItems);
+                    if (_currentCanvasPage() == pagePtr) {
+                        pagePtr->setRulerPpi(ppi);
+                        if (m_pPropertyPanel)
+                            m_pPropertyPanel->setDisplayPpi(ppi);
+                        pagePtr->updateRulers();
+                        _updateCanvasLabel();
+                        _updatePosLabel(m_lastScenePos);
+                    }
+                    refreshImageItemsFromCache(loadedItems);
+                    watcher->deleteLater();
+                });
 
-                watcher->deleteLater();
-            });
+        watcher->setFuture(QtConcurrent::mapped(bundle.tasks, deserializeItemWorker));
+    }
 
-    auto future = QtConcurrent::mapped(tasks, deserializeItemWorker);
-    watcher->setFuture(future);
+    m_pPropertyPanel->setDisplayPpi(
+        canvasBundles.first().info.dpi > 0 ? canvasBundles.first().info.dpi : 150.0);
+    m_pProgressMgr->resetAll();
+    setWindowTitle(tr("AT Drawing Tools - %1").arg(projInfo.name));
 }
 
 void MainWindow::onSaveProject()
 {
-    CanvasItem *canvas = m_pView->canvasItem();
-    if (!canvas) {
-        QMessageBox::warning(this, tr("Save Project"),
-                             tr("No canvas to save. Create a new canvas first."));
+    if (_canvasCount() == 0)
         return;
+
+    QString path = m_projectPath;
+    if (path.isEmpty()) {
+        path = QFileDialog::getSaveFileName(this, tr("Save Project"), QString(),
+                                            tr("AT Project Files (*.atp);;All Files (*)"));
+        if (path.isEmpty())
+            return;
+        if (!path.endsWith(QLatin1String(".atp"), Qt::CaseInsensitive))
+            path.append(QLatin1String(".atp"));
     }
 
-    QString path = QFileDialog::getSaveFileName(this, tr("Save Project"), QString(),
-                                                tr("AT Project Files (*.atp);;All Files (*)"));
-    if (path.isEmpty())
-        return;
-
-    // 确保后缀为 .atp
-    if (!path.endsWith(QLatin1String(".atp"), Qt::CaseInsensitive))
-        path.append(QLatin1String(".atp"));
-
-    ProjectFile::ProjectInfo info;
+    ProjectFile::ProjectInfo projInfo;
     QFileInfo fi(path);
-    info.name = fi.completeBaseName();
-    info.version = QStringLiteral("1.0.0");
-    info.author = QStringLiteral("ATHC");
+    projInfo.name = fi.completeBaseName();
+    projInfo.version = QStringLiteral("2.0.0");
+    projInfo.author = QStringLiteral("ATHC");
 
-    ProjectFile::CanvasInfo canvasInfo;
-    canvasInfo.width = canvas->canvasSize().width();
-    canvasInfo.height = canvas->canvasSize().height();
-    // 存储画布实际 DPI：锁定状态用 canvasDpiX，未锁定用 0
-    canvasInfo.dpi = canvas->isDpiLocked() ? canvas->canvasDpiX() : 0.0;
+    // ---- 采集所有画布的快照（主线程，线程安全） ----
+    struct CanvasSnapshot
+    {
+        QPointer<QAtCanvasPage> page;
+        CanvasInfo info;
+        QList<SerializeInput> inputs;
+    };
+    QList<CanvasSnapshot> snapshots;
 
-    auto items = ::filterSelectableItems(m_pView->scene()->items());
+    int totalItems = 0;
+    for (int i = 0; i < _canvasCount(); ++i) {
+        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+        if (!page)
+            continue;
+        auto *canvas = page->canvasItem();
+        if (!canvas)
+            continue;
 
-    // ---- 在主线程采集快照（线程安全），然后并发 Base64 编码 ----
-    QList<SerializeInput> inputs;
-    inputs.reserve(items.size());
-    for (auto *item : items) {
-        SerializeInput input;
-        auto *igi = dynamic_cast<IGraphicsItem *>(item);
-        input.itemType = igi ? static_cast<int>(igi->itemType()) : 0;
-        input.zValue = item->zValue();
-        input.posX = item->pos().x();
-        input.posY = item->pos().y();
-        input.rotation = item->rotation();
-        if (igi) {
-            QByteArray binary;
-            QDataStream out(&binary, QIODevice::WriteOnly);
-            out << static_cast<int>(igi->itemType());
-            igi->serialize(out);
-            input.binary = binary;
+        CanvasSnapshot snap;
+        snap.page = page;
+        snap.info.width = canvas->canvasSize().width();
+        snap.info.height = canvas->canvasSize().height();
+        snap.info.dpi = canvas->isDpiLocked() ? canvas->canvasDpiX() : 0.0;
 
-            // 采集 CMYK 数据（写入 XML 属性，用于 TIFF 导出精确颜色）
-            if (igi->hasPenCmyk()) {
-                input.cmyk.hasPen = true;
-                igi->penCmyk(input.cmyk.penC, input.cmyk.penM, input.cmyk.penY, input.cmyk.penK);
+        auto items = ::filterSelectableItems(page->scene()->items());
+        snap.inputs.reserve(items.size());
+        for (auto *item : items) {
+            SerializeInput input;
+            auto *igi = dynamic_cast<IGraphicsItem *>(item);
+            input.itemType = igi ? static_cast<int>(igi->itemType()) : 0;
+            input.zValue = item->zValue();
+            input.posX = item->pos().x();
+            input.posY = item->pos().y();
+            input.rotation = item->rotation();
+            if (igi) {
+                QByteArray binary;
+                QDataStream out(&binary, QIODevice::WriteOnly);
+                out << static_cast<int>(igi->itemType());
+                igi->serialize(out);
+                input.binary = binary;
+                if (igi->hasPenCmyk()) {
+                    input.cmyk.hasPen = true;
+                    igi->penCmyk(input.cmyk.penC, input.cmyk.penM, input.cmyk.penY,
+                                 input.cmyk.penK);
+                }
+                if (igi->hasBrushCmyk()) {
+                    input.cmyk.hasBrush = true;
+                    igi->brushCmyk(input.cmyk.brushC, input.cmyk.brushM, input.cmyk.brushY,
+                                   input.cmyk.brushK);
+                }
+                input.cmyk.gradient = igi->gradientStopCmykMap();
             }
-            if (igi->hasBrushCmyk()) {
-                input.cmyk.hasBrush = true;
-                igi->brushCmyk(input.cmyk.brushC, input.cmyk.brushM, input.cmyk.brushY,
-                               input.cmyk.brushK);
-            }
-            input.cmyk.gradient = igi->gradientStopCmykMap();
+            snap.inputs.append(input);
         }
-        inputs.append(input);
+        totalItems += snap.inputs.size();
+        snapshots.append(snap);
     }
 
-    // ---- 并发序列化（禁用视图防止用户在序列化期间修改图元） ----
-    const QString taskId = m_pProgressMgr->startTask(tr("Save Project"), inputs.size());
+    if (totalItems == 0 && m_projectPath.isEmpty()) {
+        QMessageBox::information(this, tr("Save Project"),
+                                 tr("All canvases are empty. Nothing to save."));
+        return;
+    }
 
-    m_pView->setEnabled(false);
+    // ---- 并发序列化所有画布的图元 ----
+    const QString taskId = m_pProgressMgr->startTask(tr("Save Project"), totalItems);
+
+    // Disable all views during save
+    for (auto &snap : snapshots) {
+        if (snap.page)
+            snap.page->view()->setEnabled(false);
+    }
 
     auto *watcher = new QFutureWatcher<SerializedItem>(this);
-
-    // Capture active page for per-tab state sync on async completion
-    QPointer<QAtCanvasPage> savePage(qobject_cast<QAtCanvasPage*>(
-        m_tabWidget ? m_tabWidget->currentWidget() : nullptr));
+    int snapCount = snapshots.size();
 
     connect(watcher, &QFutureWatcher<SerializedItem>::progressValueChanged, this,
-            [this, taskId](int value) { m_pProgressMgr->updateTask(taskId, value); });
+            [this, taskId](int v) { m_pProgressMgr->updateTask(taskId, v); });
 
     connect(watcher, &QFutureWatcher<SerializedItem>::finished, this,
-            [this, watcher, taskId, path, info, canvasInfo, savePage]() {
+            [this, watcher, taskId, path, projInfo, snapshots, snapCount]() {
                 m_pProgressMgr->finishTask(taskId);
 
-                // 收集序列化结果
-                QList<SerializedItem> results;
+                // Collect results per canvas
                 auto future = watcher->future();
-                for (int i = 0; i < future.resultCount(); ++i)
-                    results.append(future.resultAt(i));
+                QList<CanvasSaveBundle> bundles;
+                int offset = 0;
+                for (int i = 0; i < snapCount; ++i) {
+                    CanvasSaveBundle bundle;
+                    bundle.info = snapshots[i].info;
+                    for (int j = 0; j < snapshots[i].inputs.size(); ++j) {
+                        bundle.items.append(future.resultAt(offset + j));
+                    }
+                    bundles.append(bundle);
+                    offset += snapshots[i].inputs.size();
+                }
 
-                // 主线程组装 XML 并写入文件
                 ProjectFile pf;
-                if (!pf.saveFromSerialized(path, info, canvasInfo, results)) {
+                if (!pf.saveMulti(path, projInfo, bundles)) {
                     QMessageBox::warning(this, tr("Save Project"),
-                                         tr("Failed to save project:\n%1").arg(pf.lastError()));
-                    m_pView->setEnabled(true);
+                                         tr("Failed to save:\n%1").arg(pf.lastError()));
+                    for (auto &snap : snapshots) {
+                        if (snap.page)
+                            snap.page->view()->setEnabled(true);
+                    }
                     watcher->deleteLater();
                     return;
                 }
 
-                m_currentProjectPath = path;
+                m_projectPath = path;
                 m_projectModified = false;
-                if (savePage) {
-                    m_tabStates[savePage].projectPath = path;
-                    m_tabStates[savePage].modified = false;
+                for (auto &snap : snapshots) {
+                    if (snap.page) {
+                        m_tabStates[snap.page].modified = false;
+                        _updateCanvasDockTitle(snap.page);
+                        snap.page->view()->setEnabled(true);
+                    }
                 }
-                setWindowTitle(tr("AT Drawing Tools - %1").arg(info.name));
-
-                m_pView->setEnabled(true);
+                setWindowTitle(tr("AT Drawing Tools - %1").arg(projInfo.name));
                 watcher->deleteLater();
             });
 
-    auto future = QtConcurrent::mapped(inputs, serializeItemWorker);
-    watcher->setFuture(future);
+    // Flatten all inputs
+    QList<SerializeInput> allInputs;
+    for (auto &snap : snapshots)
+        allInputs.append(snap.inputs);
+
+    auto f = QtConcurrent::mapped(allInputs, serializeItemWorker);
+    watcher->setFuture(f);
 }
 
 void MainWindow::onImportImage()
@@ -1788,8 +2230,7 @@ void MainWindow::importSingleImage(const QStringList &paths)
     // Capture view/scene/undoStack before async operations (multi-canvas safe)
     QAtGraphicsView *view = m_pView;
     QUndoStack *undoStack = m_undoStack;
-    QPointer<QAtCanvasPage> page(qobject_cast<QAtCanvasPage*>(
-        m_tabWidget ? m_tabWidget->currentWidget() : nullptr));
+    QPointer<QAtCanvasPage> page(qobject_cast<QAtCanvasPage *>(_currentCanvasPage()));
 
     const QString taskId = m_pProgressMgr->startTask(tr("Import"), paths.size());
 
@@ -1803,7 +2244,8 @@ void MainWindow::importSingleImage(const QStringList &paths)
 
     connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt, this,
             [this, watcher, importedItems, runningY, view, undoStack, page](int index) {
-                if (!page) return;
+                if (!page)
+                    return;
                 auto result = watcher->resultAt(index);
                 if (result.isValid()) {
                     // 根据图片 DPI 与画布 PPI 计算场景像素尺寸，保持物理尺寸一致
@@ -1835,12 +2277,16 @@ void MainWindow::importSingleImage(const QStringList &paths)
 
     connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished, this,
             [this, watcher, taskId, importedItems, fitType, fitVal, view, undoStack, page]() {
-                if (!page) { watcher->deleteLater(); delete importedItems; return; }
+                if (!page) {
+                    watcher->deleteLater();
+                    delete importedItems;
+                    return;
+                }
                 m_pProgressMgr->finishTask(taskId);
                 watcher->deleteLater();
 
                 // 导入完成后刷新状态栏（仅当该页仍是活动页时）
-                if (m_tabWidget && m_tabWidget->currentWidget() == page) {
+                if (_currentCanvasPage() == page) {
                     _updateCanvasLabel();
                     _updatePosLabel(m_lastScenePos);
                 }
@@ -1900,10 +2346,10 @@ void MainWindow::importSingleImage(const QStringList &paths)
                                     oldPositions, newPositions, page->scene()));
                             }
 
-                            undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize,
-                                                                      page->scene()));
+                            undoStack->push(
+                                new CanvasResizeCommand(canvas, oldSize, newSize, page->scene()));
                             undoStack->endMacro();
-                            if (m_tabWidget && m_tabWidget->currentWidget() == page) {
+                            if (_currentCanvasPage() == page) {
                                 _updateCanvasLabel();
                                 view->fitToCanvas();
                             }
@@ -1942,8 +2388,7 @@ void MainWindow::importMultipleImages(const QStringList &paths)
     // Capture view/scene/undoStack before async operations (multi-canvas safe)
     QAtGraphicsView *view = m_pView;
     QUndoStack *undoStack = m_undoStack;
-    QPointer<QAtCanvasPage> page(qobject_cast<QAtCanvasPage*>(
-        m_tabWidget ? m_tabWidget->currentWidget() : nullptr));
+    QPointer<QAtCanvasPage> page(qobject_cast<QAtCanvasPage *>(_currentCanvasPage()));
 
     const QString taskId = m_pProgressMgr->startTask(tr("Import"), ordered.size());
 
@@ -1957,7 +2402,8 @@ void MainWindow::importMultipleImages(const QStringList &paths)
 
     connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::resultReadyAt, this,
             [this, watcher, importedItems, runningCoord, arr, view, undoStack, page](int index) {
-                if (!page) return;
+                if (!page)
+                    return;
                 auto result = watcher->resultAt(index);
                 if (result.isValid()) {
                     qreal canvasPpi = view->canvasItem()->ppi();
@@ -1992,11 +2438,15 @@ void MainWindow::importMultipleImages(const QStringList &paths)
 
     connect(watcher, &QFutureWatcher<ImageUtils::ImportWorkerResult>::finished, this,
             [this, watcher, taskId, importedItems, fitType, fitVal, view, undoStack, page]() {
-                if (!page) { watcher->deleteLater(); delete importedItems; return; }
+                if (!page) {
+                    watcher->deleteLater();
+                    delete importedItems;
+                    return;
+                }
                 m_pProgressMgr->finishTask(taskId);
                 watcher->deleteLater();
 
-                if (m_tabWidget && m_tabWidget->currentWidget() == page) {
+                if (_currentCanvasPage() == page) {
                     _updateCanvasLabel();
                     _updatePosLabel(m_lastScenePos);
                 }
@@ -2055,10 +2505,10 @@ void MainWindow::importMultipleImages(const QStringList &paths)
                                     oldPositions, newPositions, page->scene()));
                             }
 
-                            undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize,
-                                                                      page->scene()));
+                            undoStack->push(
+                                new CanvasResizeCommand(canvas, oldSize, newSize, page->scene()));
                             undoStack->endMacro();
-                            if (m_tabWidget && m_tabWidget->currentWidget() == page) {
+                            if (_currentCanvasPage() == page) {
                                 _updateCanvasLabel();
                                 view->fitToCanvas();
                             }
@@ -2150,11 +2600,11 @@ void MainWindow::onExportImage()
                 }
             }
 
-            m_hRuler->setPpi(static_cast<qreal>(dpiOverride));
-            m_vRuler->setPpi(static_cast<qreal>(dpiOverride));
+            if (auto *page = qobject_cast<QAtCanvasPage *>(_currentCanvasPage()))
+                page->setRulerPpi(static_cast<qreal>(dpiOverride));
             m_pPropertyPanel->setDisplayPpi(static_cast<qreal>(dpiOverride));
-            m_hRuler->updateRuler();
-            m_vRuler->updateRuler();
+            if (auto *page = qobject_cast<QAtCanvasPage *>(_currentCanvasPage()))
+                page->updateRulers();
             _updateCanvasLabel();
         }
     }
@@ -2364,178 +2814,6 @@ void MainWindow::exportWithEngine(const QString &json, const QString &outputPath
 }
 
 // ============================================================
-// 撤销/重做
-// ============================================================
-void MainWindow::onUndo()
-{
-    if (m_undoStack) m_undoStack->undo();
-}
-void MainWindow::onRedo()
-{
-    if (m_undoStack) m_undoStack->redo();
-}
-
-// ============================================================
-// 剪贴板操作
-// ============================================================
-void MainWindow::onCut()
-{
-    auto items = m_pView->scene()->selectedItems();
-    if (items.isEmpty())
-        return;
-
-    // 使用 macro 将 Copy+Delete 合并为单步撤销
-    m_undoStack->beginMacro(tr("Cut"));
-    onCopy();
-    onDelete();
-    m_undoStack->endMacro();
-}
-
-void MainWindow::onCopy()
-{
-    auto items = m_pView->scene()->selectedItems();
-    if (items.isEmpty())
-        return;
-    copyItemsToClipboard(items);
-}
-
-void MainWindow::onPaste()
-{
-    auto items = pasteItemsFromClipboard();
-    if (items.isEmpty())
-        return;
-
-    // 偏移粘贴位置
-    for (auto *item : items)
-        item->moveBy(20, 20);
-
-    m_undoStack->push(new PasteItemsCommand(m_pView->scene(), items));
-
-    // 选中粘贴的项
-    m_pView->scene()->clearSelection();
-    for (auto *item : items)
-        item->setSelected(true);
-
-    // 标记为粘贴图元（用于区分选中框样式）
-    m_pView->setPastedItems(items);
-}
-
-void MainWindow::onDelete()
-{
-    auto items = m_pView->scene()->selectedItems();
-    if (items.isEmpty())
-        return;
-
-    auto deletable = ::filterSelectableItems(items);
-    if (deletable.isEmpty())
-        return;
-
-    m_undoStack->push(new RemoveItemsCommand(m_pView->scene(), deletable));
-}
-
-void MainWindow::onSelectAll()
-{
-    auto items = m_pView->scene()->items();
-    auto selectable = ::filterSelectableItems(items);
-    for (auto *item : selectable)
-        item->setSelected(true);
-}
-
-// ============================================================
-// Z 序操作
-// ============================================================
-void MainWindow::onBringToFront()
-{
-    auto items = m_pView->scene()->selectedItems();
-    if (items.isEmpty())
-        return;
-
-    QList<qreal> oldZ, newZ;
-    for (auto *item : items) {
-        oldZ << item->zValue();
-        newZ << item->zValue() + 1.0;
-    }
-    m_undoStack->push(new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
-}
-
-void MainWindow::onSendToBack()
-{
-    auto items = m_pView->scene()->selectedItems();
-    if (items.isEmpty())
-        return;
-
-    QList<qreal> oldZ, newZ;
-    for (auto *item : items) {
-        oldZ << item->zValue();
-        newZ << item->zValue() - 1.0;
-    }
-    m_undoStack->push(new ZValueChangeCommand(items, oldZ, newZ, m_pView->scene()));
-}
-
-// ============================================================
-// 成组 / 解散组
-// ============================================================
-void MainWindow::onGroup()
-{
-    auto items = filterSelectableItems();
-    if (items.size() < 2)
-        return;
-
-    // 过滤掉已经是组成员的图元（已在某个 GraphicsItemGroup 内的跳过）
-    QList<QGraphicsItem *> topLevel;
-    for (auto *item : items) {
-        if (!item->parentItem())
-            topLevel << item;
-    }
-    if (topLevel.size() < 2)
-        return;
-
-    auto *cmd = new GroupItemsCommand(m_pView->scene(), topLevel);
-    m_undoStack->push(cmd);
-
-    // 选中新组
-    m_pView->scene()->clearSelection();
-    if (cmd->groupItem())
-        cmd->groupItem()->setSelected(true);
-}
-
-void MainWindow::onUngroup()
-{
-    auto items = filterSelectableItems();
-    if (items.isEmpty())
-        return;
-
-    // 找出所有选中的 GraphicsItemGroup，并提前收集子图元
-    QList<QGraphicsItem *> groupsToUngroup;
-    QList<QGraphicsItem *> childrenToSelect;
-
-    for (auto *item : items) {
-        auto *grp = qgraphicsitem_cast<GraphicsItemGroup *>(item);
-        if (grp) {
-            groupsToUngroup << item;
-            childrenToSelect << grp->childGraphicsItems();
-        }
-    }
-    if (groupsToUngroup.isEmpty())
-        return;
-
-    m_undoStack->beginMacro(tr("Ungroup"));
-
-    for (auto *groupItem : groupsToUngroup) {
-        m_undoStack->push(new UngroupItemsCommand(m_pView->scene(), groupItem));
-    }
-
-    m_undoStack->endMacro();
-
-    // 选中解散后的子图元
-    m_pView->scene()->clearSelection();
-    for (auto *child : childrenToSelect) {
-        if (child && child->scene())
-            child->setSelected(true);
-    }
-}
-
-// ============================================================
 // 对齐与分布面板
 // ============================================================
 void MainWindow::onAlignLayoutDialog()
@@ -2650,21 +2928,6 @@ void MainWindow::onDistributeH()
 void MainWindow::onDistributeV()
 {
     applyDistribute(AlignmentUtils::DistributeV);
-}
-
-// ============================================================
-// 工具切换
-// ============================================================
-void MainWindow::onToolTriggered(Tool tool)
-{
-    m_currentTool = tool;
-    m_pView->setTool(tool);
-
-    // 更新工具栏按钮状态
-    for (auto it = m_toolActions.begin(); it != m_toolActions.end(); ++it)
-        it.value()->setChecked(it.key() == tool);
-
-    _updateToolLabel();
 }
 
 // ============================================================
@@ -2884,8 +3147,8 @@ void MainWindow::onResizeCanvas()
 
     m_undoStack->push(new CanvasResizeCommand(canvas, oldSize, newSize, m_pView->scene()));
 
-    m_hRuler->updateRuler();
-    m_vRuler->updateRuler();
+    if (auto *page = qobject_cast<QAtCanvasPage *>(_currentCanvasPage()))
+        page->updateRulers();
     _updateCanvasLabel();
     _updatePosLabel(m_lastScenePos);
     m_pView->fitToCanvas();
@@ -2974,152 +3237,41 @@ void MainWindow::rotateSelectedItems(qreal angleDelta)
     m_pView->scheduleResizeHandleUpdate();
 }
 
-// ============================================================
-// 剪贴板序列化
-// ============================================================
 QList<QGraphicsItem *> MainWindow::filterSelectableItems() const
 {
     return ::filterSelectableItems(m_pView->scene()->selectedItems());
 }
 
-void MainWindow::copyItemsToClipboard(const QList<QGraphicsItem *> &items)
-{
-    QByteArray data;
-    QDataStream out(&data, QIODevice::WriteOnly);
-
-    // 写入序列化版本号
-    out << IGraphicsItem::kSerializationVersion;
-
-    auto filtered = ::filterSelectableItems(items);
-    int count = 0;
-    for (auto *item : filtered) {
-        if (dynamic_cast<IGraphicsItem *>(item))
-            count++;
-    }
-
-    out << count;
-    for (auto *item : filtered) {
-        auto *gi = dynamic_cast<IGraphicsItem *>(item);
-        if (!gi)
-            continue;
-        // 序列化到独立缓冲区，写入长度前缀（支持 CMYK 扩展数据）
-        QByteArray itemBinary = serializeItemToBytes(gi);
-        out << static_cast<quint32>(itemBinary.size());
-        out.writeRawData(itemBinary.constData(), itemBinary.size());
-    }
-
-    auto *mime = new QMimeData;
-    mime->setData(kMimeFormat, data);
-    QApplication::clipboard()->setMimeData(mime);
-}
-
-QList<QGraphicsItem *> MainWindow::pasteItemsFromClipboard()
-{
-    QList<QGraphicsItem *> result;
-    const QMimeData *mime = QApplication::clipboard()->mimeData();
-    if (!mime || !mime->hasFormat(kMimeFormat))
-        return result;
-
-    QByteArray data = mime->data(kMimeFormat);
-    QDataStream in(&data, QIODevice::ReadOnly);
-
-    // 读取并校验序列化版本号
-    int version = 0;
-    in >> version;
-    if (version < 1 || version > IGraphicsItem::kSerializationVersion) {
-        qWarning("Unsupported clipboard format version: %d (current: %d)", version,
-                 IGraphicsItem::kSerializationVersion);
-        return result;
-    }
-
-    int count = 0;
-    in >> count;
-    for (int i = 0; i < count; ++i) {
-        if (version >= 2) {
-            // v2+: 长度前缀格式，每个图元数据独立
-            quint32 dataLen = 0;
-            in >> dataLen;
-            if (in.status() != QDataStream::Ok || dataLen == 0) {
-                qWarning("Clipboard: invalid item data length at index %d", i);
-                break;
-            }
-            QByteArray itemData(dataLen, '\0');
-            in.readRawData(itemData.data(), dataLen);
-            if (in.status() != QDataStream::Ok) {
-                qWarning("Clipboard: failed to read item data at index %d", i);
-                break;
-            }
-            QDataStream itemIn(&itemData, QIODevice::ReadOnly);
-            int typeInt = 0;
-            itemIn >> typeInt;
-            auto *gi = createItemByType(static_cast<IGraphicsItem::ItemType>(typeInt));
-            if (!gi) {
-                qWarning("Clipboard: unknown item type %d at index %d", typeInt, i);
-                continue;
-            }
-            if (!gi->deserialize(itemIn)) {
-                qWarning("Clipboard: failed to deserialize item type %d at index %d", typeInt, i);
-                delete gi;
-                continue;
-            }
-            result << dynamic_cast<QGraphicsItem *>(gi);
-        } else {
-            // v1: 旧格式，直接从流中读取
-            int typeInt = 0;
-            in >> typeInt;
-            auto *gi = createItemByType(static_cast<IGraphicsItem::ItemType>(typeInt));
-            if (!gi) {
-                qWarning("Clipboard: unknown item type %d at index %d", typeInt, i);
-                continue;
-            }
-            if (!gi->deserialize(in)) {
-                qWarning("Clipboard: failed to deserialize item type %d "
-                         "(stream corrupted)",
-                         typeInt);
-                delete gi;
-                continue;
-            }
-            result << dynamic_cast<QGraphicsItem *>(gi);
-        }
-    }
-    return result;
-}
-
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
-    // 快捷键切换工具
-    switch (event->key()) {
-    case Qt::Key_V:
-        if (!event->modifiers())
-            onToolTriggered(Tool::Select);
-        return;
-    case Qt::Key_R:
-        if (!event->modifiers())
-            onToolTriggered(Tool::Rect);
-        return;
-    case Qt::Key_E:
-        if (!event->modifiers())
-            onToolTriggered(Tool::Ellipse);
-        return;
-    case Qt::Key_L:
-        if (!event->modifiers())
-            onToolTriggered(Tool::Line);
-        return;
-    case Qt::Key_C:
-        if (!event->modifiers())
-            onToolTriggered(Tool::BezierCurve);
-        return;
-    case Qt::Key_F:
-        if (!event->modifiers())
-            onToolTriggered(Tool::Freehand);
-        return;
-    case Qt::Key_T:
-        if (!event->modifiers())
-            onToolTriggered(Tool::Text);
-        return;
-    case Qt::Key_Delete:
-        onDelete();
-        return;
+    // 快捷键切换工具 (single key, no modifiers)
+    // Tool → token mapping for trigger via AppContext
+    static const QMap<int, QString> keyToToken = {
+        { Qt::Key_V, QStringLiteral("SelectTool") },
+        { Qt::Key_R, QStringLiteral("RectTool") },
+        { Qt::Key_E, QStringLiteral("EllipseTool") },
+        { Qt::Key_L, QStringLiteral("LineTool") },
+        { Qt::Key_C, QStringLiteral("BezierCurveTool") },
+        { Qt::Key_F, QStringLiteral("FreehandTool") },
+        { Qt::Key_T, QStringLiteral("TextTool") },
+    };
+    if (!event->modifiers()) {
+        auto it = keyToToken.find(event->key());
+        if (it != keyToToken.end()) {
+            QAction *act = AppContext::get().getQAction(it.value());
+            if (act) {
+                act->trigger();
+                return;
+            }
+        }
+    }
+    // Delete key — trigger via AppContext action
+    if (event->key() == Qt::Key_Delete) {
+        QAction *act = AppContext::get().getQAction(QStringLiteral("Delete"));
+        if (act) {
+            act->trigger();
+            return;
+        }
     }
     QMainWindow::keyPressEvent(event);
 }
@@ -3159,14 +3311,12 @@ void MainWindow::loadWindowState()
     // 恢复其他设置
     // If session was loaded, per-tab grid state is already set; only apply
     // QSettings grid if no session tabs were restored.
-    if (m_tabWidget->count() == 0 && settings.contains("view/gridVisible")) {
+    if (_canvasCount() == 0 && settings.contains("view/gridVisible")) {
         bool gridVisible = settings.value("view/gridVisible").toBool();
         if (m_pView) {
             m_pView->setGridVisible(gridVisible);
         }
-        if (m_gridAction) {
-            m_gridAction->setChecked(gridVisible);
-        }
+        AppContext::get().refreshAllActions();
     }
 }
 
@@ -3195,20 +3345,33 @@ void MainWindow::saveWindowState()
         settings.setValue("toolbar/AlignToolBar_visible", alignToolBar->isVisible());
     }
 
-    // 保存其他设置
-    if (m_pView) {
-        settings.setValue("view/gridVisible", m_pView->isGridVisible());
-    }
-
-    settings.sync();
+    // QSettings 析构时自动 flush，无需显式 sync()
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    // 保存完整会话状态（标签页/工具/项目）
+    // 1. 收集序列化数据（只做一次，quit snapshot 和 session 共用）
+    auto bundles = _collectCanvasBundles();
+
+    // 2. 构建完整会话信息
+    SessionInfo si;
+    si.version = 2;
+    si.projectPath = m_projectPath;
+    si.activeTabIndex = qMax(0, _currentCanvasIndex());
+    si.currentTool = m_currentTool;
+    si.ripEnabled = m_ripEnabled;
+    si.ripXRes = m_ripXRes;
+    si.ripYRes = m_ripYRes;
+    si.alignHSpacing = AlignWidget::hSpacing();
+    si.alignVSpacing = AlignWidget::vSpacing();
+
+    // 3. 保存退出快照 (Level 3: 崩溃恢复兜底)
+    RecoveryManager::instance().saveQuitSnapshot(bundles, m_projectPath, si);
+
+    // 4. 保存完整会话状态（标签页/工具/项目）
     saveSession();
 
-    // 保存窗口状态
+    // 5. 保存窗口状态
     saveWindowState();
 
     // 断开 view 信号，防止析构期间信号触发访问半销毁状态的对象

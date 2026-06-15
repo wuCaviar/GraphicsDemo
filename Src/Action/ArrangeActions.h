@@ -7,6 +7,7 @@ class BringToFrontAction : public QAtArrangeActionBase
 {
 public:
     BringToFrontAction() { m_strActionToken = QStringLiteral("BringToFront"); }
+    QIcon _icon() override;
     QString _text() override;
     QKeySequence _shortcut() const override;
     void _execute() override;
@@ -16,6 +17,7 @@ class SendToBackAction : public QAtArrangeActionBase
 {
 public:
     SendToBackAction() { m_strActionToken = QStringLiteral("SendToBack"); }
+    QIcon _icon() override;
     QString _text() override;
     QKeySequence _shortcut() const override;
     void _execute() override;
@@ -25,6 +27,7 @@ class GroupAction : public QAtArrangeActionBase
 {
 public:
     GroupAction() { m_strActionToken = QStringLiteral("Group"); }
+    QIcon _icon() override;
     QString _text() override;
     QKeySequence _shortcut() const override;
     void _execute() override;
@@ -34,6 +37,7 @@ class UngroupAction : public QAtArrangeActionBase
 {
 public:
     UngroupAction() { m_strActionToken = QStringLiteral("Ungroup"); }
+    QIcon _icon() override;
     QString _text() override;
     QKeySequence _shortcut() const override;
     void _execute() override;
@@ -43,6 +47,7 @@ class FitCanvasToItemsAction : public QAtArrangeActionBase
 {
 public:
     FitCanvasToItemsAction() { m_strActionToken = QStringLiteral("FitCanvasToItems"); }
+    QIcon _icon() override;
     QString _text() override;
     void _execute() override;
 };

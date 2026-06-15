@@ -34,7 +34,7 @@ HEADERS += \
     UI/ResizeCanvasDialog.h \
     UI/RulerBar.h \
     UI/GradientDialog.h \
-    UI/AlignLayoutDialog.h \
+    UI/AlignWidget.h \
     UI/AutoLayoutDialog.h \
     UI/AdvancedLayoutDialog.h \
     UI/SettingsDialog.h \
@@ -90,6 +90,8 @@ HEADERS += \
     Core/PageManager.h \
     Core/ThemeService.h \
     Core/ClipboardService.h \
+    Core/ProjectDocument.h \
+    Core/RecoveryManager.h \
     Service/ProgressService.h \
     Service/NetworkService.h \
     Service/ProcessService.h \
@@ -120,7 +122,7 @@ SOURCES += \
     UI/ResizeCanvasDialog.cpp \
     UI/RulerBar.cpp \
     UI/GradientDialog.cpp \
-    UI/AlignLayoutDialog.cpp \
+    UI/AlignWidget.cpp \
     UI/AutoLayoutDialog.cpp \
     UI/AdvancedLayoutDialog.cpp \
     UI/SettingsDialog.cpp \
@@ -169,6 +171,8 @@ SOURCES += \
     Core/PageManager.cpp \
     Core/ThemeService.cpp \
     Core/ClipboardService.cpp \
+    Core/ProjectDocument.cpp \
+    Core/RecoveryManager.cpp \
     Page/QAtCanvasPage.cpp \
     Page/QAtDataTablePage.cpp \
     Service/ProgressService.cpp \

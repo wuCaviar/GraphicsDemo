@@ -21,146 +21,146 @@
     </message>
 </context>
 <context>
-    <name>AlignLayoutDialog</name>
+    <name>AlignWidget</name>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="48"/>
+        <location filename="../UI/AlignWidget.cpp" line="48"/>
         <source>Align &amp; Distribute</source>
         <translation>对齐与分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="67"/>
+        <location filename="../UI/AlignWidget.cpp" line="67"/>
         <source>Horizontal</source>
         <translation>水平</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="75"/>
+        <location filename="../UI/AlignWidget.cpp" line="75"/>
         <source>Align left edges</source>
         <translation>左边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="77"/>
+        <location filename="../UI/AlignWidget.cpp" line="77"/>
         <source>Align horizontal centers</source>
         <translation>水平居中对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="79"/>
+        <location filename="../UI/AlignWidget.cpp" line="79"/>
         <source>Align right edges</source>
         <translation>右边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="82"/>
+        <location filename="../UI/AlignWidget.cpp" line="82"/>
         <source>Stretch to same width, align left &amp; right</source>
         <translation>拉伸至同宽，左右对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="85"/>
+        <location filename="../UI/AlignWidget.cpp" line="85"/>
         <source>Stretch horizontally, scale proportionally</source>
         <translation>水平拉伸，等比缩放</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="97"/>
+        <location filename="../UI/AlignWidget.cpp" line="97"/>
         <source>Left edges equally spaced</source>
         <translation>左边缘等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="99"/>
+        <location filename="../UI/AlignWidget.cpp" line="99"/>
         <source>Horizontal centers equally spaced</source>
         <translation>水平中心等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="100"/>
+        <location filename="../UI/AlignWidget.cpp" line="100"/>
         <source>Right edges equally spaced</source>
         <translation>右边缘等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="103"/>
+        <location filename="../UI/AlignWidget.cpp" line="103"/>
         <source>Equal horizontal gaps</source>
         <translation>水平等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="105"/>
+        <location filename="../UI/AlignWidget.cpp" line="105"/>
         <source>Custom horizontal gap spacing</source>
         <translation>自定义水平间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="122"/>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="185"/>
+        <location filename="../UI/AlignWidget.cpp" line="122"/>
+        <location filename="../UI/AlignWidget.cpp" line="185"/>
         <source>Gap:</source>
         <translation>间距:</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="121"/>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="184"/>
+        <location filename="../UI/AlignWidget.cpp" line="121"/>
+        <location filename="../UI/AlignWidget.cpp" line="184"/>
         <source>Gap value for Custom Gap distribution</source>
         <translation>自定义间距分布的值</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="130"/>
+        <location filename="../UI/AlignWidget.cpp" line="130"/>
         <source>Vertical</source>
         <translation>垂直</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="137"/>
+        <location filename="../UI/AlignWidget.cpp" line="137"/>
         <source>Align top edges</source>
         <translation>顶部边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="139"/>
+        <location filename="../UI/AlignWidget.cpp" line="139"/>
         <source>Align vertical centers</source>
         <translation>垂直居中对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="141"/>
+        <location filename="../UI/AlignWidget.cpp" line="141"/>
         <source>Align bottom edges</source>
         <translation>底部边缘对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="144"/>
+        <location filename="../UI/AlignWidget.cpp" line="144"/>
         <source>Stretch to same height, align top &amp; bottom</source>
         <translation>拉伸至同高，上下对齐</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="147"/>
+        <location filename="../UI/AlignWidget.cpp" line="147"/>
         <source>Stretch vertically, scale proportionally</source>
         <translation>垂直拉伸，等比缩放</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="159"/>
+        <location filename="../UI/AlignWidget.cpp" line="159"/>
         <source>Top edges equally spaced</source>
         <translation>顶部边缘等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="161"/>
+        <location filename="../UI/AlignWidget.cpp" line="161"/>
         <source>Vertical centers equally spaced</source>
         <translation>垂直中心等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="163"/>
+        <location filename="../UI/AlignWidget.cpp" line="163"/>
         <source>Bottom edges equally spaced</source>
         <translation>底部边缘等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="165"/>
+        <location filename="../UI/AlignWidget.cpp" line="165"/>
         <source>Equal vertical gaps</source>
         <translation>垂直等间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="167"/>
+        <location filename="../UI/AlignWidget.cpp" line="167"/>
         <source>Custom vertical gap spacing</source>
         <translation>自定义垂直间距分布</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="193"/>
+        <location filename="../UI/AlignWidget.cpp" line="193"/>
         <source>Page</source>
         <translation>页面</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="198"/>
+        <location filename="../UI/AlignWidget.cpp" line="198"/>
         <source>Center horizontally on canvas</source>
         <translation>在画布上水平居中</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="200"/>
+        <location filename="../UI/AlignWidget.cpp" line="200"/>
         <source>Center vertically on canvas</source>
         <translation>在画布上垂直居中</translation>
     </message>
@@ -169,12 +169,12 @@
         <translation type="vanished"> px</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="208"/>
+        <location filename="../UI/AlignWidget.cpp" line="208"/>
         <source>Selected: 0 items</source>
         <translation>已选中: 0 个图元</translation>
     </message>
     <message>
-        <location filename="../UI/AlignLayoutDialog.cpp" line="287"/>
+        <location filename="../UI/AlignWidget.cpp" line="287"/>
         <source>Selected: %1 item(s)</source>
         <translation>已选中: %1 个图元</translation>
     </message>

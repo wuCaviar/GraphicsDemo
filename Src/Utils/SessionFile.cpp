@@ -11,10 +11,8 @@
 
 // ======================== Tool serialization ========================
 
-static const char *kToolNames[] = {
-    "Select", "Hand", "Rect", "Ellipse",
-    "Line", "BezierCurve", "Freehand", "Text", "Image"
-};
+static const char *kToolNames[] = { "Select",      "Hand",     "Rect", "Ellipse", "Line",
+                                    "BezierCurve", "Freehand", "Text", "Image" };
 
 QString SessionInfo::toolToString(Tool t)
 {
@@ -38,26 +36,25 @@ Tool SessionInfo::toolFromString(const QString &s)
 static QJsonObject tabToJson(const SessionTabInfo &tab)
 {
     QJsonObject o;
-    o["projectPath"]    = tab.projectPath;
-    o["modified"]       = tab.modified;
-    o["canvasWidthPx"]  = tab.canvasWidthPx;
+    o["modified"] = tab.modified;
+    o["canvasWidthPx"] = tab.canvasWidthPx;
     o["canvasHeightPx"] = tab.canvasHeightPx;
-    o["ppi"]            = tab.ppi;
-    o["zoomLevel"]      = tab.zoomLevel;
-    o["gridVisible"]    = tab.gridVisible;
+    o["ppi"] = tab.ppi;
+    o["zoomLevel"] = tab.zoomLevel;
+    o["gridVisible"] = tab.gridVisible;
     return o;
 }
 
 static SessionTabInfo tabFromJson(const QJsonObject &o)
 {
     SessionTabInfo tab;
-    tab.projectPath    = o.value("projectPath").toString();
-    tab.modified       = o.value("modified").toBool(false);
-    tab.canvasWidthPx  = o.value("canvasWidthPx").toDouble(0);
+    // v1 backward compat: projectPath was per-tab (now ignored — read from top-level)
+    tab.modified = o.value("modified").toBool(false);
+    tab.canvasWidthPx = o.value("canvasWidthPx").toDouble(0);
     tab.canvasHeightPx = o.value("canvasHeightPx").toDouble(0);
-    tab.ppi            = o.value("ppi").toDouble(150.0);
-    tab.zoomLevel      = o.value("zoomLevel").toDouble(1.0);
-    tab.gridVisible    = o.value("gridVisible").toBool(true);
+    tab.ppi = o.value("ppi").toDouble(150.0);
+    tab.zoomLevel = o.value("zoomLevel").toDouble(1.0);
+    tab.gridVisible = o.value("gridVisible").toBool(true);
     return tab;
 }
 
@@ -66,14 +63,15 @@ static SessionTabInfo tabFromJson(const QJsonObject &o)
 QJsonObject SessionInfo::toJson() const
 {
     QJsonObject o;
-    o["version"]        = version;
+    o["version"] = version;
+    o["projectPath"] = projectPath;
     o["activeTabIndex"] = activeTabIndex;
-    o["currentTool"]    = toolToString(currentTool);
-    o["ripEnabled"]     = ripEnabled;
-    o["ripXRes"]        = ripXRes;
-    o["ripYRes"]        = ripYRes;
-    o["alignHSpacing"]  = alignHSpacing;
-    o["alignVSpacing"]  = alignVSpacing;
+    o["currentTool"] = toolToString(currentTool);
+    o["ripEnabled"] = ripEnabled;
+    o["ripXRes"] = ripXRes;
+    o["ripYRes"] = ripYRes;
+    o["alignHSpacing"] = alignHSpacing;
+    o["alignVSpacing"] = alignVSpacing;
 
     QJsonArray arr;
     for (const auto &tab : tabs)
@@ -86,18 +84,26 @@ QJsonObject SessionInfo::toJson() const
 SessionInfo SessionInfo::fromJson(const QJsonObject &o)
 {
     SessionInfo info;
-    info.version        = o.value("version").toInt(1);
+    info.version = o.value("version").toInt(1);
+    info.projectPath = o.value("projectPath").toString();
     info.activeTabIndex = o.value("activeTabIndex").toInt(0);
-    info.currentTool    = toolFromString(o.value("currentTool").toString());
-    info.ripEnabled     = o.value("ripEnabled").toBool(false);
-    info.ripXRes        = o.value("ripXRes").toInt(0);
-    info.ripYRes        = o.value("ripYRes").toInt(0);
-    info.alignHSpacing  = o.value("alignHSpacing").toDouble(0.0);
-    info.alignVSpacing  = o.value("alignVSpacing").toDouble(0.0);
+    info.currentTool = toolFromString(o.value("currentTool").toString());
+    info.ripEnabled = o.value("ripEnabled").toBool(false);
+    info.ripXRes = o.value("ripXRes").toInt(0);
+    info.ripYRes = o.value("ripYRes").toInt(0);
+    info.alignHSpacing = o.value("alignHSpacing").toDouble(0.0);
+    info.alignVSpacing = o.value("alignVSpacing").toDouble(0.0);
 
     const QJsonArray arr = o.value("tabs").toArray();
     for (const auto &v : arr)
         info.tabs.append(tabFromJson(v.toObject()));
+
+    // v1 backward compat: if tabs have per-tab projectPath, use first tab's
+    if (info.projectPath.isEmpty() && !info.tabs.isEmpty()) {
+        const QJsonArray arrV1 = o.value("tabs").toArray();
+        if (!arrV1.isEmpty())
+            info.projectPath = arrV1.first().toObject().value("projectPath").toString();
+    }
 
     return info;
 }
@@ -130,7 +136,8 @@ bool SessionFile::save(const SessionInfo &info, QString *errorOut)
 
     QFile tmpFile(tmpPath);
     if (!tmpFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        if (errorOut) *errorOut = tmpFile.errorString();
+        if (errorOut)
+            *errorOut = tmpFile.errorString();
         return false;
     }
 
@@ -141,7 +148,8 @@ bool SessionFile::save(const SessionInfo &info, QString *errorOut)
     QFile::remove(path);
 
     if (!tmpFile.rename(path)) {
-        if (errorOut) *errorOut = tmpFile.errorString();
+        if (errorOut)
+            *errorOut = tmpFile.errorString();
         QFile::remove(tmpPath);
         return false;
     }
@@ -154,15 +162,18 @@ SessionInfo SessionFile::load(bool *okOut, QString *errorOut)
     const QString path = sessionFilePath();
 
     if (!QFile::exists(path)) {
-        if (okOut) *okOut = true;
+        if (okOut)
+            *okOut = true;
         // No session file — return empty (this is the normal first-run case)
         return SessionInfo();
     }
 
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        if (errorOut) *errorOut = file.errorString();
-        if (okOut) *okOut = false;
+        if (errorOut)
+            *errorOut = file.errorString();
+        if (okOut)
+            *okOut = false;
         return SessionInfo();
     }
 
@@ -171,13 +182,16 @@ SessionInfo SessionFile::load(bool *okOut, QString *errorOut)
     file.close();
 
     if (parseError.error != QJsonParseError::NoError) {
-        if (errorOut) *errorOut = parseError.errorString();
-        if (okOut) *okOut = false;
+        if (errorOut)
+            *errorOut = parseError.errorString();
+        if (okOut)
+            *okOut = false;
         return SessionInfo();
     }
 
     SessionInfo info = SessionInfo::fromJson(doc);
-    if (okOut) *okOut = true;
+    if (okOut)
+        *okOut = true;
     return info;
 }
 
@@ -188,7 +202,8 @@ bool SessionFile::remove(QString *errorOut)
         return true;
 
     if (!QFile::remove(path)) {
-        if (errorOut) *errorOut = QStringLiteral("Failed to remove %1").arg(path);
+        if (errorOut)
+            *errorOut = QStringLiteral("Failed to remove %1").arg(path);
         return false;
     }
     return true;

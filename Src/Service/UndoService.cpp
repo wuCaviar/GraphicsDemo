@@ -2,9 +2,12 @@
 
 #include <QUndoStack>
 
-UndoService::UndoService(QObject *parent) : QAtService(parent) {}
+UndoService::UndoService(QObject *parent) : QAtService(parent) { }
 
-QString UndoService::description() const { return tr("Undo/Redo proxy service"); }
+QString UndoService::description() const
+{
+    return tr("Undo/Redo proxy service");
+}
 
 void UndoService::bindUndoStack(QUndoStack *stack)
 {
@@ -23,7 +26,21 @@ void UndoService::bindUndoStack(QUndoStack *stack)
     }
 }
 
-void UndoService::undo()       { if (m_stack) m_stack->undo(); }
-void UndoService::redo()       { if (m_stack) m_stack->redo(); }
-bool UndoService::canUndo() const { return m_stack ? m_stack->canUndo() : false; }
-bool UndoService::canRedo() const { return m_stack ? m_stack->canRedo() : false; }
+void UndoService::undo()
+{
+    if (m_stack)
+        m_stack->undo();
+}
+void UndoService::redo()
+{
+    if (m_stack)
+        m_stack->redo();
+}
+bool UndoService::canUndo() const
+{
+    return m_stack ? m_stack->canUndo() : false;
+}
+bool UndoService::canRedo() const
+{
+    return m_stack ? m_stack->canRedo() : false;
+}

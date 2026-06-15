@@ -10,8 +10,14 @@
 #include <QMap>
 #include <QString>
 
-// ---- CMYK 颜色数据（用于 XML 中精确存储） ----
+struct CanvasInfo
+{
+    double width = 1920.0;
+    double height = 1080.0;
+    double dpi = 96.0;
+};
 
+// ---- CMYK 颜色数据（用于 XML 中精确存储） ----
 struct CmykData
 {
     bool hasPen = false;
@@ -77,7 +83,23 @@ DeserializedItem deserializeItemWorker(const DeserialTask &task);
 // 在主线程从 DeserializedItem 创建 QGraphicsItem
 QGraphicsItem *createItemFromDeserialized(const DeserializedItem &data);
 
+// ---- Multi-canvas data bundles ----
+
+struct CanvasSaveBundle
+{
+    CanvasInfo info;
+    QList<SerializedItem> items;
+};
+
+struct CanvasDeserialBundle
+{
+    CanvasInfo info;
+    QList<DeserialTask> tasks;
+};
+
 // ---- 工程文件类 ----
+// ATP v2 format: one project → N canvases (each with its own size/dpi/items)
+// ATP v1 backward-compatible: single <Canvas> element read as one-canvas project
 
 class ProjectFile
 {
@@ -85,27 +107,26 @@ public:
     struct ProjectInfo
     {
         QString name;
-        QString version = QStringLiteral("1.0.0");
+        QString version = QStringLiteral("2.0.0");
         QString author;
         QString description;
     };
 
-    struct CanvasInfo
-    {
-        double width = 1920.0;
-        double height = 1080.0;
-        double dpi = 96.0;
-    };
+    // ---- Multi-canvas save ----
+    bool saveMulti(const QString &filePath, const ProjectInfo &info,
+                   const QList<CanvasSaveBundle> &canvases);
 
-    // 从已序列化的 item 列表组装并保存 XML（在主线程调用）
+    // ---- Multi-canvas parse ----
+    bool parseMulti(const QString &filePath, ProjectInfo &info,
+                    QList<CanvasDeserialBundle> &canvases);
+
+    // ---- Legacy single-canvas API (delegates to multi-canvas internally) ----
     bool saveFromSerialized(const QString &filePath, const ProjectInfo &info,
                             const CanvasInfo &canvas, const QList<SerializedItem> &items);
 
-    // 解析 XML 文件，提取 DeserialTask 列表供并行反序列化
     bool parseForDeserialize(const QString &filePath, ProjectInfo &info, CanvasInfo &canvas,
                              QList<DeserialTask> &tasks);
 
-    // 同步版本的 save/load（内部串行，不推荐大数据量使用）
     bool save(const QString &filePath, const ProjectInfo &info, const CanvasInfo &canvas,
               const QList<QGraphicsItem *> &items);
 
@@ -115,6 +136,11 @@ public:
     QString lastError() const { return m_lastError; }
 
 private:
+    void _writeCanvasToXml(QDomDocument &doc, QDomElement &parent, int index,
+                           const CanvasSaveBundle &bundle);
+    void _writeSingleCanvasToXml(QDomDocument &doc, QDomElement &parent, const CanvasInfo &info,
+                                 const QList<SerializedItem> &items);
+    bool _parseCanvasElement(const QDomElement &el, CanvasDeserialBundle &bundle);
     QByteArray encrypt(const QByteArray &data, const QByteArray &key);
     QByteArray decrypt(const QByteArray &data, const QByteArray &key);
 

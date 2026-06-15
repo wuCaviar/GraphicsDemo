@@ -53,8 +53,7 @@ QAtGraphicsView::QAtGraphicsView(QWidget *parent) : QGraphicsView(parent)
 
     // 将 scene 的 selectionChanged 转发为 view 的 selectionChanged，
     // 供 MainWindow → PropertyPanel 联动
-    connect(m_scene, &QGraphicsScene::selectionChanged, this,
-            &QAtGraphicsView::selectionChanged);
+    connect(m_scene, &QGraphicsScene::selectionChanged, this, &QAtGraphicsView::selectionChanged);
 
     // 不创建默认画布 — 用户需要通过 New File 操作显式创建
     m_scene->setSceneRect(-500, -500, 1000, 1000);
@@ -77,8 +76,7 @@ void QAtGraphicsView::initCanvas(const QSizeF &size)
     m_pCanvas = new CanvasItem(size);
     m_scene->addItem(m_pCanvas);
 
-    m_scene->setSceneRect(-500, -500, size.width() + 1000,
-                          size.height() + 1000);
+    m_scene->setSceneRect(-500, -500, size.width() + 1000, size.height() + 1000);
 
     scrollToCanvasOrigin();
 }
@@ -87,8 +85,7 @@ void QAtGraphicsView::setCanvasSize(const QSizeF &size)
 {
     if (m_pCanvas) {
         m_pCanvas->setCanvasSize(size);
-        m_scene->setSceneRect(-500, -500, size.width() + 1000,
-                              size.height() + 1000);
+        m_scene->setSceneRect(-500, -500, size.width() + 1000, size.height() + 1000);
     } else {
         initCanvas(size);
     }
@@ -140,11 +137,7 @@ void QAtGraphicsView::fitToCanvas()
 void QAtGraphicsView::scrollToCanvasOrigin()
 {
     QMetaObject::invokeMethod(
-        this,
-        [this]() {
-            centerOn(m_pCanvas ? m_pCanvas->rect().center()
-                               : QPointF(400, 560));
-        },
+        this, [this]() { centerOn(m_pCanvas ? m_pCanvas->rect().center() : QPointF(400, 560)); },
         Qt::QueuedConnection);
 }
 
@@ -165,7 +158,6 @@ void QAtGraphicsView::setTool(Tool tool)
         viewport()->setCursor(Qt::OpenHandCursor);
         break;
     case Tool::Text:
-    case Tool::Image:
         setDragMode(NoDrag);
         viewport()->setCursor(Qt::ArrowCursor);
         break;
@@ -231,22 +223,19 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
 
     if (m_tool == Tool::Select) {
         QGraphicsItem *hit = m_scene->itemAt(scenePos, transform());
-        bool isCanvasOrHandle = hit
-                                && (hit->type() == CanvasItem::Type
-                                    || hit->type() == ResizeHandleItem::Type);
+        bool isCanvasOrHandle =
+            hit && (hit->type() == CanvasItem::Type || hit->type() == ResizeHandleItem::Type);
         m_rubberBanding = (!hit || isCanvasOrHandle);
         if (m_rubberBanding)
             m_scene->scheduleResizeHandleUpdate();
 
         m_moving = true;
-        QGraphicsView::mousePressEvent(
-            event); // 先让 Qt 处理选中变更，再捕获位置
+        QGraphicsView::mousePressEvent(event); // 先让 Qt 处理选中变更，再捕获位置
 
         m_moveStartPositions.clear();
         const auto selected = m_scene->selectedItems();
         for (auto *item : selected) {
-            if (item->type() != CanvasItem::Type
-                && item->type() != ResizeHandleItem::Type)
+            if (item->type() != CanvasItem::Type && item->type() != ResizeHandleItem::Type)
                 m_moveStartPositions[item] = item->pos();
         }
         return;
@@ -326,8 +315,7 @@ void QAtGraphicsView::mouseMoveEvent(QMouseEvent *event)
     if (m_handPanning) {
         QPoint delta = event->pos() - m_handLastPos;
         m_handLastPos = event->pos();
-        horizontalScrollBar()->setValue(horizontalScrollBar()->value()
-                                        - delta.x());
+        horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
         verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
         QGraphicsView::mouseMoveEvent(event);
         return;
@@ -399,8 +387,7 @@ void QAtGraphicsView::mouseReleaseEvent(QMouseEvent *event)
 
     if (m_handPanning) {
         m_handPanning = false;
-        viewport()->setCursor(m_tool == Tool::Hand ? Qt::OpenHandCursor
-                                                   : Qt::ArrowCursor);
+        viewport()->setCursor(m_tool == Tool::Hand ? Qt::OpenHandCursor : Qt::ArrowCursor);
         event->accept();
         return;
     }
@@ -413,8 +400,7 @@ void QAtGraphicsView::mouseReleaseEvent(QMouseEvent *event)
         QList<QPointF> oldPositions;
         QList<QPointF> newPositions;
 
-        for (auto it = m_moveStartPositions.begin();
-             it != m_moveStartPositions.end(); ++it) {
+        for (auto it = m_moveStartPositions.begin(); it != m_moveStartPositions.end(); ++it) {
             QGraphicsItem *item = it.key();
             QPointF oldPos = it.value();
             QPointF newPos = item->pos();
@@ -426,8 +412,8 @@ void QAtGraphicsView::mouseReleaseEvent(QMouseEvent *event)
         }
 
         if (!movedItems.isEmpty() && m_undoStack) {
-            m_undoStack->push(new MoveItemsCommand(movedItems, oldPositions,
-                                                   newPositions, m_scene));
+            m_undoStack->push(
+                new MoveItemsCommand(movedItems, oldPositions, newPositions, m_scene));
         }
         m_moveStartPositions.clear();
 
@@ -456,8 +442,7 @@ void QAtGraphicsView::contextMenuEvent(QContextMenuEvent *event)
     QGraphicsItem *hitItem = nullptr;
     const auto allItems = items(event->pos());
     for (auto *item : allItems) {
-        if (item->type() != CanvasItem::Type
-            && item->type() != ResizeHandleItem::Type) {
+        if (item->type() != CanvasItem::Type && item->type() != ResizeHandleItem::Type) {
             hitItem = item;
             break;
         }
@@ -475,11 +460,11 @@ void QAtGraphicsView::contextMenuEvent(QContextMenuEvent *event)
         return;
 
     QMenu menu;
-    menu.addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring Forward"),
-                   this, &QAtGraphicsView::bringToFrontRequested)
+    menu.addAction(QIcon(":/icons/icons/bring-front.svg"), tr("Bring Forward"), this,
+                   &QAtGraphicsView::bringToFrontRequested)
         ->setToolTip(tr("Bring selected items forward one step"));
-    menu.addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send Backward"),
-                   this, &QAtGraphicsView::sendToBackRequested)
+    menu.addAction(QIcon(":/icons/icons/send-back.svg"), tr("Send Backward"), this,
+                   &QAtGraphicsView::sendToBackRequested)
         ->setToolTip(tr("Send selected items backward one step"));
 
     menu.addSeparator();
@@ -576,10 +561,8 @@ void QAtGraphicsView::drawBackground(QPainter *painter, const QRectF &rect)
 
     painter->fillRect(canvasRect, Qt::white);
 
-    QRectF rightShadow(canvasRect.right(), canvasRect.top() + 3, 6,
-                       canvasRect.height() - 3);
-    QRectF bottomShadow(canvasRect.left() + 3, canvasRect.bottom(),
-                        canvasRect.width() - 3, 6);
+    QRectF rightShadow(canvasRect.right(), canvasRect.top() + 3, 6, canvasRect.height() - 3);
+    QRectF bottomShadow(canvasRect.left() + 3, canvasRect.bottom(), canvasRect.width() - 3, 6);
     QRectF cornerShadow(canvasRect.right(), canvasRect.bottom(), 6, 6);
     QColor shadowColor(60, 60, 60, 80);
     painter->fillRect(rightShadow, shadowColor);
@@ -619,33 +602,26 @@ void QAtGraphicsView::drawBackground(QPainter *painter, const QRectF &rect)
         for (qreal x = startX; x <= gridRect.right(); x += baseInterval) {
             if (qFuzzyCompare(qRound(x / majorInterval) * majorInterval, x))
                 continue;
-            painter->drawLine(QPointF(x, gridRect.top()),
-                              QPointF(x, gridRect.bottom()));
+            painter->drawLine(QPointF(x, gridRect.top()), QPointF(x, gridRect.bottom()));
         }
         for (qreal y = startY; y <= gridRect.bottom(); y += baseInterval) {
             if (qFuzzyCompare(qRound(y / majorInterval) * majorInterval, y))
                 continue;
-            painter->drawLine(QPointF(gridRect.left(), y),
-                              QPointF(gridRect.right(), y));
+            painter->drawLine(QPointF(gridRect.left(), y), QPointF(gridRect.right(), y));
         }
 
         QPen majorPen(QColor(0, 0, 0, 40));
         majorPen.setWidthF(0.8);
         painter->setPen(majorPen);
 
-        qreal majorStartX =
-            qFloor(gridRect.left() / majorInterval) * majorInterval;
-        qreal majorStartY =
-            qFloor(gridRect.top() / majorInterval) * majorInterval;
+        qreal majorStartX = qFloor(gridRect.left() / majorInterval) * majorInterval;
+        qreal majorStartY = qFloor(gridRect.top() / majorInterval) * majorInterval;
 
         for (qreal x = majorStartX; x <= gridRect.right(); x += majorInterval) {
-            painter->drawLine(QPointF(x, gridRect.top()),
-                              QPointF(x, gridRect.bottom()));
+            painter->drawLine(QPointF(x, gridRect.top()), QPointF(x, gridRect.bottom()));
         }
-        for (qreal y = majorStartY; y <= gridRect.bottom();
-             y += majorInterval) {
-            painter->drawLine(QPointF(gridRect.left(), y),
-                              QPointF(gridRect.right(), y));
+        for (qreal y = majorStartY; y <= gridRect.bottom(); y += majorInterval) {
+            painter->drawLine(QPointF(gridRect.left(), y), QPointF(gridRect.right(), y));
         }
 
         painter->setClipping(false);

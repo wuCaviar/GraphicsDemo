@@ -27,10 +27,10 @@ public:
     void _execute() override;
 };
 
-class AlignLayoutDialogAction : public QAtDialogActionBase
+class AlignWidgetAction : public QAtDialogActionBase
 {
 public:
-    AlignLayoutDialogAction()
+    AlignWidgetAction()
     {
         m_strActionToken = QStringLiteral("AlignLayoutDialog");
         m_checkable = true;

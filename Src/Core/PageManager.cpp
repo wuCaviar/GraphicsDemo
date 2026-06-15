@@ -1,6 +1,6 @@
 #include "PageManager.h"
 
-PageManager& PageManager::get()
+PageManager &PageManager::get()
 {
     static PageManager instance;
     return instance;
@@ -8,16 +8,19 @@ PageManager& PageManager::get()
 
 void PageManager::registerPage(QAtPage *page)
 {
-    if (!page) return;
+    if (!page)
+        return;
     const QString &id = page->pageId();
-    if (m_pages.contains(id)) return;
+    if (m_pages.contains(id))
+        return;
     m_pages[id] = page;
     emit pageAdded(id);
 }
 
 void PageManager::unregisterPage(const QString &pageId)
 {
-    if (!m_pages.contains(pageId)) return;
+    if (!m_pages.contains(pageId))
+        return;
     m_pages.remove(pageId);
     if (m_activePageId == pageId) {
         m_activePageId.clear();
@@ -27,8 +30,10 @@ void PageManager::unregisterPage(const QString &pageId)
 
 void PageManager::setActivePage(const QString &pageId)
 {
-    if (m_activePageId == pageId) return;
-    if (!m_pages.contains(pageId)) return;
+    if (m_activePageId == pageId)
+        return;
+    if (!m_pages.contains(pageId))
+        return;
 
     QAtPage *oldPage = m_pages.value(m_activePageId);
     if (oldPage) {
@@ -44,17 +49,17 @@ void PageManager::setActivePage(const QString &pageId)
     }
 }
 
-QAtPage* PageManager::activePage() const
+QAtPage *PageManager::activePage() const
 {
     return m_pages.value(m_activePageId);
 }
 
-QAtPage* PageManager::page(const QString &pageId) const
+QAtPage *PageManager::page(const QString &pageId) const
 {
     return m_pages.value(pageId);
 }
 
-QList<QAtPage*> PageManager::allPages() const
+QList<QAtPage *> PageManager::allPages() const
 {
     return m_pages.values();
 }
@@ -70,17 +75,17 @@ QString PageManager::activePageType() const
     return p ? p->pageType() : QString();
 }
 
-QAtCanvasPage* PageManager::activeCanvasPage() const
+QAtCanvasPage *PageManager::activeCanvasPage() const
 {
     QAtPage *p = activePage();
     if (p && p->pageType() == PageType::Canvas)
-        return static_cast<QAtCanvasPage*>(p);
+        return static_cast<QAtCanvasPage *>(p);
     return nullptr;
 }
 
-QList<QAtPage*> PageManager::pagesByType(const QString &type) const
+QList<QAtPage *> PageManager::pagesByType(const QString &type) const
 {
-    QList<QAtPage*> result;
+    QList<QAtPage *> result;
     for (auto *p : m_pages) {
         if (p->pageType() == type)
             result.append(p);

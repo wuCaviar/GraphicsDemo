@@ -9,11 +9,11 @@
 #include "AlignmentUtils.h"
 #include "NetWorkUtils.h"
 #include "ProcessGuard.h"
+#include "Core/ProjectDocument.h"
 #include "atDefine.h"
 
 #include <QMainWindow>
-#include <QTabWidget>
-#include <QTabBar>
+#include <QDockWidget>
 #include <QMap>
 #include <QUndoStack>
 #include <QProgressBar>
@@ -25,12 +25,13 @@ class QPushButton;
 class QSlider;
 class QToolBar;
 class QToolButton;
-class AlignLayoutDialog;
+class AlignWidget;
 class AutoLayoutDialog;
 class LayoutEngine;
 class TaskHistoryPopup;
 class ToolBarDirector;
 class StatusBarDirector;
+class QAtCanvasPage;
 
 #ifdef USE_LEGACY_EXPORT
 class TiffExportEngine;
@@ -58,22 +59,12 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private slots:
-    void onNew();
+    void onNew(); // toolbar: add canvas to current project
+    void onNewProject(); // menubar: create a new project (prompts for path)
     void onOpenProject();
     void onSaveProject();
     void onImportImage();
     void onExportImage();
-    void onUndo();
-    void onRedo();
-    void onCut();
-    void onCopy();
-    void onPaste();
-    void onDelete();
-    void onSelectAll();
-    void onBringToFront();
-    void onSendToBack();
-    void onGroup();
-    void onUngroup();
     void onAlignLayoutDialog();
     void onFitCanvasToItems();
     void onResizeCanvas();
@@ -88,7 +79,6 @@ private slots:
     void onAlignVCenter();
     void onDistributeH();
     void onDistributeV();
-    void onToolTriggered(Tool tool);
     void onSelectionChanged();
     void onItemAdded(QGraphicsItem *item);
 
@@ -126,7 +116,6 @@ private:
     void _initServices();
     void _initPages();
     void _initActions();
-    void _updateUndoRedoActions();
 
     // 窗口状态持久化
     void loadWindowState();
@@ -137,12 +126,28 @@ private:
 
     // DPI 锁定已移除 — 画布使用固定 150 PPI，允许任意 DPI 图片导入
 
-    void copyItemsToClipboard(const QList<QGraphicsItem *> &items);
-    QList<QGraphicsItem *> pasteItemsFromClipboard();
     QList<QGraphicsItem *> filterSelectableItems() const;
     void rotateSelectedItems(qreal angleDelta);
 
-    bool _maybeSaveProject(); // 提示保存，返回 false 表示用户取消操作
+    bool _maybeSaveProject(); // 提示保存整个工程，返回 false 表示用户取消操作
+    bool _maybeCloseCanvas(QAtCanvasPage *page); // 提示关闭画布（图元将丢失），返回 false 表示取消
+    bool _syncSaveAllCanvases(); // 同步保存所有画布到 m_projectPath
+    QList<CanvasSaveBundle> _collectCanvasBundles() const; // 公共：收集所有画布的序列化数据
+    void _addCanvasDock(const QString &title, const QString &pageId); // 创建画布 dock 页
+    void _updateCanvasDockTitle(QAtCanvasPage *page); // 更新画布 dock 标题
+
+    // ---- Canvas Dock 管理 (替代 QTabWidget API) ----
+    QAtCanvasPage *_currentCanvasPage() const;
+    QAtCanvasPage *_canvasPageAt(int index) const;
+    int _canvasCount() const;
+    int _currentCanvasIndex() const;
+    int _indexOfCanvasPage(QAtCanvasPage *page) const;
+    void _setCurrentCanvasPage(QAtCanvasPage *page);
+    void _setCurrentCanvasIndex(int index);
+    QDockWidget *_addCanvasDockInternal(QAtCanvasPage *page, const QString &title);
+    void _removeCanvasDockInternal(int index);
+    void _onCanvasDockActivated(QDockWidget *dock);
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
     /// 项目加载后异步刷新图元缩略图（缓存感知，不阻塞 UI）
     void refreshImageItemsFromCache(const QList<QGraphicsItem *> &items);
@@ -155,13 +160,15 @@ private:
 
     Ui::MainWindow *ui;
 
-    QTabWidget     *m_tabWidget   = nullptr;  // P9: multi-canvas tab container
-    QAtGraphicsView *m_pView       = nullptr;
-    PropertyPanel   *m_pPropertyPanel = nullptr;
-    QUndoStack      *m_undoStack   = nullptr;
+    // Canvas dock management (replaces QTabWidget — each canvas is a QDockWidget)
+    QList<QDockWidget *> m_canvasDocks; // all canvas dock widgets in insertion order
+    QDockWidget *m_activeCanvasDock = nullptr; // currently active/focused canvas dock
+    QAtGraphicsView *m_pView = nullptr;
+    PropertyPanel *m_pPropertyPanel = nullptr;
+    QUndoStack *m_undoStack = nullptr;
 
     // P6: UI builders for page-type-aware behavior
-    ToolBarDirector   *m_toolBarDirector   = nullptr;
+    ToolBarDirector *m_toolBarDirector = nullptr;
     StatusBarDirector *m_statusBarDirector = nullptr;
 
     NetWorkUtils *m_pNetWorkUtils = nullptr;
@@ -176,31 +183,28 @@ private:
     int m_ripXRes = 0;
     int m_ripYRes = 0;
 
-    QString m_currentProjectPath; // 当前工程文件路径，空表示未保存
-    bool m_projectModified = false; // 工程文件是否已修改（未保存）
+    QString m_projectPath; // 当前工程文件路径（一个工程包含多个画布），空表示未保存
+    bool m_projectModified = false; // 工程文件中是否有画布未保存
 
-    // P9: per-tab project state
-    struct TabProjectState {
-        QString projectPath;
-        bool    modified = false;
+    // P9: per-tab canvas modified state (projectPath is shared at project level)
+    struct TabProjectState
+    {
+        bool modified = false;
     };
-    QMap<class QAtCanvasPage*, TabProjectState> m_tabStates;
+    QMap<class QAtCanvasPage *, TabProjectState> m_tabStates;
 
-    TabProjectState& _activeTabState();
-    const TabProjectState& _activeTabState() const;
+    TabProjectState &_activeTabState();
+    const TabProjectState &_activeTabState() const;
+
+    ProjectDocument *m_document = nullptr; // 工程文档模型（逐步替代上述散落字段）
 
     ImageUtils::ImageImportPipeline m_importSinglePipeline; // 单图导入处理管线
     ImageUtils::ImageImportPipeline m_importMultiPipeline; // 批量导入处理管线
 
-    QAction *m_undoAction = nullptr;
-    QAction *m_redoAction = nullptr;
-
-    // 当前工具 Action 组
-    QMap<Tool, QAction *> m_toolActions;
     Tool m_currentTool = Tool::Select;
 
     // 对齐与布局对话框（非模态单例）
-    AlignLayoutDialog *m_alignLayoutDlg = nullptr;
+    AlignWidget *m_alignLayoutDlg = nullptr;
 
     // 自动排版引擎
     LayoutEngine *m_layoutEngine = nullptr;
@@ -208,10 +212,6 @@ private:
     // 新导出流程：后台 ExportEngine 渲染任务
     QFuture<void> m_exportFuture;
     void exportWithEngine(const QString &json, const QString &outputPath);
-
-    // 刻度尺
-    class RulerBar *m_hRuler = nullptr;
-    class RulerBar *m_vRuler = nullptr;
 
     // 网格显示切换
     QAction *m_gridAction = nullptr;
@@ -250,7 +250,7 @@ private:
     void _updatePosLabel(const QPointF &scenePos); // 根据单位模式更新坐标标签
     void saveSession();
     void loadSession();
-    void _syncViewState();     // sync ruler / propertyPanel / labels from active view
+    void _syncViewState(); // sync ruler / propertyPanel / labels from active view
     void _updateCanvasLabel(); // 根据单位模式更新画布尺寸标签
     void _updateToolLabel(); // 根据当前工具更新工具标签
 };

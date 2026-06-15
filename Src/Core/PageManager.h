@@ -17,20 +17,20 @@ class PageManager : public QObject
     Q_OBJECT
 
 public:
-    static PageManager& get();
+    static PageManager &get();
 
     void registerPage(QAtPage *page);
     void unregisterPage(const QString &pageId);
     void setActivePage(const QString &pageId);
 
-    QAtPage*        activePage() const;
-    QAtPage*        page(const QString &pageId) const;
-    QList<QAtPage*> allPages() const;
-    QString         activePageId() const;
+    QAtPage *activePage() const;
+    QAtPage *page(const QString &pageId) const;
+    QList<QAtPage *> allPages() const;
+    QString activePageId() const;
 
-    QAtCanvasPage*  activeCanvasPage() const;
-    QString         activePageType() const;
-    QList<QAtPage*> pagesByType(const QString &type) const;
+    QAtCanvasPage *activeCanvasPage() const;
+    QString activePageType() const;
+    QList<QAtPage *> pagesByType(const QString &type) const;
 
 signals:
     void pageSwitched(const QString &pageId, const QString &pageType);
@@ -41,8 +41,8 @@ private:
     PageManager() = default;
     Q_DISABLE_COPY(PageManager)
 
-    QMap<QString, QAtPage*> m_pages;
-    QString                 m_activePageId;
+    QMap<QString, QAtPage *> m_pages;
+    QString m_activePageId;
 };
 
 #endif // PAGEMANAGER_H

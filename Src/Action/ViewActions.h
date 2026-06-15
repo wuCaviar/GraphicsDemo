@@ -6,7 +6,12 @@
 class ToggleGridAction : public QAtViewActionBase
 {
 public:
-    ToggleGridAction() { m_strActionToken = QStringLiteral("ToggleGrid"); m_checkable = true; }
+    ToggleGridAction()
+    {
+        m_strActionToken = QStringLiteral("ToggleGrid");
+        m_checkable = true;
+    }
+    QIcon _icon() override;
     QString _text() override;
     QKeySequence _shortcut() const override;
     void _execute() override;
@@ -17,6 +22,7 @@ class FitToCanvasAction : public QAtViewActionBase
 {
 public:
     FitToCanvasAction() { m_strActionToken = QStringLiteral("FitToCanvas"); }
+    QIcon _icon() override;
     QString _text() override;
     void _execute() override;
 };
@@ -25,6 +31,7 @@ class ResetZoomAction : public QAtViewActionBase
 {
 public:
     ResetZoomAction() { m_strActionToken = QStringLiteral("ResetZoom"); }
+    QIcon _icon() override;
     QString _text() override;
     QKeySequence _shortcut() const override;
     void _execute() override;
@@ -33,7 +40,11 @@ public:
 class ThemeAction : public QAtViewActionBase
 {
 public:
-    ThemeAction() { m_strActionToken = QStringLiteral("LightTheme"); m_checkable = true; }
+    ThemeAction()
+    {
+        m_strActionToken = QStringLiteral("LightTheme");
+        m_checkable = true;
+    }
     QString _text() override;
     void _execute() override;
 };

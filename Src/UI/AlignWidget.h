@@ -1,5 +1,5 @@
-#ifndef ALIGNLAYOUTDIALOG_H
-#define ALIGNLAYOUTDIALOG_H
+#ifndef ALIGNWIDGET_H
+#define ALIGNWIDGET_H
 
 #include <QDockWidget>
 #include <QPointer>
@@ -13,22 +13,21 @@ class QDoubleSpinBox;
 class QPushButton;
 class QLabel;
 
-class AlignLayoutDialog : public QDockWidget
+class AlignWidget : public QDockWidget
 {
     Q_OBJECT
 
 public:
-    explicit AlignLayoutDialog(QGraphicsScene *scene, QUndoStack *undoStack,
-                               QWidget *parent = nullptr);
+    explicit AlignWidget(QGraphicsScene *scene, QUndoStack *undoStack, QWidget *parent = nullptr);
 
     void setScene(QGraphicsScene *scene);
     void setUndoStack(QUndoStack *undoStack);
     void refreshSelectionInfo();
 
     // Session persistence — exposed for session serialization
-    static qreal hSpacing()    { return s_hSpacing; }
+    static qreal hSpacing() { return s_hSpacing; }
     static void setHSpacing(qreal v) { s_hSpacing = v; }
-    static qreal vSpacing()    { return s_vSpacing; }
+    static qreal vSpacing() { return s_vSpacing; }
     static void setVSpacing(qreal v) { s_vSpacing = v; }
 
 private slots:
@@ -94,4 +93,4 @@ private:
     static qreal s_vSpacing;
 };
 
-#endif // ALIGNLAYOUTDIALOG_H
+#endif // ALIGNWIDGET_H

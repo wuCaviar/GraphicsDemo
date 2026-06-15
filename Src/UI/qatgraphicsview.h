@@ -10,16 +10,16 @@ class CanvasItem;
 class GraphicsScene;
 
 // 绘图工具类型
-enum class Tool {
-    Select,         // 选择/移动
-    Hand,           // 抓手/平移
-    Rect,           // 矩形
-    Ellipse,        // 椭圆
-    Line,           // 直线
-    BezierCurve,    // 贝塞尔曲线
-    Freehand,       // 自由线条
-    Text,           // 文字
-    Image,          // 图片（打开文件对话框）
+enum class Tool
+{
+    Select, // 选择/移动
+    Hand, // 抓手/平移
+    Rect, // 矩形
+    Ellipse, // 椭圆
+    Line, // 直线
+    BezierCurve, // 贝塞尔曲线
+    Freehand, // 自由线条
+    Text, // 文字
 };
 
 // 自定义 GraphicsView，支持多种绘图工具
@@ -38,7 +38,7 @@ public:
 
     CanvasItem *canvasItem() const { return m_pCanvas; }
     void setCanvasSize(const QSizeF &size);
-    void clearScene();  // 安全清空场景，重建画布
+    void clearScene(); // 安全清空场景，重建画布
     void resetCanvas(const QSizeF &size); // 清空场景并重建画布
 
     qreal zoomLevel() const { return m_zoomLevel; }
@@ -62,7 +62,7 @@ signals:
     void selectionChanged();
     void mousePositionChanged(const QPointF &scenePos);
     void zoomChanged(qreal level);
-    void toolChanged(Tool tool);  // 通知工具变更（含空格临时切换）
+    void toolChanged(Tool tool); // 通知工具变更（含空格临时切换）
     // 右键菜单请求（复用 MainWindow 已有功能）
     void bringToFrontRequested();
     void sendToBackRequested();
@@ -96,7 +96,7 @@ private:
     // 绘制状态
     bool m_drawing = false;
     QGraphicsItem *m_tempItem = nullptr;
-    QPointF m_startPos;    // 鼠标按下位置（场景坐标）
+    QPointF m_startPos; // 鼠标按下位置（场景坐标）
     QPointF m_lastPos;
 
     // 移动跟踪（用于 MoveItemsCommand）

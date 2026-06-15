@@ -8,29 +8,29 @@
 // Forward-declared in qatgraphicsview.h
 enum class Tool;
 
-// Single tab entry in the session JSON
+// Single tab entry in the session JSON (v2: projectPath moved to project level)
 struct SessionTabInfo
 {
-    QString projectPath;
-    bool    modified        = false;
-    double  canvasWidthPx   = 0;
-    double  canvasHeightPx  = 0;
-    double  ppi             = 150.0;
-    double  zoomLevel       = 1.0;
-    bool    gridVisible     = true;
+    bool modified = false;
+    double canvasWidthPx = 0;
+    double canvasHeightPx = 0;
+    double ppi = 150.0;
+    double zoomLevel = 1.0;
+    bool gridVisible = true;
 };
 
-// Full session state
+// Full session state (v2: one project path for all tabs)
 struct SessionInfo
 {
-    int     version           = 1;
-    int     activeTabIndex    = 0;
-    Tool    currentTool;       // default Tool::Select, serialized as string
-    bool    ripEnabled        = false;
-    int     ripXRes           = 0;
-    int     ripYRes           = 0;
-    double  alignHSpacing     = 0.0;
-    double  alignVSpacing     = 0.0;
+    int version = 2;
+    QString projectPath; // 工程文件路径（一个工程包含多个画布），空表示未保存
+    int activeTabIndex = 0;
+    Tool currentTool; // default Tool::Select, serialized as string
+    bool ripEnabled = false;
+    int ripXRes = 0;
+    int ripYRes = 0;
+    double alignHSpacing = 0.0;
+    double alignVSpacing = 0.0;
     QList<SessionTabInfo> tabs;
 
     QJsonObject toJson() const;
@@ -38,7 +38,7 @@ struct SessionInfo
     static SessionInfo fromJson(const QJsonDocument &doc);
 
     static QString toolToString(Tool t);
-    static Tool    toolFromString(const QString &s);
+    static Tool toolFromString(const QString &s);
 };
 
 // File-level read/write operations
