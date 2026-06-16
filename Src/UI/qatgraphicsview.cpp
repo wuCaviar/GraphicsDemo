@@ -142,6 +142,38 @@ void QAtGraphicsView::fitToCanvas()
     emit zoomChanged(m_zoomLevel);
 }
 
+void QAtGraphicsView::fitToSelection()
+{
+    if (!scene())
+        return;
+
+    auto items = scene()->selectedItems();
+    if (items.isEmpty()) {
+        fitToCanvas();
+        return;
+    }
+
+    QRectF rect;
+    for (auto *item : items)
+        rect = rect.united(item->sceneBoundingRect());
+
+    if (rect.isEmpty())
+        return;
+
+    resetTransform();
+    m_zoomLevel = 1.0;
+
+    fitInView(rect, Qt::KeepAspectRatio);
+
+    scale(0.9, 0.9);
+
+    qreal actualScale = transform().m11();
+    m_zoomLevel = AtMath::clamp(actualScale, 0.01, 32.0);
+    resetCachedContent();
+
+    emit zoomChanged(m_zoomLevel);
+}
+
 void QAtGraphicsView::scrollToCanvasOrigin()
 {
     QMetaObject::invokeMethod(
