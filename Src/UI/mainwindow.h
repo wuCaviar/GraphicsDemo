@@ -25,7 +25,6 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QSlider;
-class QToolBar;
 class QToolButton;
 class QMenu;
 class AlignWidget;
@@ -39,10 +38,6 @@ class QAtCanvasPage;
 #ifdef USE_LEGACY_EXPORT
 class TiffExportEngine;
 #endif
-
-namespace Ui {
-class MainWindow;
-}
 
 class MainWindow : public DockMainWindow
 {
@@ -150,8 +145,6 @@ private:
     void applyDistribute(
         AlignmentUtils::DistributeDirection direction,
         const AlignmentUtils::DistributeParams &params = AlignmentUtils::DistributeParams());
-
-    Ui::MainWindow *ui;
 
     // Canvas document panels (Qtitan DockDocumentPanel replaces QDockWidget for canvases)
     DockDocumentPanel *m_activeDocumentPanel = nullptr;

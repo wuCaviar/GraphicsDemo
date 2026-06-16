@@ -1,8 +1,6 @@
 #include "mainwindow.h"
 #include "atMath.h"
 
-#include <QMainWindow>
-
 #include "AlignWidget.h"
 #include "AutoLayoutDialog.h"
 #include "LayoutEngine.h"
