@@ -5,8 +5,9 @@
 #include <QPointF>
 
 class QLabel;
-class QComboBox;
+class QLineEdit;
 class QToolButton;
+class QMenu;
 class QSlider;
 enum class Tool;
 
@@ -17,12 +18,14 @@ public:
     explicit StatusBarDirector(QObject *parent = nullptr);
 
     void setPositionLabel(QLabel *label);
-    void setZoomControls(QComboBox *combo, QToolButton *outBtn, QToolButton *inBtn, QSlider *slider);
+    void setZoomControls(QLineEdit *edit, QLabel *pctLabel, QToolButton *presetBtn,
+                         QMenu *presetMenu, QToolButton *outBtn, QToolButton *inBtn,
+                         QSlider *slider);
     void setCanvasLabel(QLabel *label);
     void setToolLabel(QLabel *label);
 
-    void applyZoomFromCombo();
-    void applyPresetFromCombo(int index);
+    void applyZoomFromEdit();
+    void applyZoomPreset(int pct);
 
 public slots:
     void onPageSwitched(const QString &pageId, const QString &pageType);
@@ -32,7 +35,10 @@ public slots:
 
 private:
     QLabel *m_posLabel = nullptr;
-    QComboBox *m_zoomCombo = nullptr;
+    QLineEdit *m_zoomEdit = nullptr;
+    QLabel *m_zoomPctLabel = nullptr;
+    QToolButton *m_zoomPresetBtn = nullptr;
+    QMenu *m_zoomPresetMenu = nullptr;
     QToolButton *m_zoomOutBtn = nullptr;
     QToolButton *m_zoomInBtn = nullptr;
     QSlider *m_zoomSlider = nullptr;

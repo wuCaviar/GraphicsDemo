@@ -5,10 +5,11 @@
 #include "qatgraphicsview.h"
 
 #include <QLabel>
-#include <QComboBox>
-#include <QToolButton>
-#include <QSlider>
 #include <QLineEdit>
+#include <QToolButton>
+#include <QMenu>
+#include <QSlider>
+#include <QAction>
 #include <Qt>
 #include <cmath>
 
@@ -19,10 +20,15 @@ void StatusBarDirector::setPositionLabel(QLabel *label)
     m_posLabel = label;
 }
 
-void StatusBarDirector::setZoomControls(QComboBox *combo, QToolButton *outBtn,
-                                         QToolButton *inBtn, QSlider *slider)
+void StatusBarDirector::setZoomControls(QLineEdit *edit, QLabel *pctLabel,
+                                         QToolButton *presetBtn, QMenu *presetMenu,
+                                         QToolButton *outBtn, QToolButton *inBtn,
+                                         QSlider *slider)
 {
-    m_zoomCombo = combo;
+    m_zoomEdit = edit;
+    m_zoomPctLabel = pctLabel;
+    m_zoomPresetBtn = presetBtn;
+    m_zoomPresetMenu = presetMenu;
     m_zoomOutBtn = outBtn;
     m_zoomInBtn = inBtn;
     m_zoomSlider = slider;
@@ -51,36 +57,28 @@ int StatusBarDirector::_zoomToSliderValue(qreal zoom)
     return qRound(100.0 * std::log(zoom / 0.01) / std::log(3200.0));
 }
 
-// ---- Combo input ----
+// ---- Zoom input ----
 
-void StatusBarDirector::applyZoomFromCombo()
+void StatusBarDirector::applyZoomFromEdit()
 {
-    if (!m_zoomCombo) return;
+    if (!m_zoomEdit) return;
     auto *p = AppContext::get().activeCanvasPage();
     if (!p || !p->view()) return;
 
-    QString text = m_zoomCombo->lineEdit()->text().remove(QLatin1Char('%')).trimmed();
     bool ok = false;
-    int pct = text.toInt(&ok);
+    int pct = m_zoomEdit->text().toInt(&ok);
     if (!ok || pct < 1) {
         onZoomChanged(p->view()->zoomLevel());
         return;
     }
     pct = qBound(1, pct, 3200);
-    qreal level = pct / 100.0;
-    p->view()->setZoomLevel(level);
+    p->view()->setZoomLevel(pct / 100.0);
 }
 
-void StatusBarDirector::applyPresetFromCombo(int index)
+void StatusBarDirector::applyZoomPreset(int pct)
 {
-    if (!m_zoomCombo) return;
-    QVariant data = m_zoomCombo->itemData(index);
-    if (!data.isValid()) return;
-
     auto *p = AppContext::get().activeCanvasPage();
     if (!p || !p->view()) return;
-
-    int pct = data.toInt();
     p->view()->setZoomLevel(pct / 100.0);
 }
 
@@ -88,7 +86,6 @@ void StatusBarDirector::applyPresetFromCombo(int index)
 
 void StatusBarDirector::onPageSwitched(const QString &, const QString &pageType)
 {
-    // Disconnect previous page signals
     auto pages = AppContext::get().allPages();
     for (auto *p : pages) {
         auto *cp = qobject_cast<QAtCanvasPage *>(p);
@@ -96,7 +93,8 @@ void StatusBarDirector::onPageSwitched(const QString &, const QString &pageType)
     }
 
     bool isCanvas = (pageType == QStringLiteral("canvas"));
-    if (m_zoomCombo) m_zoomCombo->setEnabled(isCanvas);
+    if (m_zoomEdit) m_zoomEdit->setEnabled(isCanvas);
+    if (m_zoomPresetBtn) m_zoomPresetBtn->setEnabled(isCanvas);
     if (m_zoomOutBtn) m_zoomOutBtn->setEnabled(isCanvas);
     if (m_zoomInBtn) m_zoomInBtn->setEnabled(isCanvas);
     if (m_zoomSlider) m_zoomSlider->setEnabled(isCanvas);
@@ -110,7 +108,6 @@ void StatusBarDirector::onPageSwitched(const QString &, const QString &pageType)
                     &StatusBarDirector::onZoomChanged);
             connect(p, &QAtCanvasPage::toolChanged, this,
                     &StatusBarDirector::onToolChanged);
-            // Sync controls to current zoom
             if (p->view()) onZoomChanged(p->view()->zoomLevel());
         }
     }
@@ -128,10 +125,10 @@ void StatusBarDirector::onMousePositionChanged(const QPointF &scenePos)
 void StatusBarDirector::onZoomChanged(qreal level)
 {
     int pct = qRound(level * 100.0);
-    if (m_zoomCombo) {
-        m_zoomCombo->blockSignals(true);
-        m_zoomCombo->setCurrentText(QString::number(pct) + QStringLiteral("%"));
-        m_zoomCombo->blockSignals(false);
+    if (m_zoomEdit) {
+        m_zoomEdit->blockSignals(true);
+        m_zoomEdit->setText(QString::number(pct));
+        m_zoomEdit->blockSignals(false);
     }
     if (m_zoomSlider) {
         m_zoomSlider->blockSignals(true);

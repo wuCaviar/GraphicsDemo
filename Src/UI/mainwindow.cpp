@@ -98,8 +98,7 @@
 #include <QSettings>
 #include <QShortcut>
 #include <QSlider>
-#include <QComboBox>
-#include <QAbstractItemView>
+#include <QIntValidator>
 #include <QStyle>
 #include <QSplitter>
 #include <QStandardPaths>
@@ -193,7 +192,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     // P6: Wire StatusBarDirector for signal rebinding on page switch
     m_statusBarDirector = new StatusBarDirector(this);
     m_statusBarDirector->setPositionLabel(m_posLabel);
-    m_statusBarDirector->setZoomControls(m_zoomCombo, m_zoomOutBtn, m_zoomInBtn, m_zoomSlider);
+    m_statusBarDirector->setZoomControls(m_zoomEdit, m_zoomPctLabel, m_zoomPresetBtn,
+                                         m_zoomPresetMenu, m_zoomOutBtn, m_zoomInBtn,
+                                         m_zoomSlider);
     m_statusBarDirector->setCanvasLabel(m_canvasLabel);
     m_statusBarDirector->setToolLabel(m_toolLabel);
     connect(&AppContext::get(), &AppContext::pageSwitched, m_statusBarDirector,
@@ -835,29 +836,41 @@ void MainWindow::_initStatusBar()
         if (m_pView) m_pView->setZoomLevel(m_pView->zoomLevel() * 0.8);
     });
 
-    m_zoomCombo = new QComboBox;
-    m_zoomCombo->setEditable(true);
-    m_zoomCombo->setInsertPolicy(QComboBox::NoInsert);
-    m_zoomCombo->setFixedWidth(72);
-    m_zoomCombo->setToolTip(tr("Zoom percentage (type number + Enter, or pick preset)"));
-    m_zoomCombo->lineEdit()->setAlignment(Qt::AlignCenter);
-    m_zoomCombo->lineEdit()->setValidator(new QIntValidator(1, 3200, m_zoomCombo));
-    // Preset items
-    m_zoomCombo->addItem(QStringLiteral("100%"), 100);
-    m_zoomCombo->addItem(QStringLiteral("200%"), 200);
-    m_zoomCombo->addItem(QStringLiteral("50%"), 50);
-    m_zoomCombo->addItem(QStringLiteral("25%"), 25);
-    m_zoomCombo->addItem(QStringLiteral("400%"), 400);
-    m_zoomCombo->addItem(QStringLiteral("800%"), 800);
-    m_zoomCombo->setCurrentText(QStringLiteral("100%"));
-    // Signals
-    connect(m_zoomCombo->lineEdit(), &QLineEdit::returnPressed,
-            m_statusBarDirector, &StatusBarDirector::applyZoomFromCombo);
-    // Use popup view's pressed signal for reliable dropdown selection on all platforms
-    connect(m_zoomCombo->view(), &QAbstractItemView::pressed,
-            this, [this](const QModelIndex &index) {
-        m_statusBarDirector->applyPresetFromCombo(index.row());
-    });
+    // Zoom percentage input
+    m_zoomEdit = new QLineEdit(QStringLiteral("100"));
+    m_zoomEdit->setFixedWidth(44);
+    m_zoomEdit->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    m_zoomEdit->setValidator(new QIntValidator(1, 3200, this));
+    m_zoomEdit->setToolTip(tr("Enter zoom percentage, press Enter to apply"));
+    connect(m_zoomEdit, &QLineEdit::returnPressed,
+            m_statusBarDirector, &StatusBarDirector::applyZoomFromEdit);
+
+    // % label
+    m_zoomPctLabel = new QLabel(QStringLiteral("%"));
+
+    // Dropdown preset button
+    m_zoomPresetMenu = new QMenu(this);
+    auto addPreset = [this](const QString &text, int pct) {
+        auto *act = m_zoomPresetMenu->addAction(text);
+        connect(act, &QAction::triggered, this, [this, pct]() {
+            m_statusBarDirector->applyZoomPreset(pct);
+        });
+    };
+    addPreset(QStringLiteral("100%"), 100);
+    addPreset(QStringLiteral("200%"), 200);
+    addPreset(QStringLiteral("50%"), 50);
+    addPreset(QStringLiteral("25%"), 25);
+    addPreset(QStringLiteral("400%"), 400);
+    addPreset(QStringLiteral("800%"), 800);
+
+    m_zoomPresetBtn = new QToolButton;
+    m_zoomPresetBtn->setText(QStringLiteral("▾"));
+    m_zoomPresetBtn->setFixedSize(18, 24);
+    m_zoomPresetBtn->setAutoRaise(true);
+    m_zoomPresetBtn->setToolTip(tr("Zoom presets"));
+    m_zoomPresetBtn->setPopupMode(QToolButton::InstantPopup);
+    m_zoomPresetBtn->setMenu(m_zoomPresetMenu);
+    m_zoomPresetBtn->setStyleSheet("QToolButton::menu-indicator { image: none; }");
 
     m_zoomInBtn = new QToolButton;
     m_zoomInBtn->setText(QStringLiteral("+"));
@@ -940,7 +953,9 @@ void MainWindow::_initStatusBar()
     bar->addPermanentWidget(m_pProgressMgr->bar());
     bar->addPermanentWidget(createStatusSeparator(bar));
     bar->addPermanentWidget(m_zoomOutBtn);
-    bar->addPermanentWidget(m_zoomCombo);
+    bar->addPermanentWidget(m_zoomEdit);
+    bar->addPermanentWidget(m_zoomPctLabel);
+    bar->addPermanentWidget(m_zoomPresetBtn);
     bar->addPermanentWidget(m_zoomInBtn);
     bar->addPermanentWidget(createStatusSeparator(bar));
     bar->addPermanentWidget(m_zoomSlider);
