@@ -2,6 +2,9 @@
 #include "atMath.h"
 #include "ui_mainwindow.h"
 
+#include <QMainWindow>
+#include <QDockWidget>
+
 #include "AlignWidget.h"
 #include "AutoLayoutDialog.h"
 #include "LayoutEngine.h"

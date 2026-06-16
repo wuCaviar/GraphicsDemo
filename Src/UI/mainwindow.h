@@ -12,8 +12,6 @@
 #include "Core/ProjectDocument.h"
 #include "atDefine.h"
 
-#include <QMainWindow>
-#include <QDockWidget>
 #include <QMap>
 #include <QUndoStack>
 #include <QProgressBar>
