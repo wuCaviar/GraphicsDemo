@@ -27,6 +27,7 @@ class QPushButton;
 class QSlider;
 class QToolBar;
 class QToolButton;
+class QComboBox;
 class AlignWidget;
 class AutoLayoutDialog;
 class LayoutEngine;
@@ -239,11 +240,12 @@ private:
 
     // 状态栏控件
     QLabel *m_posLabel = nullptr;
-    QLabel *m_zoomLabel = nullptr;
-    QLineEdit *m_zoomEdit = nullptr;
     QLabel *m_canvasLabel = nullptr;
     QLabel *m_toolLabel = nullptr;
     QSlider *m_zoomSlider = nullptr;
+    QComboBox *m_zoomCombo = nullptr;
+    QToolButton *m_zoomOutBtn = nullptr;
+    QToolButton *m_zoomInBtn = nullptr;
     QToolButton *m_resizeCanvasBtn = nullptr;
 
     // 状态栏辅助

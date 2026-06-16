@@ -98,6 +98,7 @@
 #include <QSettings>
 #include <QShortcut>
 #include <QSlider>
+#include <QComboBox>
 #include <QStyle>
 #include <QSplitter>
 #include <QStandardPaths>
@@ -191,7 +192,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     // P6: Wire StatusBarDirector for signal rebinding on page switch
     m_statusBarDirector = new StatusBarDirector(this);
     m_statusBarDirector->setPositionLabel(m_posLabel);
-    m_statusBarDirector->setZoomControls(m_zoomLabel, m_zoomEdit, m_zoomSlider);
+    m_statusBarDirector->setZoomControls(m_zoomCombo, m_zoomOutBtn, m_zoomInBtn, m_zoomSlider);
     m_statusBarDirector->setCanvasLabel(m_canvasLabel);
     m_statusBarDirector->setToolLabel(m_toolLabel);
     connect(&AppContext::get(), &AppContext::pageSwitched, m_statusBarDirector,
@@ -801,18 +802,9 @@ void MainWindow::_bindViewConnections()
 
     // Ruler sync is handled internally by each QAtCanvasPage
 
-    // Status bar: mouse position & zoom
+    // Status bar: mouse position (zoom is handled by StatusBarDirector)
     connect(m_pView, &QAtGraphicsView::mousePositionChanged, this,
             [this](const QPointF &pos) { _updatePosLabel(pos); });
-    connect(m_pView, &QAtGraphicsView::zoomChanged, this, [this](qreal level) {
-        int pct = qRound(level * 100);
-        m_zoomEdit->blockSignals(true);
-        m_zoomEdit->setText(QString::number(pct));
-        m_zoomEdit->blockSignals(false);
-        m_zoomSlider->blockSignals(true);
-        m_zoomSlider->setValue(pct);
-        m_zoomSlider->blockSignals(false);
-    });
 
     // Tool changed → sync status bar + refresh action states
     connect(m_pView, &QAtGraphicsView::toolChanged, this, [this](Tool tool) {
@@ -832,32 +824,58 @@ void MainWindow::_initStatusBar()
 
     m_pProgressMgr = new ProgressManager(this);
 
-    // 缩放编辑框
-    m_zoomEdit = new QLineEdit(QStringLiteral("100"));
-    m_zoomEdit->setFixedWidth(48);
-    m_zoomEdit->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    m_zoomEdit->setToolTip(tr("Enter zoom percentage (1–3200)"));
-    connect(m_zoomEdit, &QLineEdit::editingFinished, m_statusBarDirector,
-            &StatusBarDirector::applyZoomFromEdit);
-    connect(m_zoomEdit, &QLineEdit::returnPressed, m_statusBarDirector,
-            &StatusBarDirector::applyZoomFromEdit);
+    // ---- Zoom controls: − / combo / + / log-slider ----
+    m_zoomOutBtn = new QToolButton;
+    m_zoomOutBtn->setText(QStringLiteral("−")); // minus sign
+    m_zoomOutBtn->setFixedSize(26, 24);
+    m_zoomOutBtn->setAutoRaise(true);
+    m_zoomOutBtn->setToolTip(tr("Zoom out"));
+    connect(m_zoomOutBtn, &QToolButton::clicked, this, [this]() {
+        if (m_pView) m_pView->setZoomLevel(m_pView->zoomLevel() * 0.8);
+    });
 
-    // 缩放标签
-    m_zoomLabel = new QLabel(tr("%"));
-    m_zoomLabel->setMaximumWidth(20);
-    m_zoomLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    m_zoomCombo = new QComboBox;
+    m_zoomCombo->setEditable(true);
+    m_zoomCombo->setInsertPolicy(QComboBox::NoInsert);
+    m_zoomCombo->setFixedWidth(72);
+    m_zoomCombo->setToolTip(tr("Zoom percentage (type number + Enter, or pick preset)"));
+    m_zoomCombo->lineEdit()->setAlignment(Qt::AlignCenter);
+    m_zoomCombo->lineEdit()->setValidator(new QIntValidator(1, 3200, m_zoomCombo));
+    // Preset items
+    m_zoomCombo->addItem(tr("Fit to Canvas"), QStringLiteral("fit"));
+    m_zoomCombo->addItem(tr("Fit to Selection"), QStringLiteral("fit-selection"));
+    m_zoomCombo->insertSeparator(m_zoomCombo->count());
+    m_zoomCombo->addItem(QStringLiteral("100%"), 100);
+    m_zoomCombo->addItem(QStringLiteral("200%"), 200);
+    m_zoomCombo->addItem(QStringLiteral("50%"), 50);
+    m_zoomCombo->addItem(QStringLiteral("25%"), 25);
+    m_zoomCombo->addItem(QStringLiteral("400%"), 400);
+    m_zoomCombo->addItem(QStringLiteral("800%"), 800);
+    m_zoomCombo->setCurrentText(QStringLiteral("100%"));
+    // Signals
+    connect(m_zoomCombo->lineEdit(), &QLineEdit::returnPressed,
+            m_statusBarDirector, &StatusBarDirector::applyZoomFromCombo);
+    connect(m_zoomCombo, QOverload<int>::of(&QComboBox::activated),
+            m_statusBarDirector, &StatusBarDirector::applyPresetFromCombo);
 
-    // 缩放滑块
+    m_zoomInBtn = new QToolButton;
+    m_zoomInBtn->setText(QStringLiteral("+"));
+    m_zoomInBtn->setFixedSize(26, 24);
+    m_zoomInBtn->setAutoRaise(true);
+    m_zoomInBtn->setToolTip(tr("Zoom in"));
+    connect(m_zoomInBtn, &QToolButton::clicked, this, [this]() {
+        if (m_pView) m_pView->setZoomLevel(m_pView->zoomLevel() * 1.25);
+    });
+
+    // Log-mapped slider
     m_zoomSlider = new QSlider(Qt::Horizontal);
-    m_zoomSlider->setRange(1, 3200);
-    m_zoomSlider->setValue(100);
-    m_zoomSlider->setFixedWidth(120);
-    m_zoomSlider->setTickPosition(QSlider::TicksBelow);
-    m_zoomSlider->setTickInterval(50);
+    m_zoomSlider->setRange(0, 100);
+    m_zoomSlider->setValue(50); // ~56.6% default; corrected on first sync
+    m_zoomSlider->setFixedWidth(80);
     m_zoomSlider->setToolTip(tr("Adjust zoom level"));
-    connect(m_zoomSlider, &QSlider::valueChanged, this, [this](int value) {
+    connect(m_zoomSlider, &QSlider::valueChanged, this, [this](int v) {
         if (m_pView)
-            m_pView->setZoomLevel(value / 100.0);
+            m_pView->setZoomLevel(0.01 * std::pow(3200.0, v / 100.0));
     });
 
     // 画布尺寸修改按钮
@@ -920,8 +938,10 @@ void MainWindow::_initStatusBar()
     bar->addPermanentWidget(taskContainer);
     bar->addPermanentWidget(m_pProgressMgr->bar());
     bar->addPermanentWidget(createStatusSeparator(bar));
-    bar->addPermanentWidget(m_zoomEdit);
-    bar->addPermanentWidget(m_zoomLabel);
+    bar->addPermanentWidget(m_zoomOutBtn);
+    bar->addPermanentWidget(m_zoomCombo);
+    bar->addPermanentWidget(m_zoomInBtn);
+    bar->addPermanentWidget(createStatusSeparator(bar));
     bar->addPermanentWidget(m_zoomSlider);
     bar->addPermanentWidget(createStatusSeparator(bar));
     bar->addPermanentWidget(m_resizeCanvasBtn);
@@ -1291,17 +1311,7 @@ void MainWindow::_onCanvasDockActivated(QDockWidget *dock)
         if (m_pView && m_pView->currentTool() != m_currentTool)
             m_pView->setTool(m_currentTool);
 
-        // Sync zoom
-        if (m_pView) {
-            qreal zoom = m_pView->zoomLevel();
-            int pct = qRound(zoom * 100);
-            m_zoomEdit->blockSignals(true);
-            m_zoomEdit->setText(QString::number(pct));
-            m_zoomEdit->blockSignals(false);
-            m_zoomSlider->blockSignals(true);
-            m_zoomSlider->setValue(pct);
-            m_zoomSlider->blockSignals(false);
-        }
+        // Zoom sync is handled by StatusBarDirector::onPageSwitched
         _updateCanvasLabel();
         _updatePosLabel(m_lastScenePos);
 
