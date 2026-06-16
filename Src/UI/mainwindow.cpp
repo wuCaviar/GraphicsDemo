@@ -155,9 +155,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     // New architecture: create canvas page (owns view + scene + undoStack)
     _initPages();
 
-    // Install event filter for tracking canvas dock focus changes
-    qApp->installEventFilter(this);
-
     // Register services and actions BEFORE menu/toolbar so they can use AppContext::getQAction()
     _initServices();
     _initActions();
@@ -1024,23 +1021,10 @@ void MainWindow::_initServices()
 
 void MainWindow::_initPages()
 {
-    // Canvas pages are now QDockWidgets instead of QTabWidget tabs.
-    // Each canvas can be dragged, floated, and rearranged.
-    // Initially all canvases are tabbed together in the right dock area.
-    setDockNestingEnabled(true);
-    setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::TabPosition::North);
-
-    // Use an empty placeholder as central widget so dock widgets can occupy the space
-    //auto *centralPlaceholder = new QWidget(this);
-    //centralPlaceholder->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    //setCentralWidget(centralPlaceholder);
-
-    // Start with no canvas — user creates one via File → New
-    // m_canvasDocks is empty until the first _addCanvasDock call
-
-    QWidget *widget = takeCentralWidget();
-    if (widget)
-        widget->hide();
+    // Canvas pages are now Qtitan DockDocumentPanels — each gets its own
+    // QAtCanvasPage widget embedded via setWidget().
+    // No canvases created on startup — user creates via File -> New.
+    // The DockPanelManager automatically fills the central area with document panels.
 }
 
 void MainWindow::_initActions()
@@ -1133,110 +1117,79 @@ void MainWindow::_updateCanvasLabel()
 }
 
 // ============================================================
-// Canvas Dock 管理 (替代 QTabWidget API)
+// Qtitan Dock Canvas management (replaces old QDockWidget API)
 // ============================================================
 
 QAtCanvasPage *MainWindow::_currentCanvasPage() const
 {
-    return m_activeCanvasDock ? qobject_cast<QAtCanvasPage *>(m_activeCanvasDock->widget())
-                              : nullptr;
-}
-
-QAtCanvasPage *MainWindow::_canvasPageAt(int index) const
-{
-    if (index < 0 || index >= m_canvasDocks.size())
+    if (!m_activeDocumentPanel)
         return nullptr;
-    return qobject_cast<QAtCanvasPage *>(m_canvasDocks.at(index)->widget());
+    return qobject_cast<QAtCanvasPage *>(m_activeDocumentPanel->widget());
 }
 
 int MainWindow::_canvasCount() const
 {
-    return m_canvasDocks.size();
+    return dockPanelManager()->documentPanelList().size();
 }
 
-int MainWindow::_currentCanvasIndex() const
+void MainWindow::_addCanvasPage(const QString &title, const QString &pageId)
 {
-    return m_canvasDocks.indexOf(m_activeCanvasDock);
-}
+    static constexpr qreal kDefaultPpi = 150.0;
+    qreal mmToPx = AtMath::Units::DPIContext(kDefaultPpi).mmToPx(1.0);
 
-int MainWindow::_indexOfCanvasPage(QAtCanvasPage *page) const
-{
-    for (int i = 0; i < m_canvasDocks.size(); ++i) {
-        if (qobject_cast<QAtCanvasPage *>(m_canvasDocks.at(i)->widget()) == page)
-            return i;
-    }
-    return -1;
-}
-
-void MainWindow::_setCurrentCanvasPage(QAtCanvasPage *page)
-{
-    if (!page)
+    NewFileDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted)
         return;
-    for (auto *dock : m_canvasDocks) {
-        if (qobject_cast<QAtCanvasPage *>(dock->widget()) == page) {
-            dock->raise();
-            _onCanvasDockActivated(dock);
-            return;
-        }
-    }
+
+    QSizeF sizeMM = dlg.selectedSizeMM();
+    QSizeF canvasSize(std::ceil(sizeMM.width() * mmToPx), std::ceil(sizeMM.height() * mmToPx));
+
+    auto *canvasPage = new QAtCanvasPage(pageId, canvasSize, kDefaultPpi, this);
+    AppContext::get().registerPage(canvasPage);
+
+    auto *docPanel = dockPanelManager()->addDocumentPanel(title);
+    docPanel->setWidget(canvasPage);
+    docPanel->setProperty("pageId", pageId);
+
+    // Set as active
+    m_activeDocumentPanel = docPanel;
+    m_tabStates[canvasPage].modified = false;
+
+    AppContext::get().setActivePage(pageId);
+    QAtGraphicsView *newView = canvasPage->view();
+    QUndoStack *newStack = canvasPage->undoStack();
+    m_pView = newView;
+    m_undoStack = newStack;
+    if (m_undoStack)
+        AppContext::get().undo()->bindUndoStack(m_undoStack);
+    _bindViewConnections();
+
+    m_pPropertyPanel->setItem(nullptr);
+    m_resizeCanvasBtn->setVisible(true);
+    m_pPropertyPanel->setDisplayPpi(kDefaultPpi);
+
+    m_pProgressMgr->resetAll();
+
+    // Sync labels
+    _updateCanvasLabel();
+    _updatePosLabel(m_lastScenePos);
+    AppContext::get().refreshAllActions();
+    m_statusBarDirector->onPageSwitched(pageId, QStringLiteral("canvas"));
+
+    // Enable side panels now that we have a canvas
+    if (m_propsDockPanel)
+        m_propsDockPanel->showPanel();
+    if (m_alignDockPanel)
+        m_alignDockPanel->closePanel();
+
+    m_projectModified = true;
 }
 
-void MainWindow::_setCurrentCanvasIndex(int index)
+void MainWindow::_removeCanvasPage(Qtitan::DockDocumentPanel *docPanel)
 {
-    if (index < 0 || index >= m_canvasDocks.size())
+    if (!docPanel)
         return;
-    m_canvasDocks.at(index)->raise();
-    _onCanvasDockActivated(m_canvasDocks.at(index));
-}
-
-QDockWidget *MainWindow::_addCanvasDockInternal(QAtCanvasPage *page, const QString &title)
-{
-    if (!page)
-        return nullptr;
-
-    QDockWidget *dock = new QDockWidget(title, this);
-    dock->setObjectName(page->pageId());
-    dock->setWidget(page);
-    dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable
-                      | QDockWidget::DockWidgetClosable);
-    dock->setAllowedAreas(Qt::LeftDockWidgetArea);
-    // Tab switch / float / close detection via visibility changes
-    connect(dock, &QDockWidget::visibilityChanged, this, [this, dock](bool visible) {
-        if (visible) {
-            // Dock became visible — if it's a tab switch (dock is in our list),
-            // activate it immediately so the user doesn't need an extra click
-            if (m_canvasDocks.contains(dock) && m_activeCanvasDock != dock)
-                _onCanvasDockActivated(dock);
-        }
-    });
-
-    addDockWidget(Qt::LeftDockWidgetArea, dock);
-    if (!m_canvasDocks.isEmpty()) {
-        tabifyDockWidget(m_canvasDocks.first(), dock);
-    }
-    dock->raise();
-
-    m_canvasDocks.append(dock);
-    _onCanvasDockActivated(dock);
-
-    // Forward QAtCanvasPage signals through the dock widget's child focus
-    if (auto *view = page->view())
-        view->installEventFilter(this);
-    dock->installEventFilter(this);
-
-    return dock;
-}
-
-void MainWindow::_removeCanvasDockInternal(int index)
-{
-    if (index < 0 || index >= m_canvasDocks.size())
-        return;
-    QDockWidget *dock = m_canvasDocks.at(index);
-    QAtCanvasPage *page = qobject_cast<QAtCanvasPage *>(dock->widget());
-
-    // Remove from tracking list
-    m_canvasDocks.removeAt(index);
-
+    QAtCanvasPage *page = qobject_cast<QAtCanvasPage *>(docPanel->widget());
     if (page) {
         page->disconnect(this);
         if (m_statusBarDirector)
@@ -1245,69 +1198,44 @@ void MainWindow::_removeCanvasDockInternal(int index)
         m_tabStates.remove(page);
     }
 
-    // If this was the active dock, update
-    if (m_activeCanvasDock == dock) {
-        m_activeCanvasDock = m_canvasDocks.isEmpty() ? nullptr : m_canvasDocks.first();
-        if (m_activeCanvasDock)
-            _onCanvasDockActivated(m_activeCanvasDock);
+    auto docList = dockPanelManager()->documentPanelList();
+    if (m_activeDocumentPanel == docPanel) {
+        m_activeDocumentPanel = nullptr;
     }
 
     // Last canvas removed — reset all state
-    if (m_canvasDocks.isEmpty()) {
+    if (docList.size() <= 1) {
         m_pView = nullptr;
         m_undoStack = nullptr;
         m_projectPath.clear();
         m_projectModified = false;
+        if (m_propsDockPanel)
+            m_propsDockPanel->closePanel();
+        if (m_alignDockPanel)
+            m_alignDockPanel->closePanel();
     }
 
-    removeDockWidget(dock);
-    dock->deleteLater();
+    dockPanelManager()->removeDockPanel(docPanel);
 }
 
-void MainWindow::_updateCanvasDockTitle(QAtCanvasPage *page)
+void MainWindow::_onDocumentPanelActivated(Qtitan::DockDocumentPanel *panel)
 {
-    if (!page)
-        return;
-    int idx = _indexOfCanvasPage(page);
-    if (idx < 0)
-        return;
-    QDockWidget *dock = m_canvasDocks.at(idx);
-    auto &state = m_tabStates[page];
-    QString title;
-    if (!m_projectPath.isEmpty()) {
-        if (_canvasCount() == 1)
-            title = QFileInfo(m_projectPath).completeBaseName();
-        else
-            title =
-                tr("%1 — Canvas %2").arg(QFileInfo(m_projectPath).completeBaseName()).arg(idx + 1);
-    } else {
-        title = page->title();
-    }
-    if (state.modified && !title.endsWith(QStringLiteral(" *")))
-        title += QStringLiteral(" *");
-    dock->setWindowTitle(title);
-}
-
-void MainWindow::_onCanvasDockActivated(QDockWidget *dock)
-{
-    if (!dock || m_activeCanvasDock == dock)
+    if (!panel || m_activeDocumentPanel == panel)
         return;
 
-    QAtCanvasPage *page = qobject_cast<QAtCanvasPage *>(dock->widget());
+    QAtCanvasPage *page = qobject_cast<QAtCanvasPage *>(panel->widget());
     if (!page)
         return;
 
-    // Update title of the NEW active tab (add/remove * indicator)
-    _updateCanvasDockTitle(page);
+    _updateDocumentPanelTitle(page);
 
-    QDockWidget *oldDock = m_activeCanvasDock;
-    m_activeCanvasDock = dock;
+    Qtitan::DockDocumentPanel *oldPanel = m_activeDocumentPanel;
+    m_activeDocumentPanel = panel;
 
     AppContext::get().setActivePage(page->pageId());
     QAtGraphicsView *newView = page->view();
     QUndoStack *newStack = page->undoStack();
 
-    // Rebind view signals
     if (m_pView != newView) {
         if (m_pView) {
             m_pView->disconnect(this);
@@ -1320,23 +1248,19 @@ void MainWindow::_onCanvasDockActivated(QDockWidget *dock)
             AppContext::get().undo()->bindUndoStack(m_undoStack);
         _bindViewConnections();
 
-        // Rebinding AlignLayoutDialog
         if (m_alignLayoutDlg && newView) {
             m_alignLayoutDlg->setScene(newView->scene());
             m_alignLayoutDlg->setUndoStack(newStack);
         }
 
-        // Apply global tool
         if (m_pView && m_pView->currentTool() != m_currentTool)
             m_pView->setTool(m_currentTool);
 
-        // Zoom sync is handled by StatusBarDirector::onPageSwitched
         _updateCanvasLabel();
         _updatePosLabel(m_lastScenePos);
 
         AppContext::get().refreshAllActions();
 
-        // Sync PPI
         if (m_pView && m_pView->canvasItem()) {
             qreal ppi = m_pView->canvasItem()->ppi();
             if (m_pPropertyPanel)
@@ -1344,48 +1268,50 @@ void MainWindow::_onCanvasDockActivated(QDockWidget *dock)
         }
     }
 
-    // If old dock was visible and is now hidden by tab switch, update its title too
-    if (oldDock) {
-        auto *oldPage = qobject_cast<QAtCanvasPage *>(oldDock->widget());
+    if (oldPanel) {
+        auto *oldPage = qobject_cast<QAtCanvasPage *>(oldPanel->widget());
         if (oldPage)
-            _updateCanvasDockTitle(oldPage);
+            _updateDocumentPanelTitle(oldPage);
     }
 
-    // Restore property panel from the newly active canvas's selection
     if (m_pView && m_pPropertyPanel) {
         auto items = ::filterSelectableItems(m_pView->scene()->selectedItems());
         m_pPropertyPanel->setItem(items.size() == 1 ? items.first() : nullptr);
     }
 }
 
-bool MainWindow::eventFilter(QObject *obj, QEvent *event)
+void MainWindow::_updateDocumentPanelTitle(QAtCanvasPage *page)
 {
-    // Handle dock close button — ask user for confirmation, then remove the canvas
-    if (event->type() == QEvent::Close) {
-        QDockWidget *dock = qobject_cast<QDockWidget *>(obj);
-        if (dock && m_canvasDocks.contains(dock)) {
-            int idx = m_canvasDocks.indexOf(dock);
-            QAtCanvasPage *page = qobject_cast<QAtCanvasPage *>(dock->widget());
-            if (!_maybeCloseCanvas(page)) {
-                event->ignore();
-                return true;
+    if (!page)
+        return;
+    QString title;
+    if (!m_projectPath.isEmpty()) {
+        if (_canvasCount() == 1)
+            title = QFileInfo(m_projectPath).completeBaseName();
+        else {
+            auto docList = dockPanelManager()->documentPanelList();
+            for (int i = 0; i < docList.size(); ++i) {
+                if (qobject_cast<QAtCanvasPage *>(docList[i]->widget()) == page) {
+                    title = tr("%1 — Canvas %2")
+                                .arg(QFileInfo(m_projectPath).completeBaseName())
+                                .arg(i + 1);
+                    break;
+                }
             }
-            _removeCanvasDockInternal(idx);
-            return true;
+        }
+    } else {
+        title = page->title();
+    }
+    auto &state = m_tabStates[page];
+    if (state.modified && !title.endsWith(QStringLiteral(" *")))
+        title += QStringLiteral(" *");
+    auto docList = dockPanelManager()->documentPanelList();
+    for (auto *dp : docList) {
+        if (qobject_cast<QAtCanvasPage *>(dp->widget()) == page) {
+            dp->setCaption(title);
+            break;
         }
     }
-    if (event->type() == QEvent::FocusIn) {
-        QWidget *w = qobject_cast<QWidget *>(obj);
-        while (w) {
-            QDockWidget *dock = qobject_cast<QDockWidget *>(w);
-            if (dock && m_canvasDocks.contains(dock) && m_activeCanvasDock != dock) {
-                _onCanvasDockActivated(dock);
-                break;
-            }
-            w = w->parentWidget();
-        }
-    }
-    return QMainWindow::eventFilter(obj, event);
 }
 
 void MainWindow::_updateToolLabel()
