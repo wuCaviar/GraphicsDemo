@@ -1,4 +1,5 @@
 #include "TiffExportEngine.h"
+#include "atMath.h"
 #include "TiffExportPipeline.h"
 
 #include "CanvasItem.h"
@@ -222,10 +223,10 @@ ImageUtils::CmykOverlay TiffExportEngine::renderCmykOverlay(
 
         auto toCmyk = [](double c, double m, double y, double k) {
             return std::array<uint8_t, 4>{
-                { static_cast<uint8_t>(qBound(0.0, std::round(c * 2.55), 255.0)),
-                  static_cast<uint8_t>(qBound(0.0, std::round(m * 2.55), 255.0)),
-                  static_cast<uint8_t>(qBound(0.0, std::round(y * 2.55), 255.0)),
-                  static_cast<uint8_t>(qBound(0.0, std::round(k * 2.55), 255.0)) }
+                { static_cast<uint8_t>(AtMath::clamp(std::round(c * 2.55), 0.0, 255.0)),
+                  static_cast<uint8_t>(AtMath::clamp(std::round(m * 2.55), 0.0, 255.0)),
+                  static_cast<uint8_t>(AtMath::clamp(std::round(y * 2.55), 0.0, 255.0)),
+                  static_cast<uint8_t>(AtMath::clamp(std::round(k * 2.55), 0.0, 255.0)) }
             };
         };
         auto brushCmyk = toCmyk(brushC, brushM, brushY, brushK);
@@ -254,10 +255,11 @@ ImageUtils::CmykOverlay TiffExportEngine::renderCmykOverlay(
         double dY = hasBrush ? brushY : penY;
         double dK = hasBrush ? brushK : penK;
 
-        uint8_t cmyk[4] = { static_cast<uint8_t>(qBound(0.0, std::round(dC * 2.55), 255.0)),
-                            static_cast<uint8_t>(qBound(0.0, std::round(dM * 2.55), 255.0)),
-                            static_cast<uint8_t>(qBound(0.0, std::round(dY * 2.55), 255.0)),
-                            static_cast<uint8_t>(qBound(0.0, std::round(dK * 2.55), 255.0)) };
+        uint8_t cmyk[4] = { static_cast<uint8_t>(AtMath::clamp(std::round(dC * 2.55), 0.0, 255.0)),
+                            static_cast<uint8_t>(AtMath::clamp(std::round(dM * 2.55), 0.0, 255.0)),
+                            static_cast<uint8_t>(AtMath::clamp(std::round(dY * 2.55), 0.0, 255.0)),
+                            static_cast<uint8_t>(
+                                AtMath::clamp(std::round(dK * 2.55), 0.0, 255.0)) };
 
         size_t totalPixels = static_cast<size_t>(w) * h;
         uint8_t *dst = overlay.data.data();

@@ -1,4 +1,5 @@
 #include "RectItem.h"
+#include "atMath.h"
 #include "ColorUtils.h"
 
 #include <QPainter>
@@ -9,8 +10,7 @@ RectItem::RectItem(QGraphicsItem *parent) : QGraphicsRectItem(parent)
     setFlag(ItemIsMovable, true);
 }
 
-RectItem::RectItem(const QRectF &rect, QGraphicsItem *parent)
-    : QGraphicsRectItem(rect, parent)
+RectItem::RectItem(const QRectF &rect, QGraphicsItem *parent) : QGraphicsRectItem(rect, parent)
 {
     setFlag(ItemIsSelectable, true);
     setFlag(ItemIsMovable, true);
@@ -35,11 +35,14 @@ QGraphicsItem *RectItem::cloneItem() const
     return item;
 }
 
-qreal RectItem::cornerRadius() const { return m_cornerRadius; }
+qreal RectItem::cornerRadius() const
+{
+    return m_cornerRadius;
+}
 
 void RectItem::setCornerRadius(qreal r)
 {
-    if (qFuzzyCompare(m_cornerRadius, r))
+    if (AtMath::isEqual(m_cornerRadius, r))
         return;
     m_cornerRadius = r;
     update();

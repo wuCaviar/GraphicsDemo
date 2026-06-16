@@ -2,6 +2,7 @@
 #define CANVASITEM_H
 
 #include "IGraphicsItem.h"
+#include "atMath.h"
 #include <QGraphicsRectItem>
 
 // 画布图元 — 纯白背景板，左上角在 (0,0)，不可选择/移动/删除

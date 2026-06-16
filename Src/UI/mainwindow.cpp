@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "atMath.h"
 #include "ui_mainwindow.h"
 
 #include "AlignWidget.h"
@@ -26,6 +27,9 @@
 #include "RectItem.h"
 #include "ResizeHandleItem.h"
 #include "TextItem.h"
+// Strip write mode by default; comment out to switch to tile-based write.
+#define EXPORT_USE_STRIP_WRITE
+
 #ifdef USE_LEGACY_EXPORT
 #    include "TiffExportEngine.h"
 #endif
@@ -466,7 +470,8 @@ void MainWindow::_initMenuBar()
     arrMenu->addSeparator();
     {
         QAction *act = AppContext::get().getQAction(QStringLiteral("AlignLayoutDialog"));
-        if (act) arrMenu->addAction(act);
+        if (act)
+            arrMenu->addAction(act);
     }
     arrMenu->addSeparator();
     QAction *fitCanvasAct =
@@ -476,27 +481,32 @@ void MainWindow::_initMenuBar()
     QMenu *rotateMenu = arrMenu->addMenu(tr("Rotate"));
     {
         QAction *act = AppContext::get().getQAction(QStringLiteral("RotateCW"));
-        if (act) rotateMenu->addAction(act);
+        if (act)
+            rotateMenu->addAction(act);
     }
     {
         QAction *act = AppContext::get().getQAction(QStringLiteral("RotateCCW"));
-        if (act) rotateMenu->addAction(act);
+        if (act)
+            rotateMenu->addAction(act);
     }
     {
         QAction *act = AppContext::get().getQAction(QStringLiteral("Rotate180"));
-        if (act) rotateMenu->addAction(act);
+        if (act)
+            rotateMenu->addAction(act);
     }
 
     // ---- 设置 ----
     QMenu *settingsMenu = menu->addMenu(tr("&Settings"));
     {
         QAction *act = AppContext::get().getQAction(QStringLiteral("Settings"));
-        if (act) settingsMenu->addAction(act);
+        if (act)
+            settingsMenu->addAction(act);
     }
     settingsMenu->addSeparator();
     {
         QAction *act = AppContext::get().getQAction(QStringLiteral("Preferences"));
-        if (act) settingsMenu->addAction(act);
+        if (act)
+            settingsMenu->addAction(act);
     }
 
     // ---- 视图 ----
@@ -509,7 +519,8 @@ void MainWindow::_initMenuBar()
     QMenu *helpMenu = menu->addMenu(tr("&Help"));
     {
         QAction *act = AppContext::get().getQAction(QStringLiteral("About"));
-        if (act) helpMenu->addAction(act);
+        if (act)
+            helpMenu->addAction(act);
     }
 
     // 网格显示/隐藏
@@ -656,7 +667,8 @@ void MainWindow::_initToolBar()
 
     {
         QAction *act = AppContext::get().getQAction(QStringLiteral("AlignLayoutDialog"));
-        if (act) alignToolBar->addAction(act);
+        if (act)
+            alignToolBar->addAction(act);
     }
 
     alignToolBar->addSeparator();
@@ -674,11 +686,13 @@ void MainWindow::_initToolBar()
     // 旋转
     {
         QAction *act = AppContext::get().getQAction(QStringLiteral("RotateCW"));
-        if (act) alignToolBar->addAction(act);
+        if (act)
+            alignToolBar->addAction(act);
     }
     {
         QAction *act = AppContext::get().getQAction(QStringLiteral("RotateCCW"));
-        if (act) alignToolBar->addAction(act);
+        if (act)
+            alignToolBar->addAction(act);
     }
 
     alignToolBar->addSeparator();
@@ -1053,9 +1067,9 @@ void MainWindow::_updatePosLabel(const QPointF &scenePos)
 {
     m_lastScenePos = scenePos;
     qreal ppi = m_pView->canvasItem() ? m_pView->canvasItem()->ppi() : 150.0;
-    qreal kPxToMm = 25.4 / ppi;
-    qreal xmm = scenePos.x() * kPxToMm;
-    qreal ymm = scenePos.y() * kPxToMm;
+    AtMath::Units::DPIContext ctx(ppi);
+    qreal xmm = ctx.pxToMm(scenePos.x());
+    qreal ymm = ctx.pxToMm(scenePos.y());
     m_posLabel->setText(tr("X: %1 mm  Y: %2 mm").arg(xmm, 0, 'f', 1).arg(ymm, 0, 'f', 1));
 }
 
@@ -1072,11 +1086,11 @@ void MainWindow::_updateCanvasLabel()
 
     QSizeF sz = canvas->canvasSize();
     qreal ppi = canvas->ppi();
-    qreal kPxToMm = 25.4 / ppi;
+    AtMath::Units::DPIContext ctx(ppi);
 
     m_canvasLabel->setText(tr("Canvas: %1 \u00d7 %2 mm")
-                               .arg(sz.width() * kPxToMm, 0, 'f', 1)
-                               .arg(sz.height() * kPxToMm, 0, 'f', 1));
+                               .arg(ctx.pxToMm(sz.width()), 0, 'f', 1)
+                               .arg(ctx.pxToMm(sz.height()), 0, 'f', 1));
 }
 
 // ============================================================
@@ -1144,7 +1158,8 @@ QDockWidget *MainWindow::_addCanvasDockInternal(QAtCanvasPage *page, const QStri
     QDockWidget *dock = new QDockWidget(title, this);
     dock->setObjectName(page->pageId());
     dock->setWidget(page);
-    dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    dock->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable
+                      | QDockWidget::DockWidgetClosable);
     dock->setAllowedAreas(Qt::LeftDockWidgetArea);
     // Tab switch / float / close detection via visibility changes
     connect(dock, &QDockWidget::visibilityChanged, this, [this, dock](bool visible) {
@@ -1168,6 +1183,7 @@ QDockWidget *MainWindow::_addCanvasDockInternal(QAtCanvasPage *page, const QStri
     // Forward QAtCanvasPage signals through the dock widget's child focus
     if (auto *view = page->view())
         view->installEventFilter(this);
+    dock->installEventFilter(this);
 
     return dock;
 }
@@ -1315,6 +1331,20 @@ void MainWindow::_onCanvasDockActivated(QDockWidget *dock)
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
+    // Handle dock close button — ask user for confirmation, then remove the canvas
+    if (event->type() == QEvent::Close) {
+        QDockWidget *dock = qobject_cast<QDockWidget *>(obj);
+        if (dock && m_canvasDocks.contains(dock)) {
+            int idx = m_canvasDocks.indexOf(dock);
+            QAtCanvasPage *page = qobject_cast<QAtCanvasPage *>(dock->widget());
+            if (!_maybeCloseCanvas(page)) {
+                event->ignore();
+                return true;
+            }
+            _removeCanvasDockInternal(idx);
+            return true;
+        }
+    }
     if (event->type() == QEvent::FocusIn) {
         QWidget *w = qobject_cast<QWidget *>(obj);
         while (w) {
@@ -1540,7 +1570,7 @@ void MainWindow::loadSession()
         QSizeF canvasSize(tab.canvasWidthPx, tab.canvasHeightPx);
         if (canvasSize.width() <= 0 || canvasSize.height() <= 0) {
             constexpr qreal kDefaultPpi = 150.0;
-            constexpr qreal mmToPx = kDefaultPpi / 25.4;
+            const qreal mmToPx = AtMath::Units::DPIContext(kDefaultPpi).mmToPx(1.0);
             canvasSize = QSizeF(210.0 * mmToPx, 297.0 * mmToPx);
         }
 
@@ -1559,7 +1589,7 @@ void MainWindow::loadSession()
     }
 
     // --- Set active tab ---
-    int activeIdx = qBound(0, info.activeTabIndex, _canvasCount() - 1);
+    int activeIdx = AtMath::clamp(info.activeTabIndex, 0, _canvasCount() - 1);
     _setCurrentCanvasIndex(activeIdx);
 
     // --- Restore global tool ---
@@ -1892,7 +1922,7 @@ void MainWindow::onNewProject()
 void MainWindow::_addCanvasDock(const QString &title, const QString &pageId)
 {
     static constexpr qreal kDefaultPpi = 150.0;
-    qreal mmToPx = kDefaultPpi / 25.4;
+    qreal mmToPx = AtMath::Units::DPIContext(kDefaultPpi).mmToPx(1.0);
 
     NewFileDialog dlg(this);
     if (dlg.exec() != QDialog::Accepted)
@@ -2245,9 +2275,9 @@ void MainWindow::onImportImage()
         importMultipleImages(paths, view, undoStack, page, canvas);
 }
 
-void MainWindow::importSingleImage(const QStringList &paths,
-                                   QAtGraphicsView *view, QUndoStack *undoStack,
-                                   QPointer<QAtCanvasPage> page, CanvasItem *canvas)
+void MainWindow::importSingleImage(const QStringList &paths, QAtGraphicsView *view,
+                                   QUndoStack *undoStack, QPointer<QAtCanvasPage> page,
+                                   CanvasItem *canvas)
 {
     FitCanvasDlg dlg;
     dlg.setParam(canvas->canvasSize());
@@ -2390,9 +2420,9 @@ void MainWindow::importSingleImage(const QStringList &paths,
     atDebug() << "Started import task for" << paths.size() << "images";
 }
 
-void MainWindow::importMultipleImages(const QStringList &paths,
-                                     QAtGraphicsView *view, QUndoStack *undoStack,
-                                     QPointer<QAtCanvasPage> page, CanvasItem *canvas)
+void MainWindow::importMultipleImages(const QStringList &paths, QAtGraphicsView *view,
+                                      QUndoStack *undoStack, QPointer<QAtCanvasPage> page,
+                                      CanvasItem *canvas)
 {
     ImageArrangementDialog dlg;
     dlg.setFilePaths(paths);
@@ -2595,21 +2625,22 @@ void MainWindow::onExportImage()
             // 先算出当前物理 mm（在修改 DPI 前）
             QSizeF oldSize = canvas->canvasSize();
             qreal oldPpi = canvas->ppi();
-            qreal mmW = oldSize.width() / oldPpi * 25.4;
-            qreal mmH = oldSize.height() / oldPpi * 25.4;
+            AtMath::Units::DPIContext ctxOld(oldPpi);
+            qreal mmW = ctxOld.pxToMm(oldSize.width());
+            qreal mmH = ctxOld.pxToMm(oldSize.height());
 
             // 更新画布 DPI（不锁定）
             canvas->setCanvasDpi(dpiOverride, dpiOverride);
             canvas->setPpi(static_cast<qreal>(dpiOverride));
 
             // 从物理 mm 反算新像素尺寸（ceil 保证整数边界，消除取整不一致）
-            qreal mmToPx = static_cast<qreal>(dpiOverride) / 25.4;
+            qreal mmToPx = AtMath::Units::DPIContext(static_cast<qreal>(dpiOverride)).mmToPx(1.0);
             QSizeF newSize(std::ceil(mmW * mmToPx), std::ceil(mmH * mmToPx));
             m_pView->setCanvasSize(newSize);
 
             // 同步缩放非图片图元的像素尺寸和位置（factor = newPpi/oldPpi）
             qreal factor = static_cast<qreal>(dpiOverride) / oldPpi;
-            if (!qFuzzyCompare(factor, 1.0)) {
+            if (!AtMath::isEqual(factor, 1.0)) {
                 const auto selectable = ::filterSelectableItems(m_pView->scene()->items());
                 for (auto *item : selectable) {
                     if (dynamic_cast<ImageItem *>(item) || item->parentItem())
@@ -2775,6 +2806,62 @@ void MainWindow::exportWithEngine(const QString &json, const QString &outputPath
     // 4. 确定分块尺寸（大画布用 1024，小画布用 512）
     int tileSize = (canvas.width > 10000 || canvas.height > 10000) ? 1024 : 512;
 
+#ifdef EXPORT_USE_STRIP_WRITE
+    // ── Strip write path ──────────────────────────────────────────────
+    // Assemble rendered tiles into full-frame buffers, then call write()
+    // which uses strip-based TIFFWriteEncodedStrip internally.
+
+    const size_t frameBytes = static_cast<size_t>(canvas.width) * canvas.height * 4;
+    ATHC::EE::ImageBuffer fullRGBA(canvas.width, canvas.height);
+    std::vector<uint8_t> fullCmyk(frameBytes, 0);
+
+    int tilesX = (canvas.width + tileSize - 1) / tileSize;
+    int tilesY = (canvas.height + tileSize - 1) / tileSize;
+    int totalTiles = tilesX * tilesY;
+
+    std::atomic<int> doneTiles{ 0 };
+
+    ATHC::EE::SceneRenderer renderer;
+    renderer.setConverter(&converter);
+    renderer.renderTiled(
+        canvas, tileSize,
+        [&](int tx, int ty, const std::vector<uint8_t> &cmykTile,
+            const ATHC::EE::ImageBuffer &rgbaTile) {
+            int tw = rgbaTile.width();
+            int th = rgbaTile.height();
+            int x0 = tx, y0 = ty;
+
+            // Copy RGBA tile into full-frame buffer
+            for (int r = 0; r < th; ++r)
+                std::memcpy(fullRGBA.scanLine(y0 + r) + x0 * 4, rgbaTile.scanLine(r),
+                            static_cast<size_t>(tw) * 4);
+
+            // Copy CMYK tile into full-frame buffer
+            if (!cmykTile.empty()) {
+                for (int r = 0; r < th; ++r)
+                    std::memcpy(fullCmyk.data()
+                                    + (static_cast<size_t>(y0 + r) * canvas.width + x0) * 4,
+                                cmykTile.data() + static_cast<size_t>(r) * tw * 4,
+                                static_cast<size_t>(tw) * 4);
+            }
+
+            int done = ++doneTiles;
+            int reportInterval = std::max(totalTiles / 10, 1);
+            if (done % reportInterval == 0 || done == totalTiles)
+                emit exportProgress(done * 100 / totalTiles);
+        });
+
+    // Strip-based write: processes the full frame in ~8 MB strips internally
+    ATHC::EE::TiffWriter writer;
+    writer.setConverter(&converter);
+    if (!writer.write(outputPath.toStdString(), fullCmyk, fullRGBA, canvas.dpi)) {
+        emit exportError(toQString(writer.errorString()));
+        return;
+    }
+
+#else
+    // ── Tile write path ────────────────────────────────────────────────
+
     // 5. 打开输出 TIFF（流式分块写入）
     ATHC::EE::TiffWriter writer;
     writer.setConverter(&converter);
@@ -2828,6 +2915,7 @@ void MainWindow::exportWithEngine(const QString &json, const QString &outputPath
         emit exportError(toQString(writer.errorString()));
         return;
     }
+#endif
 
     emit exportComplete(outputPath);
 }

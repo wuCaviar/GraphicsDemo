@@ -66,8 +66,7 @@ QSize RulerBar::sizeHint() const
 
 void RulerBar::changeEvent(QEvent *event)
 {
-    if (event->type() == QEvent::StyleChange
-        || event->type() == QEvent::PaletteChange) {
+    if (event->type() == QEvent::StyleChange || event->type() == QEvent::PaletteChange) {
         update();
     }
     QWidget::changeEvent(event);
@@ -164,15 +163,11 @@ void RulerBar::paintEvent(QPaintEvent *)
     // bgAlt = bg shifted ~5% toward black
     QColor bgAlt = bg.darker(108);
     // mid = halfway between bg and fg
-    QColor mid = QColor::fromRgb(
-        (bg.red() + fg.red()) / 2,
-        (bg.green() + fg.green()) / 2,
-        (bg.blue() + fg.blue()) / 2);
+    QColor mid = QColor::fromRgb((bg.red() + fg.red()) / 2, (bg.green() + fg.green()) / 2,
+                                 (bg.blue() + fg.blue()) / 2);
     // dark = fg at ~60% opacity over bg (visible but subdued)
-    QColor dark = QColor::fromRgb(
-        (bg.red() * 2 + fg.red()) / 3,
-        (bg.green() * 2 + fg.green()) / 3,
-        (bg.blue() * 2 + fg.blue()) / 3);
+    QColor dark = QColor::fromRgb((bg.red() * 2 + fg.red()) / 3, (bg.green() * 2 + fg.green()) / 3,
+                                  (bg.blue() * 2 + fg.blue()) / 3);
 
     QColor borderColor = mid.lighter(115);
     QColor unitColor = mid;
@@ -203,10 +198,10 @@ void RulerBar::paintEvent(QPaintEvent *)
     calcInterval(interval, subInterval);
 
     if (m_orientation == Horizontal) {
-        qreal visibleLeft  = -m_originPx / m_scale;
+        qreal visibleLeft = -m_originPx / m_scale;
         qreal visibleRight = (width() - m_originPx) / m_scale;
 
-        qreal firstTick    = qFloor(visibleLeft / interval) * interval;
+        qreal firstTick = qFloor(visibleLeft / interval) * interval;
         qreal firstSubTick = qFloor(visibleLeft / subInterval) * subInterval;
 
         // 绘制次刻度
@@ -235,8 +230,8 @@ void RulerBar::paintEvent(QPaintEvent *)
 
             painter.setPen(fg);
             qreal displayVal = toDisplayValue(pos);
-            painter.drawText(QRectF(screenX - 25, 0, 50, kRulerSize - 11),
-                             Qt::AlignCenter, formatLabel(displayVal));
+            painter.drawText(QRectF(screenX - 25, 0, 50, kRulerSize - 11), Qt::AlignCenter,
+                             formatLabel(displayVal));
             painter.setPen(pen);
         }
 
@@ -272,10 +267,10 @@ void RulerBar::paintEvent(QPaintEvent *)
         }
     } else {
         // 垂直刻度尺
-        qreal visibleTop    = -m_originPx / m_scale;
+        qreal visibleTop = -m_originPx / m_scale;
         qreal visibleBottom = (height() - m_originPx) / m_scale;
 
-        qreal firstTick    = qFloor(visibleTop / interval) * interval;
+        qreal firstTick = qFloor(visibleTop / interval) * interval;
         qreal firstSubTick = qFloor(visibleTop / subInterval) * subInterval;
 
         // 绘制次刻度

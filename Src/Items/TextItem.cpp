@@ -1,4 +1,5 @@
 #include "TextItem.h"
+#include "atMath.h"
 
 #include <QPainter>
 #include <QTextDocument>
@@ -9,6 +10,7 @@ TextItem::TextItem(QGraphicsItem *parent) : QGraphicsTextItem(parent)
     setFlag(ItemIsFocusable, false);
     setFlag(ItemIsSelectable, true);
     setFlag(ItemIsMovable, true);
+    setCacheMode(DeviceCoordinateCache); // text layout is expensive — cache for drag
 }
 
 TextItem::TextItem(const QString &text, QGraphicsItem *parent) : QGraphicsTextItem(text, parent)
@@ -17,6 +19,7 @@ TextItem::TextItem(const QString &text, QGraphicsItem *parent) : QGraphicsTextIt
     setFlag(ItemIsFocusable, false);
     setFlag(ItemIsSelectable, true);
     setFlag(ItemIsMovable, true);
+    setCacheMode(DeviceCoordinateCache);
 }
 
 QGraphicsItem *TextItem::cloneItem() const
@@ -70,7 +73,7 @@ void TextItem::setItemFont(const QFont &f)
 
 void TextItem::setTextWidth(qreal w)
 {
-    if (qAbs(w - m_textWidth) < 0.5)
+    if (AtMath::isEqual(w, m_textWidth, 0.5))
         return;
     prepareGeometryChange();
     m_textWidth = (w > 0) ? w : -1;
@@ -116,7 +119,7 @@ void TextItem::setGeometryRect(const QRectF &newRect)
     qreal newFs = curFs * scale;
     if (newFs < 1.0)
         newFs = 1.0;
-    if (qAbs(newFs - curFs) < 0.05 && qAbs(newRect.width() - m_textWidth) < 0.5)
+    if (AtMath::isEqual(newFs, curFs, 0.05) && AtMath::isEqual(newRect.width(), m_textWidth, 0.5))
         return; // 无显著变化，跳过以避免更新抖动
 
     prepareGeometryChange();

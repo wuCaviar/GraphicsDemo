@@ -1,7 +1,10 @@
 #include "QAtCanvasPage.h"
+#include "atMath.h"
 #include "qatgraphicsview.h"
 #include "CanvasItem.h"
-#include "RulerBar.h"
+#include "QRuler.h"
+#include "ViewConverter.h"
+#include "Unit.h"
 
 #include <QGraphicsScene>
 #include <QUndoStack>
@@ -12,11 +15,26 @@
 // ==================== Layout helper ====================
 void QAtCanvasPage::_initLayout()
 {
-    m_hRuler = new RulerBar(RulerBar::Horizontal, this);
-    m_vRuler = new RulerBar(RulerBar::Vertical, this);
+    // Create ViewConverters (one per ruler, though they share the same zoom)
+    m_hConverter = new ViewConverter();
+    m_vConverter = new ViewConverter();
 
+    m_hRuler = new QRuler(this, Qt::Horizontal, m_hConverter);
+    m_vRuler = new QRuler(this, Qt::Vertical, m_vConverter);
+
+    // Use Millimeter unit for display (matching old RulerBar behavior)
+    m_hRuler->setUnit(Unit(Unit::Millimeter));
+    m_vRuler->setUnit(Unit(Unit::Millimeter));
+
+    // Show mouse position indicator on both rulers
+    m_hRuler->setShowMousePosition(true);
+    m_vRuler->setShowMousePosition(true);
+
+    // Match corner widget size to ruler thickness
+    int rulerThickH = m_hRuler->sizeHint().height();
+    int rulerThickV = m_vRuler->sizeHint().width();
     m_cornerWidget = new QWidget(this);
-    m_cornerWidget->setFixedSize(30, 30);
+    m_cornerWidget->setFixedSize(rulerThickV, rulerThickH);
 
     m_layout = new QGridLayout(this);
     m_layout->setSpacing(0);
@@ -33,28 +51,29 @@ void QAtCanvasPage::_initLayout()
     m_layout->setRowStretch(0, 0);
     m_layout->setRowStretch(1, 1);
 
-    // Wire rulers AFTER the view is in the layout (viewport geometry is then valid)
-    m_hRuler->setGraphicsView(m_view);
-    m_vRuler->setGraphicsView(m_view);
+    // --- Wire rulers AFTER layout so geometry is valid ---
 
-    // Scroll bar → ruler sync
-    connect(m_view->horizontalScrollBar(), &QScrollBar::valueChanged, m_hRuler,
-            &RulerBar::updateRuler);
-    connect(m_view->verticalScrollBar(), &QScrollBar::valueChanged, m_vRuler,
-            &RulerBar::updateRuler);
+    // Scroll bar → ruler sync (update offset + zoom)
+    connect(m_view->horizontalScrollBar(), &QScrollBar::valueChanged, this,
+            [this](int) { updateRulers(); });
+    connect(m_view->verticalScrollBar(), &QScrollBar::valueChanged, this,
+            [this](int) { updateRulers(); });
 
     // Mouse position → ruler indicator
-    connect(m_view, &QAtGraphicsView::mousePositionChanged, this, [this](const QPointF &pos) {
-        m_hRuler->setMousePosition(pos);
-        m_vRuler->setMousePosition(pos);
+    connect(m_view, &QAtGraphicsView::mousePositionChanged, this, [this](const QPointF &scenePos) {
+        if (!m_view)
+            return;
+        qreal scale = m_view->transform().m11();
+        // QRuler::updateMouseCoordinate expects position in view pixels (pre-offset)
+        m_hRuler->updateMouseCoordinate(qRound(scenePos.x() * scale));
+        m_vRuler->updateMouseCoordinate(qRound(scenePos.y() * scale));
     });
 
     // Zoom → ruler update
-    connect(m_view, &QAtGraphicsView::zoomChanged, this, [this](qreal /*level*/) {
-        m_hRuler->updateRuler();
-        m_vRuler->updateRuler();
-    });
+    connect(m_view, &QAtGraphicsView::zoomChanged, this, [this](qreal) { updateRulers(); });
 
+    // Initial ruler setup
+    updateRulers();
 }
 
 // ==================== Constructors ====================
@@ -126,18 +145,48 @@ void QAtCanvasPage::onActivated()
 // ==================== Ruler helpers ====================
 void QAtCanvasPage::setRulerPpi(qreal ppi)
 {
-    if (m_hRuler)
-        m_hRuler->setPpi(ppi);
-    if (m_vRuler)
-        m_vRuler->setPpi(ppi);
+    m_ppi = AtMath::clamp(ppi, 1.0, 9999.0);
+    updateRulers();
 }
 
 void QAtCanvasPage::updateRulers()
 {
-    if (m_hRuler)
-        m_hRuler->updateRuler();
-    if (m_vRuler)
-        m_vRuler->updateRuler();
+    if (!m_view)
+        return;
+
+    QTransform transform = m_view->transform();
+    qreal scale = transform.m11();
+
+    // Calculate origin offset: scene (0,0) → screen pixel position
+    QPoint vpOrigin = m_view->mapFromScene(QPointF(0, 0));
+    QPoint widgetOrigin = m_view->viewport()->mapToParent(vpOrigin);
+
+    // Get canvas size
+    CanvasItem *canvas = m_view->canvasItem();
+    if (!canvas)
+        return;
+    QRectF canvasRect = canvas->rect();
+    qreal canvasW = canvasRect.width();
+    qreal canvasH = canvasRect.height();
+
+    // --- Horizontal ruler ---
+    if (m_hRuler && m_hConverter) {
+        // Convert scene pixels → points: 72 points/inch, PPI scene-pixels/inch
+        // docPoint = scenePixel * (72 / PPI)
+        const qreal sceneToPoint = AtMath::Units::DPIContext(m_ppi).pxToPt(1.0);
+        m_hConverter->setZoom(
+            scale * AtMath::Units::DPIContext(m_ppi).ptToPx(1.0)); // point → screen-pixel
+        m_hRuler->setOffset(widgetOrigin.x());
+        m_hRuler->setRulerLength(canvasW * sceneToPoint);
+    }
+
+    // --- Vertical ruler ---
+    if (m_vRuler && m_vConverter) {
+        const qreal sceneToPoint = AtMath::Units::DPIContext(m_ppi).pxToPt(1.0);
+        m_vConverter->setZoom(scale * AtMath::Units::DPIContext(m_ppi).ptToPx(1.0));
+        m_vRuler->setOffset(widgetOrigin.y());
+        m_vRuler->setRulerLength(canvasH * sceneToPoint);
+    }
 }
 
 // ==================== Accessors ====================

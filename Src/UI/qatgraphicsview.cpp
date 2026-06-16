@@ -1,4 +1,5 @@
 #include "qatgraphicsview.h"
+#include "atMath.h"
 
 #include "BezierCurveItem.h"
 #include "CanvasItem.h"
@@ -44,10 +45,11 @@ QAtGraphicsView::QAtGraphicsView(QWidget *parent) : QGraphicsView(parent)
     setScene(m_scene);
     setDragMode(RubberBandDrag);
     setRenderHint(QPainter::Antialiasing);
-    setViewportUpdateMode(FullViewportUpdate);
+    setViewportUpdateMode(MinimalViewportUpdate);
     setTransformationAnchor(AnchorUnderMouse);
     setResizeAnchor(AnchorUnderMouse);
-    // setOptimizationFlags(DontAdjustForAntialiasing | DontSavePainterState);
+    setOptimizationFlags(DontAdjustForAntialiasing | DontSavePainterState);
+    setCacheMode(CacheBackground); // cache grid background as pixmap — invalidated on zoom/resize
 
     m_defaultPen = QPen(Qt::black, 1.0);
     m_defaultBrush = QBrush(Qt::black);
@@ -79,6 +81,7 @@ void QAtGraphicsView::initCanvas(const QSizeF &size)
     m_scene->addItem(m_pCanvas);
 
     m_scene->setSceneRect(-500, -500, size.width() + 1000, size.height() + 1000);
+    resetCachedContent(); // canvas rect changed — grid cache stale
 
     scrollToCanvasOrigin();
 }
@@ -88,6 +91,7 @@ void QAtGraphicsView::setCanvasSize(const QSizeF &size)
     if (m_pCanvas) {
         m_pCanvas->setCanvasSize(size);
         m_scene->setSceneRect(-500, -500, size.width() + 1000, size.height() + 1000);
+        resetCachedContent(); // canvas rect changed — grid cache stale
     } else {
         initCanvas(size);
     }
@@ -107,13 +111,14 @@ void QAtGraphicsView::resetCanvas(const QSizeF &size)
 
 void QAtGraphicsView::setZoomLevel(qreal level)
 {
-    level = qBound(0.01, level, 32.0);
-    if (qFuzzyCompare(m_zoomLevel, level))
+    level = AtMath::clamp(level, 0.01, 32.0);
+    if (AtMath::isEqual(m_zoomLevel, level))
         return;
 
     qreal factor = level / m_zoomLevel;
     scale(factor, factor);
     m_zoomLevel = level;
+    resetCachedContent(); // grid cache invalid since zoom changed
 
     emit zoomChanged(m_zoomLevel);
 }
@@ -131,7 +136,8 @@ void QAtGraphicsView::fitToCanvas()
     scale(0.9, 0.9);
 
     qreal actualScale = transform().m11();
-    m_zoomLevel = qBound(0.01, actualScale, 32.0);
+    m_zoomLevel = AtMath::clamp(actualScale, 0.01, 32.0);
+    resetCachedContent(); // grid cache invalid since zoom changed
 
     emit zoomChanged(m_zoomLevel);
 }
@@ -231,6 +237,16 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
         if (m_rubberBanding)
             m_scene->scheduleResizeHandleUpdate();
 
+        // Disable ItemIsMovable on selected items so Qt won't start
+        // per-item drag — we handle drag ourselves via ghost outline.
+        const auto selectedBefore = m_scene->selectedItems();
+        for (auto *item : selectedBefore) {
+            if (item->flags() & QGraphicsItem::ItemIsMovable) {
+                m_ghostMovableStash.insert(item);
+                item->setFlag(QGraphicsItem::ItemIsMovable, false);
+            }
+        }
+
         m_moving = true;
         QGraphicsView::mousePressEvent(event); // 先让 Qt 处理选中变更，再捕获位置
 
@@ -239,6 +255,43 @@ void QAtGraphicsView::mousePressEvent(QMouseEvent *event)
         for (auto *item : selected) {
             if (item->type() != CanvasItem::Type && item->type() != ResizeHandleItem::Type)
                 m_moveStartPositions[item] = item->pos();
+        }
+
+        if (!m_rubberBanding && !selected.isEmpty()) {
+            // Ghost-Drag: 隐藏原图元，创建虚线轮廓跟随鼠标
+            QPainterPath path = buildGhostPath();
+            if (!path.isEmpty()) {
+                m_ghostPressScenePos = scenePos;
+
+                QPen ghostPen(QColor(0, 120, 212)); // 蓝色，区分于选中框黑色虚线
+                ghostPen.setStyle(Qt::DashLine);
+                ghostPen.setCosmetic(true);
+                ghostPen.setWidthF(1.5);
+
+                m_ghostItem = new QGraphicsPathItem();
+                m_ghostItem->setPath(path);
+                m_ghostItem->setPen(ghostPen);
+                m_ghostItem->setBrush(Qt::NoBrush);
+                m_ghostItem->setZValue(9999);
+                m_ghostItem->setFlag(QGraphicsItem::ItemIsSelectable, false);
+                m_ghostItem->setFlag(QGraphicsItem::ItemIsMovable, false);
+                m_ghostItem->setAcceptHoverEvents(false);
+                m_scene->addItem(m_ghostItem);
+
+                // Keep ItemIsMovable off during ghost drag
+                // (restored in endGhostDrag / cancelGhostDrag)
+                m_ghostDragging = true;
+            } else {
+                // No valid path — restore ItemIsMovable, fall through to normal drag
+                for (auto *item : m_ghostMovableStash)
+                    item->setFlag(QGraphicsItem::ItemIsMovable, true);
+                m_ghostMovableStash.clear();
+            }
+        } else {
+            // Rubber-banding or no selection — restore ItemIsMovable immediately
+            for (auto *item : m_ghostMovableStash)
+                item->setFlag(QGraphicsItem::ItemIsMovable, true);
+            m_ghostMovableStash.clear();
         }
         return;
     }
@@ -323,6 +376,13 @@ void QAtGraphicsView::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
+    // Ghost-Drag: manually move the lightweight outline, skip all
+    // expensive per-frame operations (handle sync, selection emit, item paint).
+    if (m_ghostDragging && m_ghostItem) {
+        m_ghostItem->setPos(scenePos - m_ghostPressScenePos);
+        return;
+    }
+
     if (m_tool != Tool::Select && !m_drawing) {
         QGraphicsView::mouseMoveEvent(event);
         return;
@@ -332,8 +392,13 @@ void QAtGraphicsView::mouseMoveEvent(QMouseEvent *event)
         QGraphicsView::mouseMoveEvent(event);
 
         if (m_tool == Tool::Select && m_moving) {
-            m_scene->syncResizeHandleDuringMove();
-            emit selectionChanged();
+            // Throttle: sync handle only every 3rd frame to reduce per-frame cost.
+            // At 60 fps this still updates handles ~20 fps — imperceptibly smooth.
+            m_dragThrottle = (m_dragThrottle + 1) % 3;
+            if (m_dragThrottle == 0) {
+                m_scene->syncResizeHandleDuringMove();
+                emit selectionChanged();
+            }
         }
         return;
     }
@@ -395,6 +460,15 @@ void QAtGraphicsView::mouseReleaseEvent(QMouseEvent *event)
     }
 
     m_rubberBanding = false;
+
+    // Ghost-Drag completion: teleport real items to ghost position
+    if (m_ghostDragging) {
+        endGhostDrag();
+        m_moving = false;
+        QGraphicsView::mouseReleaseEvent(event);
+        m_scene->cleanupInvalidHandle();
+        return;
+    }
 
     if (m_moving && m_tool == Tool::Select) {
         m_moving = false;
@@ -502,7 +576,7 @@ void QAtGraphicsView::contextMenuEvent(QContextMenuEvent *event)
 
 void QAtGraphicsView::keyPressEvent(QKeyEvent *event)
 {
-    if (event->key() == Qt::Key_Space && !m_drawing && !m_spaceHandMode) {
+    if (event->key() == Qt::Key_Space && !m_drawing && !m_ghostDragging && !m_spaceHandMode) {
         m_previousTool = m_tool;
         m_spaceHandMode = true;
         setTool(Tool::Hand);
@@ -510,10 +584,17 @@ void QAtGraphicsView::keyPressEvent(QKeyEvent *event)
         return;
     }
 
-    if (event->key() == Qt::Key_Escape && m_drawing) {
-        cancelDrawing();
-        event->accept();
-        return;
+    if (event->key() == Qt::Key_Escape) {
+        if (m_ghostDragging) {
+            cancelGhostDrag();
+            event->accept();
+            return;
+        }
+        if (m_drawing) {
+            cancelDrawing();
+            event->accept();
+            return;
+        }
     }
     QGraphicsView::keyPressEvent(event);
 }
@@ -549,20 +630,19 @@ void QAtGraphicsView::setGridVisible(bool visible)
     if (m_gridVisible == visible)
         return;
     m_gridVisible = visible;
+    resetCachedContent(); // grid is part of cached background
     viewport()->update();
 }
 
 bool QAtGraphicsView::isDarkTheme() const
 {
     const QPalette &pal = palette();
-    return pal.color(QPalette::Window).value()
-         < pal.color(QPalette::WindowText).value();
+    return pal.color(QPalette::Window).value() < pal.color(QPalette::WindowText).value();
 }
 
 void QAtGraphicsView::changeEvent(QEvent *event)
 {
-    if (event->type() == QEvent::StyleChange
-        || event->type() == QEvent::PaletteChange) {
+    if (event->type() == QEvent::StyleChange || event->type() == QEvent::PaletteChange) {
         viewport()->update();
     }
     QGraphicsView::changeEvent(event);
@@ -601,19 +681,35 @@ void QAtGraphicsView::drawBackground(QPainter *painter, const QRectF &rect)
         if (!gridRect.isValid())
             return;
 
-        // Grid spacing in scene pixels, stepped by zoom level.
-        // At high zoom the grid densifies; at low zoom it coarsens.
-        static constexpr qreal kTargetScreenPx = 50.0; // target grid cell ~50 screen px
-        qreal baseInterval = kTargetScreenPx / m_zoomLevel;
-        // Snap to nice 1-2-5 multiples
-        qreal mag = std::pow(10.0, std::floor(std::log10(baseInterval)));
-        qreal norm = baseInterval / mag;
-        if (norm < 1.5)      baseInterval = 1.0 * mag;
-        else if (norm < 3.5) baseInterval = 2.0 * mag;
-        else if (norm < 7.5) baseInterval = 5.0 * mag;
-        else                 baseInterval = 10.0 * mag;
-        if (baseInterval < 1.0)
-            baseInterval = 1.0;
+        // Grid aligned with ruler: mm-based spacing derived from canvas PPI.
+        // Grid lines land on integer-mm positions matching ruler tick marks.
+        // Spacing auto-adapts to zoom so cells stay ~50 screen pixels wide.
+        const qreal ppi = m_pCanvas->ppi();
+        const qreal pxPerMm = AtMath::Units::DPIContext(ppi).mmToPx(1.0); // scene pixels per mm
+
+        static constexpr qreal kTargetScreenPx = 50.0;
+        qreal idealMm = kTargetScreenPx / (pxPerMm * m_zoomLevel);
+
+        // Snap to 1-2-5 nice mm values
+        qreal mag = std::pow(10.0, std::floor(std::log10(idealMm)));
+        qreal norm = idealMm / mag;
+        if (norm < 1.5)
+            idealMm = 1.0 * mag;
+        else if (norm < 3.5)
+            idealMm = 2.0 * mag;
+        else if (norm < 7.5)
+            idealMm = 5.0 * mag;
+        else
+            idealMm = 10.0 * mag;
+        qreal mmInterval = qMax(1.0, idealMm);
+
+        qreal baseInterval = mmInterval * pxPerMm; // scene-pixel interval
+
+        // Cap max interval so grid doesn't vanish at very low zoom
+        static constexpr int kMinGridCells = 5;
+        qreal maxInterval = qMin(canvasRect.width(), canvasRect.height()) / kMinGridCells;
+        if (baseInterval > maxInterval)
+            baseInterval = maxInterval;
 
         qreal majorInterval = baseInterval * 5;
 
@@ -623,9 +719,10 @@ void QAtGraphicsView::drawBackground(QPainter *painter, const QRectF &rect)
         QColor minorColor = pal.color(QPalette::WindowText);
         minorColor.setAlpha(isDarkTheme() ? 15 : 20);
         QPen minorPen(minorColor);
-        minorPen.setWidthF(0.5);
+        minorPen.setCosmetic(true); // fixed 1px width, doesn't scale with zoom
         painter->setPen(minorPen);
 
+        // Start from 0 so grid lines land exactly on ruler mm marks
         qreal startX = qFloor(gridRect.left() / baseInterval) * baseInterval;
         qreal startY = qFloor(gridRect.top() / baseInterval) * baseInterval;
 
@@ -640,11 +737,11 @@ void QAtGraphicsView::drawBackground(QPainter *painter, const QRectF &rect)
             painter->drawLine(QPointF(gridRect.left(), y), QPointF(gridRect.right(), y));
         }
 
-        // Major grid
+        // Major grid — slightly more opaque, also cosmetic (fixed width)
         QColor majorColor = pal.color(QPalette::WindowText);
         majorColor.setAlpha(isDarkTheme() ? 30 : 40);
         QPen majorPen(majorColor);
-        majorPen.setWidthF(0.8);
+        majorPen.setCosmetic(true); // fixed width, doesn't scale with zoom
         painter->setPen(majorPen);
 
         qreal majorStartX = qFloor(gridRect.left() / majorInterval) * majorInterval;
@@ -675,12 +772,98 @@ void QAtGraphicsView::finishDrawing()
     }
 
     m_scene->removeItem(m_tempItem);
+    // Enable device-coordinate cache for drag performance.
+    // Items drawn frame-by-frame (Rect, Ellipse, Line, Bezier, Freehand) would
+    // thrash the cache during creation, so we enable it only once stable.
+    m_tempItem->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
 
     if (m_undoStack)
         m_undoStack->push(new AddItemCommand(m_scene, m_tempItem));
 
     emit itemAdded(m_tempItem);
     m_tempItem = nullptr;
+}
+
+// ============================================================
+// Ghost-Drag: 拖拽时仅绘制虚线轮廓，松手后瞬移原图元
+// ============================================================
+QPainterPath QAtGraphicsView::buildGhostPath() const
+{
+    QPainterPath combined;
+    const auto selected = m_scene->selectedItems();
+    for (auto *item : selected) {
+        if (item->type() == CanvasItem::Type || item->type() == ResizeHandleItem::Type)
+            continue;
+        auto *igi = dynamic_cast<IGraphicsItem *>(item);
+        QPainterPath itemPath;
+        if (igi && igi->supportsGeometryRect()) {
+            itemPath.addRect(igi->geometryRect());
+        } else {
+            itemPath = item->shape();
+        }
+        itemPath.translate(item->pos());
+        combined.addPath(itemPath);
+    }
+    return combined;
+}
+
+void QAtGraphicsView::endGhostDrag()
+{
+    if (!m_ghostItem)
+        return;
+
+    const QPointF delta = m_ghostItem->pos();
+
+    // Remove ghost from scene
+    m_scene->removeItem(m_ghostItem);
+    delete m_ghostItem;
+    m_ghostItem = nullptr;
+    m_ghostDragging = false;
+
+    // Restore ItemIsMovable on stashed items
+    for (auto *item : m_ghostMovableStash)
+        item->setFlag(QGraphicsItem::ItemIsMovable, true);
+    m_ghostMovableStash.clear();
+
+    // Teleport real items to new positions
+    QList<QGraphicsItem *> movedItems;
+    QList<QPointF> oldPositions;
+    QList<QPointF> newPositions;
+    for (auto it = m_moveStartPositions.begin(); it != m_moveStartPositions.end(); ++it) {
+        QGraphicsItem *item = it.key();
+        QPointF oldPos = it.value();
+        QPointF newPos = oldPos + delta;
+        if (oldPos != newPos) {
+            item->setPos(newPos);
+            movedItems << item;
+            oldPositions << oldPos;
+            newPositions << newPos;
+        }
+    }
+
+    if (!movedItems.isEmpty() && m_undoStack)
+        m_undoStack->push(new MoveItemsCommand(movedItems, oldPositions, newPositions, m_scene));
+
+    m_moveStartPositions.clear();
+    m_scene->syncResizeHandleDuringMove();
+}
+
+void QAtGraphicsView::cancelGhostDrag()
+{
+    if (!m_ghostItem)
+        return;
+
+    m_scene->removeItem(m_ghostItem);
+    delete m_ghostItem;
+    m_ghostItem = nullptr;
+    m_ghostDragging = false;
+
+    // Restore ItemIsMovable
+    for (auto *item : m_ghostMovableStash)
+        item->setFlag(QGraphicsItem::ItemIsMovable, true);
+    m_ghostMovableStash.clear();
+
+    m_moveStartPositions.clear();
 }
 
 void QAtGraphicsView::cancelDrawing()

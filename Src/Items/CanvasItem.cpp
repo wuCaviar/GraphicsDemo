@@ -30,7 +30,7 @@ void CanvasItem::setCanvasSize(const QSizeF &size)
 
 void CanvasItem::setPpi(qreal ppi)
 {
-    m_ppi = qBound(1.0, ppi, 9999.0);
+    m_ppi = AtMath::clamp(ppi, 1.0, 9999.0);
 }
 
 void CanvasItem::setCanvasDpi(int dpiX, int dpiY)
@@ -63,7 +63,7 @@ void CanvasItem::updateEffectivePpi()
 qreal CanvasItem::pixelsPerMm() const
 {
     // 始终基于有效 PPI 返回换算因子
-    return m_ppi / 25.4;
+    return AtMath::Units::DPIContext(m_ppi).mmToPx(1.0);
 }
 
 QSizeF CanvasItem::canvasSize() const

@@ -2,7 +2,9 @@
 #define QATGRAPHICSVIEW_H
 
 #include <QGraphicsView>
+#include <QGraphicsPathItem>
 #include <QMap>
+#include <QSet>
 
 class QGraphicsItem;
 class QUndoStack;
@@ -121,6 +123,18 @@ private:
 
     // 网格
     bool m_gridVisible = true;
+
+    // Ghost-Drag: 拖拽时隐藏图元，仅绘制轻量虚线轮廓，松手后瞬移
+    bool m_ghostDragging = false;
+    QGraphicsPathItem *m_ghostItem = nullptr;
+    QSet<QGraphicsItem *> m_ghostMovableStash; // 暂存 ItemIsMovable 标记以便恢复
+    QPointF m_ghostPressScenePos; // 幽灵拖拽起始点（场景坐标）
+    QPainterPath buildGhostPath() const;
+    void endGhostDrag();
+    void cancelGhostDrag();
+
+    // 拖拽节流计数器 — 减少每帧不必要的 update/emit
+    int m_dragThrottle = 0;
 
     // 默认画笔/画刷（用于新建图元）
     QPen m_defaultPen;

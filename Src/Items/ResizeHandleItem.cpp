@@ -1,4 +1,5 @@
 #include "ResizeHandleItem.h"
+#include "atMath.h"
 
 #include "CanvasItem.h"
 #include "Commands.h"
@@ -582,8 +583,8 @@ void ResizeHandleItem::applyResize(HandleRole role, const QPointF &scenePos)
         if (igi->itemType() == IGraphicsItem::TextItemType) {
             QRectF after = getItemGeometry(m_target);
             // 检测锚边：newRect 中未移动的边即为锚定边
-            bool anchorLeft = qFuzzyCompare(newRect.left(), m_originalRect.left());
-            bool anchorTop = qFuzzyCompare(newRect.top(), m_originalRect.top());
+            bool anchorLeft = AtMath::isEqual(newRect.left(), m_originalRect.left());
+            bool anchorTop = AtMath::isEqual(newRect.top(), m_originalRect.top());
 
             qreal x = m_preResizePos.x();
             qreal y = m_preResizePos.y();

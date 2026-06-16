@@ -1,4 +1,5 @@
 #include "ColorUtils.h"
+#include "atMath.h"
 
 #include <QConicalGradient>
 #include <QPushButton>
@@ -50,7 +51,8 @@ void updateColorButton(QPushButton *btn, const QColor &color, bool transparent)
 QBrush mapGradientBrushToRect(const QBrush &brush, const QRectF &rect)
 {
     const QGradient *gradient = brush.gradient();
-    if (!gradient || !rect.isValid() || qFuzzyIsNull(rect.width()) || qFuzzyIsNull(rect.height()))
+    if (!gradient || !rect.isValid() || AtMath::isZero(rect.width())
+        || AtMath::isZero(rect.height()))
         return brush;
 
     QBrush mappedBrush;

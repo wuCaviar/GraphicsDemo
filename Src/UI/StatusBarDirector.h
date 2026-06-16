@@ -32,12 +32,12 @@ public slots:
     void onToolChanged(Tool tool);
 
 private:
-    QLabel    *m_posLabel    = nullptr;
-    QLabel    *m_zoomLabel   = nullptr;
-    QLineEdit *m_zoomEdit    = nullptr;
-    QSlider   *m_zoomSlider  = nullptr;
-    QLabel    *m_canvasLabel = nullptr;
-    QLabel    *m_toolLabel   = nullptr;
+    QLabel *m_posLabel = nullptr;
+    QLabel *m_zoomLabel = nullptr;
+    QLineEdit *m_zoomEdit = nullptr;
+    QSlider *m_zoomSlider = nullptr;
+    QLabel *m_canvasLabel = nullptr;
+    QLabel *m_toolLabel = nullptr;
 };
 
 #endif // STATUSBARDIRECTOR_H

@@ -1,4 +1,5 @@
 #include "PropertyPanel.h"
+#include "atMath.h"
 
 #include "RectItem.h"
 #include "EllipseItem.h"
@@ -507,15 +508,15 @@ void PropertyPanel::updatePanel()
     }
 
     // 始终以 mm 显示
-    qreal kPxToMm = 25.4 / m_ppi;
+    AtMath::Units::DPIContext ctx(m_ppi);
     QString suffix = QStringLiteral(" mm");
     m_xSpin->setSuffix(suffix);
     m_ySpin->setSuffix(suffix);
     m_wSpin->setSuffix(suffix);
     m_hSpin->setSuffix(suffix);
 
-    m_xSpin->setValue(minX * kPxToMm);
-    m_ySpin->setValue(minY * kPxToMm);
+    m_xSpin->setValue(ctx.pxToMm(minX));
+    m_ySpin->setValue(ctx.pxToMm(minY));
 
     // 判断 W/H 是否可编辑：支持 setGeometryRect 的图元（文字图元除外，其尺寸由字号派生）
     bool canResizeRect =
@@ -523,8 +524,8 @@ void PropertyPanel::updatePanel()
     m_wSpin->setReadOnly(!canResizeRect);
     m_hSpin->setReadOnly(!canResizeRect);
 
-    m_wSpin->setValue((maxX - minX) * kPxToMm);
-    m_hSpin->setValue((maxY - minY) * kPxToMm);
+    m_wSpin->setValue(ctx.pxToMm(maxX - minX));
+    m_hSpin->setValue(ctx.pxToMm(maxY - minY));
 
     m_zValueSpin->setValue(m_currentItem->zValue());
 
@@ -657,11 +658,13 @@ void PropertyPanel::updatePanel()
         // 文件路径
         m_imgPathLabel->setText(imgItem->filePath());
 
-        // 物理尺寸（mm = 像素 / DPI * 25.4）
+        // 物理尺寸（使用 AtMath::DPIContext::pxToMm 换算）
         QSize origSz = imgItem->originalSize();
         if (origSz.isValid() && imgItem->dpiX() > 0 && imgItem->dpiY() > 0) {
-            qreal mmW = origSz.width() / static_cast<qreal>(imgItem->dpiX()) * 25.4;
-            qreal mmH = origSz.height() / static_cast<qreal>(imgItem->dpiY()) * 25.4;
+            qreal mmW = AtMath::Units::DPIContext(static_cast<qreal>(imgItem->dpiX()))
+                            .pxToMm(origSz.width());
+            qreal mmH = AtMath::Units::DPIContext(static_cast<qreal>(imgItem->dpiY()))
+                            .pxToMm(origSz.height());
             m_imgOriginalSizeLabel->setText(
                 tr("%1 x %2 mm").arg(mmW, 0, 'f', 4).arg(mmH, 0, 'f', 4));
         } else {
@@ -883,11 +886,11 @@ void PropertyPanel::onGeometryChanged()
     qreal h = m_hSpin->value();
 
     // 始终 mm → px 转换
-    qreal kMmToPx = m_ppi / 25.4;
-    x *= kMmToPx;
-    y *= kMmToPx;
-    w *= kMmToPx;
-    h *= kMmToPx;
+    AtMath::Units::DPIContext ctx2(m_ppi);
+    x = ctx2.mmToPx(x);
+    y = ctx2.mmToPx(y);
+    w = ctx2.mmToPx(w);
+    h = ctx2.mmToPx(h);
 
     // 位置变更：X/Y 显示的是视觉包围盒的 minX/minY，需要转为 item 的 pos
     QRectF currentGeom =
@@ -915,7 +918,7 @@ void PropertyPanel::onGeometryChanged()
     QRectF oldRect = currentGeom;
     qreal localW = w, localH = h;
     // 旋转 ±90°/±270° 时本地 W/H 与视觉 W/H 互换
-    qreal rot = fmod(qAbs(m_currentItem->rotation()), 180.0);
+    qreal rot = std::fmod(std::fabs(m_currentItem->rotation()), 180.0);
     if (rot > 45.0 && rot < 135.0)
         std::swap(localW, localH);
     QRectF newRect(currentGeom.topLeft(), QSizeF(localW, localH));
@@ -934,7 +937,7 @@ void PropertyPanel::onCornerRadiusChanged(double r)
         return;
 
     qreal oldR = ri->cornerRadius();
-    if (!qFuzzyCompare(oldR, r))
+    if (!AtMath::isEqual(oldR, r))
         emit cornerRadiusChanged(m_currentItem, oldR, r);
 }
 
@@ -945,6 +948,6 @@ void PropertyPanel::onRotationChanged(double r)
         return;
 
     qreal oldR = m_currentItem->rotation();
-    if (!qFuzzyCompare(oldR, r))
+    if (!AtMath::isEqual(oldR, r))
         emit rotationChanged(m_currentItem, oldR, r);
 }

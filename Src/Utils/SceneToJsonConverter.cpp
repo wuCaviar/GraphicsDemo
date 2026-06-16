@@ -1,4 +1,5 @@
 #include "SceneToJsonConverter.h"
+#include "atMath.h"
 
 #include "CanvasItem.h"
 #include "GraphicsItemGroup.h"
@@ -150,7 +151,7 @@ QJsonObject makeGradientStopColorJson(IGraphicsItem *gi, double pos, const QColo
     QMap<double, CmykColor> cmykMap = gi->gradientStopCmykMap();
     const CmykColor *cmyk = nullptr;
     for (auto it = cmykMap.constBegin(); it != cmykMap.constEnd(); ++it) {
-        if (qFuzzyCompare(it.key(), pos)) {
+        if (AtMath::isEqual(it.key(), pos)) {
             cmyk = &it.value();
             break;
         }

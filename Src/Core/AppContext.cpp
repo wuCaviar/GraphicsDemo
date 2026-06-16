@@ -20,11 +20,11 @@ AppContext::AppContext()
     // 转发 PageManager 的信号，使外部只需连接 AppContext
     auto &pm = PageManager::get();
     connect(&pm, &PageManager::pageSwitched, this, &AppContext::pageSwitched);
-    connect(&pm, &PageManager::pageAdded,    this, &AppContext::pageAdded);
-    connect(&pm, &PageManager::pageRemoved,  this, &AppContext::pageRemoved);
+    connect(&pm, &PageManager::pageAdded, this, &AppContext::pageAdded);
+    connect(&pm, &PageManager::pageRemoved, this, &AppContext::pageRemoved);
 }
 
-AppContext& AppContext::get()
+AppContext &AppContext::get()
 {
     static AppContext instance;
     return instance;
@@ -52,17 +52,17 @@ QString AppContext::activePageId() const
     return PageManager::get().activePageId();
 }
 
-QAtPage* AppContext::activePage() const
+QAtPage *AppContext::activePage() const
 {
     return PageManager::get().activePage();
 }
 
-QAtCanvasPage* AppContext::activeCanvasPage() const
+QAtCanvasPage *AppContext::activeCanvasPage() const
 {
     return PageManager::get().activeCanvasPage();
 }
 
-QList<QAtPage*> AppContext::allPages() const
+QList<QAtPage *> AppContext::allPages() const
 {
     return PageManager::get().allPages();
 }
@@ -71,13 +71,14 @@ QList<QAtPage*> AppContext::allPages() const
 
 void AppContext::registerAction(const QAtActionBasePtr &action)
 {
-    if (!action) return;
+    if (!action)
+        return;
     const QString &token = action->token();
     m_actions[token] = action;
     m_actionCategories[token] = action->_category();
 }
 
-QAction* AppContext::getQAction(const QString &token) const
+QAction *AppContext::getQAction(const QString &token) const
 {
     // Return cached QAction if already created
     auto it = m_qActions.find(token);
@@ -146,46 +147,48 @@ QList<QAtActionBasePtr> AppContext::actionsByCategory(const QString &category) c
 
 void AppContext::registerService(QAtService *service)
 {
-    if (!service) return;
+    if (!service)
+        return;
     const QString &id = service->serviceId();
-    if (m_services.contains(id)) return;
+    if (m_services.contains(id))
+        return;
     m_services[id] = service;
     if (!service->initialize()) {
         qWarning() << "Service" << id << "failed to initialize";
     }
 }
 
-ClipboardService* AppContext::clipboard() const
+ClipboardService *AppContext::clipboard() const
 {
     return service<ClipboardService>();
 }
 
-ThemeService* AppContext::theme() const
+ThemeService *AppContext::theme() const
 {
     return service<ThemeService>();
 }
 
-ProgressService* AppContext::progress() const
+ProgressService *AppContext::progress() const
 {
     return service<ProgressService>();
 }
 
-NetworkService* AppContext::network() const
+NetworkService *AppContext::network() const
 {
     return service<NetworkService>();
 }
 
-ProcessService* AppContext::process() const
+ProcessService *AppContext::process() const
 {
     return service<ProcessService>();
 }
 
-ProjectService* AppContext::project() const
+ProjectService *AppContext::project() const
 {
     return service<ProjectService>();
 }
 
-UndoService* AppContext::undo() const
+UndoService *AppContext::undo() const
 {
     return service<UndoService>();
 }
@@ -219,7 +222,7 @@ void AppContext::setAlignWidget(AlignWidget *widget)
     m_alignWidget = widget;
 }
 
-AlignWidget* AppContext::alignWidget() const
+AlignWidget *AppContext::alignWidget() const
 {
     return m_alignWidget;
 }

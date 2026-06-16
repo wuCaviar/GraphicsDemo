@@ -12,5 +12,6 @@
 #include "atDebug.h"
 #include "atVersion.h"
 #include "atPresets.h"
+#include "atMath.h"
 
 #endif // ATDEFINE_H

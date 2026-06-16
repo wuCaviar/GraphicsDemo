@@ -12,7 +12,8 @@ class QGraphicsScene;
 class QUndoStack;
 class CanvasItem;
 class QGridLayout;
-class RulerBar;
+class QRuler;
+class ViewConverter;
 
 enum class Tool;
 
@@ -41,10 +42,11 @@ public:
     CanvasItem *canvasItem() const;
 
     // Ruler accessors
-    RulerBar *hRuler() const { return m_hRuler; }
-    RulerBar *vRuler() const { return m_vRuler; }
+    QRuler *hRuler() const { return m_hRuler; }
+    QRuler *vRuler() const { return m_vRuler; }
     void setRulerPpi(qreal ppi);
     void updateRulers();
+    qreal rulerPpi() const { return m_ppi; }
 
     Tool currentTool() const;
     void setTool(Tool tool);
@@ -69,9 +71,12 @@ private:
     QGraphicsScene *m_scene = nullptr;
     QUndoStack *m_undoStack = nullptr;
     QGridLayout *m_layout = nullptr;
-    RulerBar *m_hRuler = nullptr;
-    RulerBar *m_vRuler = nullptr;
+    QRuler *m_hRuler = nullptr;
+    QRuler *m_vRuler = nullptr;
+    ViewConverter *m_hConverter = nullptr;
+    ViewConverter *m_vConverter = nullptr;
     QWidget *m_cornerWidget = nullptr;
+    qreal m_ppi = 150.0;
 };
 
 #endif // QATCANVASPAGE_H

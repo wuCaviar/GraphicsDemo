@@ -1,4 +1,5 @@
 #include "ResizeCanvasDialog.h"
+#include "atMath.h"
 
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
@@ -38,8 +39,7 @@ void ResizeCanvasDialog::setupUI()
     m_infoLabel->setStyleSheet("color: gray;");
     mainLayout->addWidget(m_infoLabel);
 
-    auto *buttonBox = new QDialogButtonBox(
-        QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    auto *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     mainLayout->addWidget(buttonBox);
 
     connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -48,15 +48,14 @@ void ResizeCanvasDialog::setupUI()
 
 void ResizeCanvasDialog::setCurrentSizeMM(const QSizeF &pixelSize, qreal ppi)
 {
-    qreal factor = 25.4 / ppi;
-    m_widthSpin->setValue(pixelSize.width() * factor);
-    m_heightSpin->setValue(pixelSize.height() * factor);
-    m_infoLabel->setText(tr("PPI: %1")
-                             .arg(ppi, 0, 'f', 0));
+    AtMath::Units::DPIContext ctx(ppi);
+    m_widthSpin->setValue(ctx.pxToMm(pixelSize.width()));
+    m_heightSpin->setValue(ctx.pxToMm(pixelSize.height()));
+    m_infoLabel->setText(tr("PPI: %1").arg(ppi, 0, 'f', 0));
 }
 
 QSizeF ResizeCanvasDialog::newPixelSize(qreal ppi) const
 {
-    qreal factor = ppi / 25.4;
-    return QSizeF(m_widthSpin->value() * factor, m_heightSpin->value() * factor);
+    AtMath::Units::DPIContext ctx(ppi);
+    return QSizeF(ctx.mmToPx(m_widthSpin->value()), ctx.mmToPx(m_heightSpin->value()));
 }

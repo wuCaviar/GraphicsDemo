@@ -1,4 +1,5 @@
 #include "ImageUtils.h"
+#include "atMath.h"
 #include "ImageCacheManager.h"
 #include "ImageWorker.h"
 #include "IGraphicsItem.h"
@@ -183,9 +184,9 @@ QImage loadTiffImage(const QString &path, QPair<int, int> *dpi, bool *isCmyk)
                     double c = src[off + 0] / 2.55, m = src[off + 1] / 2.55,
                            y2 = src[off + 2] / 2.55, k = src[off + 3] / 2.55;
                     double f = 1.0 - k / 100.0;
-                    int r = qBound(0, qRound(255 * (1 - c / 100) * f), 255);
-                    int g = qBound(0, qRound(255 * (1 - m / 100) * f), 255);
-                    int b = qBound(0, qRound(255 * (1 - y2 / 100) * f), 255);
+                    int r = AtMath::clamp(qRound(255 * (1 - c / 100) * f), 0, 255);
+                    int g = AtMath::clamp(qRound(255 * (1 - m / 100) * f), 0, 255);
+                    int b = AtMath::clamp(qRound(255 * (1 - y2 / 100) * f), 0, 255);
                     scanLine[x] = qRgb(r, g, b);
                 }
             }

@@ -5,6 +5,7 @@ ImageItem::ImageItem(QGraphicsItem *parent) : QGraphicsPixmapItem(parent)
 {
     setFlag(ItemIsSelectable, true);
     setFlag(ItemIsMovable, true);
+    setCacheMode(DeviceCoordinateCache);
 }
 
 ImageItem::ImageItem(const QPixmap &pixmap, QGraphicsItem *parent)
@@ -12,6 +13,7 @@ ImageItem::ImageItem(const QPixmap &pixmap, QGraphicsItem *parent)
 {
     setFlag(ItemIsSelectable, true);
     setFlag(ItemIsMovable, true);
+    setCacheMode(DeviceCoordinateCache);
     if (!pixmap.isNull())
         m_rect = QRectF(QPointF(0, 0), pixmap.size());
 }
@@ -21,6 +23,7 @@ ImageItem::ImageItem(const QPixmap &pixmap, const QSize &sourcePixelSize, QGraph
 {
     setFlag(ItemIsSelectable, true);
     setFlag(ItemIsMovable, true);
+    setCacheMode(DeviceCoordinateCache);
     m_rect = QRectF(QPointF(0, 0), sourcePixelSize);
 }
 

@@ -19,6 +19,10 @@ LIBS += -L$$DESTDIR -lQtColorWidgets
 LIBS += -L$$DESTDIR -lQtGradientEditor
 LIBS += -L$$DESTDIR -lQSimpleUpdater
 LIBS += -L$$DESTDIR -lLayout
+# LIBS += -L$$DESTDIR -lQtitanBase
+# LIBS += -L$$DESTDIR -lQtitanDocking
+# LIBS += -L$$DESTDIR -lQtitanStyle
+LIBS += -L$$DESTDIR -lQRuler
 
 
 HEADERS += \
@@ -32,7 +36,6 @@ HEADERS += \
     UI/PropertyPanel.h \
     UI/NewFileDialog.h \
     UI/ResizeCanvasDialog.h \
-    UI/RulerBar.h \
     UI/GradientDialog.h \
     UI/AlignWidget.h \
     UI/AutoLayoutDialog.h \
@@ -107,6 +110,7 @@ HEADERS += \
     atPresets.h \
     atDebug.h \
     atDefine.h \
+    atMath.h \
 
 SOURCES += \
     App/SingleInstance.cpp \
@@ -120,7 +124,6 @@ SOURCES += \
     UI/PropertyPanel.cpp \
     UI/NewFileDialog.cpp \
     UI/ResizeCanvasDialog.cpp \
-    UI/RulerBar.cpp \
     UI/GradientDialog.cpp \
     UI/AlignWidget.cpp \
     UI/AutoLayoutDialog.cpp \
@@ -220,7 +223,9 @@ INCLUDEPATH += \
     $$PWD/../Libs/QtGradientEditor \
     $$PWD/../Libs/QSimpleUpdater/include \
     $$PWD/../Libs/QSimpleUpdater/src \
-    $$PWD/../Libs/Layout
+    $$PWD/../Libs/Layout \
+    $$PWD/../Libs/Qtitan/include \
+    $$PWD/../Libs/QRuler/include
 
 # ============================================================
 # 旧导出路径（TiffExportEngine + StripPipeline）
