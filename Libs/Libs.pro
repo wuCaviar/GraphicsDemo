@@ -6,7 +6,7 @@ SUBDIRS += \
     QtGradientEditor \
     QSimpleUpdater \
     Layout \
-    # Qtitan \
+    Qtitan \
     QRuler
 
 # 依赖顺序
@@ -15,7 +15,7 @@ QtColorWidgets.subdir = Qt-Color-Widgets
 QtGradientEditor.subdir = QtGradientEditor
 QSimpleUpdater.subdir = QSimpleUpdater
 Layout.subdir = Layout
-# Qtitan.subdir = Qtitan
+Qtitan.subdir = Qtitan
 QRuler.subdir = QRuler
 
 QtColorWidgets.depends = ColorTrans

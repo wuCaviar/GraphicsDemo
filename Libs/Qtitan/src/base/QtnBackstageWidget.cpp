@@ -461,7 +461,11 @@ bool QGraphicsSceneEx::event(QEvent* e)
     case QEvent::MetaCall:
     {
         QMetaCallEvent *mce = static_cast<QMetaCallEvent*>(e);
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+        if (mce->signalId() == m_processDirtyItemsIndex)
+#else
         if (mce->id() == m_processDirtyItemsIndex)
+#endif
             m_sharedWindow->updateRequest(false);
     }
     break;
