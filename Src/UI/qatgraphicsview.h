@@ -46,7 +46,6 @@ public:
     qreal zoomLevel() const { return m_zoomLevel; }
     void setZoomLevel(qreal level);
     void fitToCanvas();
-    void fitToSelection();
 
     // 网格显示
     bool isGridVisible() const { return m_gridVisible; }

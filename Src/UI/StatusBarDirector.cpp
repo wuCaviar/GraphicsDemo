@@ -59,7 +59,7 @@ void StatusBarDirector::applyZoomFromCombo()
     auto *p = AppContext::get().activeCanvasPage();
     if (!p || !p->view()) return;
 
-    QString text = m_zoomCombo->currentText().remove(QLatin1Char('%')).trimmed();
+    QString text = m_zoomCombo->lineEdit()->text().remove(QLatin1Char('%')).trimmed();
     bool ok = false;
     int pct = text.toInt(&ok);
     if (!ok || pct < 1) {
@@ -80,21 +80,8 @@ void StatusBarDirector::applyPresetFromCombo(int index)
     auto *p = AppContext::get().activeCanvasPage();
     if (!p || !p->view()) return;
 
-    if (data.type() == QVariant::String) {
-        QString action = data.toString();
-        if (action == QStringLiteral("fit")) {
-            p->view()->fitToCanvas();
-        } else if (action == QStringLiteral("fit-selection")) {
-            p->view()->fitToSelection();
-        }
-    } else {
-        int pct = data.toInt();
-        p->view()->setZoomLevel(pct / 100.0);
-    }
-
-    // After zoom applied, sync combo text to the resulting percentage
-    // (e.g. "Fit to Canvas" → "45%")
-    onZoomChanged(p->view()->zoomLevel());
+    int pct = data.toInt();
+    p->view()->setZoomLevel(pct / 100.0);
 }
 
 // ---- Page switching ----

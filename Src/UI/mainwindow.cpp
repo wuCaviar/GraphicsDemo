@@ -843,9 +843,6 @@ void MainWindow::_initStatusBar()
     m_zoomCombo->lineEdit()->setAlignment(Qt::AlignCenter);
     m_zoomCombo->lineEdit()->setValidator(new QIntValidator(1, 3200, m_zoomCombo));
     // Preset items
-    m_zoomCombo->addItem(tr("Fit to Canvas"), QStringLiteral("fit"));
-    m_zoomCombo->addItem(tr("Fit to Selection"), QStringLiteral("fit-selection"));
-    m_zoomCombo->insertSeparator(m_zoomCombo->count());
     m_zoomCombo->addItem(QStringLiteral("100%"), 100);
     m_zoomCombo->addItem(QStringLiteral("200%"), 200);
     m_zoomCombo->addItem(QStringLiteral("50%"), 50);
