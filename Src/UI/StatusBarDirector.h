@@ -38,7 +38,6 @@ private:
     QSlider *m_zoomSlider = nullptr;
     QLabel *m_canvasLabel = nullptr;
     QLabel *m_toolLabel = nullptr;
-    bool m_updatingZoom = false;
 
     static qreal _sliderToZoom(int sliderValue);
     static int _zoomToSliderValue(qreal zoom);

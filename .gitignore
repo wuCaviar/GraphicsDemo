@@ -125,6 +125,7 @@ release
 .claude
 .agents
 .cache
+.superpowers
 docs
 
 # 许可证与复用

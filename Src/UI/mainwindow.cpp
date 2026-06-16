@@ -99,6 +99,7 @@
 #include <QShortcut>
 #include <QSlider>
 #include <QComboBox>
+#include <QAbstractItemView>
 #include <QStyle>
 #include <QSplitter>
 #include <QStandardPaths>
@@ -855,8 +856,11 @@ void MainWindow::_initStatusBar()
     // Signals
     connect(m_zoomCombo->lineEdit(), &QLineEdit::returnPressed,
             m_statusBarDirector, &StatusBarDirector::applyZoomFromCombo);
-    connect(m_zoomCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            m_statusBarDirector, &StatusBarDirector::applyPresetFromCombo);
+    // Use popup view's pressed signal for reliable dropdown selection on all platforms
+    connect(m_zoomCombo->view(), &QAbstractItemView::pressed,
+            this, [this](const QModelIndex &index) {
+        m_statusBarDirector->applyPresetFromCombo(index.row());
+    });
 
     m_zoomInBtn = new QToolButton;
     m_zoomInBtn->setText(QStringLiteral("+"));
