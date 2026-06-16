@@ -21,6 +21,8 @@
 #include <QFuture>
 #include <QPointer>
 
+#include "QtitanDocking.h"
+
 class QLabel;
 class QLineEdit;
 class QPushButton;
@@ -44,7 +46,7 @@ namespace Ui {
 class MainWindow;
 }
 
-class MainWindow : public QMainWindow
+class MainWindow : public Qtitan::DockMainWindow
 {
     Q_OBJECT
 
@@ -134,21 +136,13 @@ private:
     bool _maybeCloseCanvas(QAtCanvasPage *page); // 提示关闭画布（图元将丢失），返回 false 表示取消
     bool _syncSaveAllCanvases(); // 同步保存所有画布到 m_projectPath
     QList<CanvasSaveBundle> _collectCanvasBundles() const; // 公共：收集所有画布的序列化数据
-    void _addCanvasDock(const QString &title, const QString &pageId); // 创建画布 dock 页
-    void _updateCanvasDockTitle(QAtCanvasPage *page); // 更新画布 dock 标题
-
-    // ---- Canvas Dock 管理 (替代 QTabWidget API) ----
+    // Qtitan Dock canvas management
     QAtCanvasPage *_currentCanvasPage() const;
-    QAtCanvasPage *_canvasPageAt(int index) const;
     int _canvasCount() const;
-    int _currentCanvasIndex() const;
-    int _indexOfCanvasPage(QAtCanvasPage *page) const;
-    void _setCurrentCanvasPage(QAtCanvasPage *page);
-    void _setCurrentCanvasIndex(int index);
-    QDockWidget *_addCanvasDockInternal(QAtCanvasPage *page, const QString &title);
-    void _removeCanvasDockInternal(int index);
-    void _onCanvasDockActivated(QDockWidget *dock);
-    bool eventFilter(QObject *obj, QEvent *event) override;
+    void _addCanvasPage(const QString &title, const QString &pageId);
+    void _removeCanvasPage(Qtitan::DockDocumentPanel *docPanel);
+    void _onDocumentPanelActivated(Qtitan::DockDocumentPanel *panel);
+    void _updateDocumentPanelTitle(QAtCanvasPage *page);
 
     /// 项目加载后异步刷新图元缩略图（缓存感知，不阻塞 UI）
     void refreshImageItemsFromCache(const QList<QGraphicsItem *> &items);
@@ -161,9 +155,12 @@ private:
 
     Ui::MainWindow *ui;
 
-    // Canvas dock management (replaces QTabWidget — each canvas is a QDockWidget)
-    QList<QDockWidget *> m_canvasDocks; // all canvas dock widgets in insertion order
-    QDockWidget *m_activeCanvasDock = nullptr; // currently active/focused canvas dock
+    // Canvas document panels (Qtitan DockDocumentPanel replaces QDockWidget for canvases)
+    Qtitan::DockDocumentPanel *m_activeDocumentPanel = nullptr;
+
+    // DockWidgetPanel wrappers (contain PropertyPanel and AlignWidget as inner widgets)
+    Qtitan::DockWidgetPanel *m_propsDockPanel = nullptr;
+    Qtitan::DockWidgetPanel *m_alignDockPanel = nullptr;
     QAtGraphicsView *m_pView = nullptr;
     PropertyPanel *m_pPropertyPanel = nullptr;
     QUndoStack *m_undoStack = nullptr;
