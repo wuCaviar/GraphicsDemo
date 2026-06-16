@@ -855,7 +855,7 @@ void MainWindow::_initStatusBar()
     // Signals
     connect(m_zoomCombo->lineEdit(), &QLineEdit::returnPressed,
             m_statusBarDirector, &StatusBarDirector::applyZoomFromCombo);
-    connect(m_zoomCombo, QOverload<int>::of(&QComboBox::activated),
+    connect(m_zoomCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             m_statusBarDirector, &StatusBarDirector::applyPresetFromCombo);
 
     m_zoomInBtn = new QToolButton;

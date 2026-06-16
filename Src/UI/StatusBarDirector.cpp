@@ -73,13 +73,14 @@ void StatusBarDirector::applyZoomFromCombo()
 
 void StatusBarDirector::applyPresetFromCombo(int index)
 {
-    if (!m_zoomCombo) return;
+    if (m_updatingZoom || !m_zoomCombo) return;
     QVariant data = m_zoomCombo->itemData(index);
     if (!data.isValid()) return;
 
     auto *p = AppContext::get().activeCanvasPage();
     if (!p || !p->view()) return;
 
+    m_updatingZoom = true;
     if (data.type() == QVariant::String) {
         QString action = data.toString();
         if (action == QStringLiteral("fit")) {
@@ -91,6 +92,10 @@ void StatusBarDirector::applyPresetFromCombo(int index)
         int pct = data.toInt();
         p->view()->setZoomLevel(pct / 100.0);
     }
+    m_updatingZoom = false;
+
+    // After zoom applied, sync combo text to the resulting percentage
+    onZoomChanged(p->view()->zoomLevel());
 }
 
 // ---- Page switching ----
@@ -136,6 +141,9 @@ void StatusBarDirector::onMousePositionChanged(const QPointF &scenePos)
 
 void StatusBarDirector::onZoomChanged(qreal level)
 {
+    if (m_updatingZoom) return;
+    m_updatingZoom = true;
+
     int pct = qRound(level * 100.0);
     if (m_zoomCombo) {
         m_zoomCombo->blockSignals(true);
@@ -147,6 +155,8 @@ void StatusBarDirector::onZoomChanged(qreal level)
         m_zoomSlider->setValue(_zoomToSliderValue(level));
         m_zoomSlider->blockSignals(false);
     }
+
+    m_updatingZoom = false;
 }
 
 void StatusBarDirector::onToolChanged(Tool tool)
