@@ -145,7 +145,7 @@ QFrame *createStatusSeparator(QWidget *parent)
 }
 } // namespace
 
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
 
@@ -1185,7 +1185,7 @@ void MainWindow::_addCanvasPage(const QString &title, const QString &pageId)
     m_projectModified = true;
 }
 
-void MainWindow::_removeCanvasPage(Qtitan::DockDocumentPanel *docPanel)
+void MainWindow::_removeCanvasPage(DockDocumentPanel *docPanel)
 {
     if (!docPanel)
         return;
@@ -1218,7 +1218,7 @@ void MainWindow::_removeCanvasPage(Qtitan::DockDocumentPanel *docPanel)
     dockPanelManager()->removeDockPanel(docPanel);
 }
 
-void MainWindow::_onDocumentPanelActivated(Qtitan::DockDocumentPanel *panel)
+void MainWindow::_onDocumentPanelActivated(DockDocumentPanel *panel)
 {
     if (!panel || m_activeDocumentPanel == panel)
         return;
@@ -1229,7 +1229,7 @@ void MainWindow::_onDocumentPanelActivated(Qtitan::DockDocumentPanel *panel)
 
     _updateDocumentPanelTitle(page);
 
-    Qtitan::DockDocumentPanel *oldPanel = m_activeDocumentPanel;
+    DockDocumentPanel *oldPanel = m_activeDocumentPanel;
     m_activeDocumentPanel = panel;
 
     AppContext::get().setActivePage(page->pageId());

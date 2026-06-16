@@ -44,7 +44,7 @@ namespace Ui {
 class MainWindow;
 }
 
-class MainWindow : public Qtitan::DockMainWindow
+class MainWindow : public DockMainWindow
 {
     Q_OBJECT
 
@@ -138,8 +138,8 @@ private:
     QAtCanvasPage *_currentCanvasPage() const;
     int _canvasCount() const;
     void _addCanvasPage(const QString &title, const QString &pageId);
-    void _removeCanvasPage(Qtitan::DockDocumentPanel *docPanel);
-    void _onDocumentPanelActivated(Qtitan::DockDocumentPanel *panel);
+    void _removeCanvasPage(DockDocumentPanel *docPanel);
+    void _onDocumentPanelActivated(DockDocumentPanel *panel);
     void _updateDocumentPanelTitle(QAtCanvasPage *page);
 
     /// 项目加载后异步刷新图元缩略图（缓存感知，不阻塞 UI）
@@ -154,11 +154,11 @@ private:
     Ui::MainWindow *ui;
 
     // Canvas document panels (Qtitan DockDocumentPanel replaces QDockWidget for canvases)
-    Qtitan::DockDocumentPanel *m_activeDocumentPanel = nullptr;
+    DockDocumentPanel *m_activeDocumentPanel = nullptr;
 
     // DockWidgetPanel wrappers (contain PropertyPanel and AlignWidget as inner widgets)
-    Qtitan::DockWidgetPanel *m_propsDockPanel = nullptr;
-    Qtitan::DockWidgetPanel *m_alignDockPanel = nullptr;
+    DockWidgetPanel *m_propsDockPanel = nullptr;
+    DockWidgetPanel *m_alignDockPanel = nullptr;
     QAtGraphicsView *m_pView = nullptr;
     PropertyPanel *m_pPropertyPanel = nullptr;
     QUndoStack *m_undoStack = nullptr;
