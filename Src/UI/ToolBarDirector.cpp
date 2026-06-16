@@ -1,13 +1,12 @@
 #include "ToolBarDirector.h"
-
-#include <QToolBar>
+#include "QtitanDocking.h"
 
 ToolBarDirector::ToolBarDirector(QObject *parent)
     : QObject(parent)
 {
 }
 
-void ToolBarDirector::addToolBar(QToolBar *bar, const QSet<QString> &pageTypes)
+void ToolBarDirector::addToolBar(DockToolBar *bar, const QSet<QString> &pageTypes)
 {
     if (!bar) return;
     m_visibilityRules[bar] = pageTypes;

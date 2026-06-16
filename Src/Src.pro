@@ -13,6 +13,9 @@ QMAKE_CXXFLAGS += -Wall
 
 include(../Common.pri)
 
+# Match Qtitan library namespace (library was compiled with QTN_NAMESPACE)
+DEFINES += QTN_NAMESPACE
+
 # 链接 Libs/ 子库（DESTDIR 已由 Common.pri 分离 Debug/Release）
 LIBS += -L$$DESTDIR -lColorTrans
 LIBS += -L$$DESTDIR -lQtColorWidgets

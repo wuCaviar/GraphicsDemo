@@ -1,9 +1,7 @@
 #include "mainwindow.h"
 #include "atMath.h"
-#include "ui_mainwindow.h"
 
 #include <QMainWindow>
-#include <QDockWidget>
 
 #include "AlignWidget.h"
 #include "AutoLayoutDialog.h"
@@ -106,7 +104,6 @@
 #include <QSplitter>
 #include <QStandardPaths>
 #include <QStatusBar>
-#include <QToolBar>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QThreadPool>
@@ -145,15 +142,36 @@ QFrame *createStatusSeparator(QWidget *parent)
 }
 } // namespace
 
-MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent), ui(new Ui::MainWindow)
+MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent)
 {
-    ui->setupUi(this);
+    setWindowTitle(tr("AT Drawing Tools"));
+    resize(1200, 800);
+    setMenuBar(new QMenuBar(this));
+    setStatusBar(new QStatusBar(this));
 
     // 创建工程文档模型（逐步替代散落的 m_projectPath/m_projectModified/m_tabStates）
     m_document = new ProjectDocument(this);
 
     // New architecture: create canvas page (owns view + scene + undoStack)
     _initPages();
+
+    // Wire Qtitan dock panel manager signals
+    connect(dockPanelManager(), &DockPanelManager::dockPanelActivated,
+            this, [this](DockWidgetPanel *panel) {
+                auto *docPanel = qobject_cast<DockDocumentPanel *>(panel);
+                if (docPanel)
+                    _onDocumentPanelActivated(docPanel);
+            });
+
+    connect(dockPanelManager(), &DockPanelManager::aboutToClose,
+            this, [this](DockPanelBase *panel, bool &handled) {
+                auto *docPanel = qobject_cast<DockDocumentPanel *>(panel);
+                if (!docPanel)
+                    return;
+                QAtCanvasPage *page = qobject_cast<QAtCanvasPage *>(docPanel->widget());
+                if (page && !_maybeCloseCanvas(page))
+                    handled = true;
+            });
 
     // Register services and actions BEFORE menu/toolbar so they can use AppContext::getQAction()
     _initServices();
@@ -174,9 +192,9 @@ MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent), ui(new Ui::Mai
     // P6: Wire ToolBarDirector for page-type-aware toolbar visibility
     m_toolBarDirector = new ToolBarDirector(this);
     {
-        QToolBar *fileEditBar = findChild<QToolBar *>("FileEditToolBar");
-        QToolBar *drawBar = findChild<QToolBar *>("DrawingToolBar");
-        QToolBar *alignBar = findChild<QToolBar *>("AlignToolBar");
+        auto *fileEditBar = findChild<DockToolBar *>("FileEditToolBar");
+        auto *drawBar = findChild<DockToolBar *>("DrawingToolBar");
+        auto *alignBar = findChild<DockToolBar *>("AlignToolBar");
         if (fileEditBar)
             m_toolBarDirector->addToolBar(fileEditBar); // always visible
         if (drawBar)
@@ -205,9 +223,6 @@ MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent), ui(new Ui::Mai
 
     // Sync PPI and labels from the initial canvas
     _syncViewState();
-
-    setWindowTitle(tr("AT Drawing Tools"));
-    resize(1200, 800);
 
     // Restore saved session (tabs / tools / projects)
     loadSession();
@@ -247,7 +262,7 @@ MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent), ui(new Ui::Mai
                     // 如果快照画布多于现有 Tab，动态创建新页
                     QAtCanvasPage *page = nullptr;
                     if (ci < _canvasCount()) {
-                        page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(ci));
+                        page = qobject_cast<QAtCanvasPage *>(dockPanelManager()->documentPanelList().at(ci)->widget());
                     } else {
                         QSizeF sz(bundle.info.width > 0 ? bundle.info.width : 1920,
                                   bundle.info.height > 0 ? bundle.info.height : 1080);
@@ -255,7 +270,9 @@ MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent), ui(new Ui::Mai
                         page = new QAtCanvasPage(QStringLiteral("recovery-%1").arg(ci + 1), sz, ppi,
                                                  this);
                         AppContext::get().registerPage(page);
-                        _addCanvasDockInternal(page, page->title());
+                        auto *docPanel = dockPanelManager()->addDocumentPanel(page->title());
+                        docPanel->setWidget(page);
+                        docPanel->setProperty("pageId", page->pageId());
                         m_tabStates[page].modified = false;
                     }
                     if (!page)
@@ -275,7 +292,7 @@ MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent), ui(new Ui::Mai
                             page->scene()->addItem(item);
                     }
                     m_tabStates[page].modified = true;
-                    _updateCanvasDockTitle(page);
+                    _updateDocumentPanelTitle(page);
                 }
                 m_projectModified = true;
             }
@@ -301,8 +318,6 @@ MainWindow::~MainWindow()
     if (m_pProcessGuard) {
         m_pProcessGuard->stopAll();
     }
-
-    delete ui;
 }
 
 void MainWindow::_initWidget()
@@ -371,7 +386,7 @@ void MainWindow::_initRulers()
 
 void MainWindow::_initMenuBar()
 {
-    QMenuBar *menu = ui->menubar;
+    QMenuBar *menu = menuBar();
 
     // ---- 文件 ----
     QMenu *fileMenu = menu->addMenu(tr("&File"));
@@ -514,8 +529,6 @@ void MainWindow::_initMenuBar()
 
     // ---- 视图 ----
     QMenu *viewMenu = menu->addMenu(tr("&View"));
-    viewMenu->addAction(m_pPropertyPanel->toggleViewAction());
-    viewMenu->addAction(m_alignLayoutDlg->toggleViewAction());
     viewMenu->addSeparator();
 
     // ---- 帮助 ----
@@ -532,6 +545,20 @@ void MainWindow::_initMenuBar()
         viewMenu->addAction(m_gridAction);
 
     _initThemeMenu(viewMenu);
+
+    viewMenu->addSeparator();
+    if (m_propsDockPanel && m_propsDockPanel->visibleAction()) {
+        QAction *propsVis = m_propsDockPanel->visibleAction();
+        propsVis->setText(tr("Properties Panel"));
+        propsVis->setShortcut(QKeySequence());
+        viewMenu->addAction(propsVis);
+    }
+    if (m_alignDockPanel && m_alignDockPanel->visibleAction()) {
+        QAction *alignVis = m_alignDockPanel->visibleAction();
+        alignVis->setText(tr("Align Panel"));
+        alignVis->setShortcut(QKeySequence());
+        viewMenu->addAction(alignVis);
+    }
 
     viewMenu->addSeparator();
     // 缩放适配
@@ -596,12 +623,10 @@ void MainWindow::switchTheme(const QString &theme)
 void MainWindow::_initToolBar()
 {
     // 文件 & 编辑工具栏 - 停靠在顶部
-    QToolBar *fileEditBar = new QToolBar(tr("File & Edit"), this);
+    DockToolBar *fileEditBar = dockBarManager()->addToolBar(tr("File & Edit"), DockBarTop);
     fileEditBar->setObjectName("FileEditToolBar");
-    fileEditBar->setMovable(true);
     fileEditBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     fileEditBar->setIconSize(QSize(20, 20));
-    addToolBar(Qt::TopToolBarArea, fileEditBar);
 
     // New 按钮
     QAction *newAct = new QAction(QIcon(":/icons/icons/file-new.svg"), tr("New"), this);
@@ -635,12 +660,10 @@ void MainWindow::_initToolBar()
     fileEditBar->addAction(AppContext::get().getQAction(QStringLiteral("Paste")));
 
     // 绘图工具栏 - 停靠在左侧
-    QToolBar *drawBar = new QToolBar(tr("Drawing Tools"), this);
+    DockToolBar *drawBar = dockBarManager()->addToolBar(tr("Drawing Tools"), DockBarLeft);
     drawBar->setObjectName("DrawingToolBar");
-    drawBar->setMovable(true);
     drawBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     drawBar->setIconSize(QSize(20, 20));
-    addToolBar(Qt::LeftToolBarArea, drawBar);
 
     auto *actionGroup = new QActionGroup(this);
     actionGroup->setExclusive(true);
@@ -661,12 +684,10 @@ void MainWindow::_initToolBar()
     }
 
     // 对齐工具栏
-    QToolBar *alignToolBar = new QToolBar(tr("Align"), this);
+    DockToolBar *alignToolBar = dockBarManager()->addToolBar(tr("Align"), DockBarTop);
     alignToolBar->setObjectName("AlignToolBar");
-    alignToolBar->setMovable(false);
     alignToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     alignToolBar->setIconSize(QSize(20, 20));
-    addToolBar(Qt::TopToolBarArea, alignToolBar);
 
     {
         QAction *act = AppContext::get().getQAction(QStringLiteral("AlignLayoutDialog"));
@@ -719,16 +740,29 @@ void MainWindow::_initPropertyPanel()
 {
     m_pPropertyPanel = new PropertyPanel(this);
     m_pPropertyPanel->setObjectName("PropertyPanel");
-    m_pPropertyPanel->setMinimumWidth(300);
-    m_pPropertyPanel->setAllowedAreas(Qt::RightDockWidgetArea); // 仅允许停靠在右侧
-    addDockWidget(Qt::RightDockWidgetArea, m_pPropertyPanel);
+
+    m_propsDockPanel = dockPanelManager()->addDockPanel(
+        tr("Properties"), QSize(300, -1), RightDockPanelArea);
+    m_propsDockPanel->setObjectName("PropertiesPanel");
+    m_propsDockPanel->setWidget(m_pPropertyPanel);
+    m_propsDockPanel->setFeatures(DockWidgetPanel::DockPanelClosable
+                                  | DockWidgetPanel::DockPanelHideable
+                                  | DockWidgetPanel::DockPanelFloatable);
+    m_propsDockPanel->setAllowedAreas(LeftDockPanelArea | RightDockPanelArea);
 
     m_alignLayoutDlg = new AlignWidget(nullptr, nullptr, this);
     m_alignLayoutDlg->setObjectName("AlignLayoutDock");
-    m_alignLayoutDlg->setMinimumWidth(300);
-    m_alignLayoutDlg->setAllowedAreas(Qt::RightDockWidgetArea); // 仅允许停靠在右侧
-    addDockWidget(Qt::RightDockWidgetArea, m_alignLayoutDlg);
-    m_alignLayoutDlg->hide();
+
+    m_alignDockPanel = dockPanelManager()->addDockPanel(
+        tr("Align"), QSize(300, -1), RightDockPanelArea, m_propsDockPanel);
+    m_alignDockPanel->setObjectName("AlignPanel");
+    m_alignDockPanel->setWidget(m_alignLayoutDlg);
+    m_alignDockPanel->setFeatures(DockWidgetPanel::DockPanelClosable
+                                  | DockWidgetPanel::DockPanelHideable
+                                  | DockWidgetPanel::DockPanelFloatable);
+    m_alignDockPanel->setAllowedAreas(LeftDockPanelArea | RightDockPanelArea);
+    m_alignDockPanel->closePanel();
+
     AppContext::get().setAlignWidget(m_alignLayoutDlg);
 }
 
@@ -795,9 +829,9 @@ void MainWindow::_bindViewConnections()
         _activeTabState().modified = true;
         m_projectModified = true;
         // Show modified indicator (*) in tab title
-        auto *page = qobject_cast<QAtCanvasPage *>(_currentCanvasPage());
+        auto *page = _currentCanvasPage();
         if (page)
-            _updateCanvasDockTitle(page);
+            _updateDocumentPanelTitle(page);
         if (m_pPropertyPanel && m_pPropertyPanel->currentItem())
             m_pPropertyPanel->setItem(m_pPropertyPanel->currentItem());
     });
@@ -1176,11 +1210,8 @@ void MainWindow::_addCanvasPage(const QString &title, const QString &pageId)
     AppContext::get().refreshAllActions();
     m_statusBarDirector->onPageSwitched(pageId, QStringLiteral("canvas"));
 
-    // Enable side panels now that we have a canvas
     if (m_propsDockPanel)
         m_propsDockPanel->showPanel();
-    if (m_alignDockPanel)
-        m_alignDockPanel->closePanel();
 
     m_projectModified = true;
 }
@@ -1359,7 +1390,7 @@ void MainWindow::_syncViewState()
         return;
     if (auto *c = m_pView->canvasItem()) {
         qreal ppi = c->ppi();
-        auto *page = qobject_cast<QAtCanvasPage *>(_currentCanvasPage());
+        auto *page = _currentCanvasPage();
         if (page)
             page->setRulerPpi(ppi);
         if (m_pPropertyPanel)
@@ -1379,8 +1410,9 @@ QList<CanvasSaveBundle> MainWindow::_collectCanvasBundles() const
     // 确保 ProjectDocument 已注册所有当前画布（文档滞后于 TabWidget）
     if (m_document) {
         m_document->setFilePath(m_projectPath);
-        for (int i = 0; i < _canvasCount(); ++i) {
-            auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+        auto docList = dockPanelManager()->documentPanelList();
+        for (int i = 0; i < docList.size(); ++i) {
+            auto *page = qobject_cast<QAtCanvasPage *>(docList.at(i)->widget());
             if (page) {
                 if (!m_document->canvases().contains(page))
                     m_document->registerCanvas(page);
@@ -1392,8 +1424,9 @@ QList<CanvasSaveBundle> MainWindow::_collectCanvasBundles() const
 
     // 回退：m_document 尚未初始化（不应发生，但安全兜底）
     QList<CanvasSaveBundle> bundles;
-    for (int i = 0; i < _canvasCount(); ++i) {
-        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+    auto docList = dockPanelManager()->documentPanelList();
+    for (int i = 0; i < docList.size(); ++i) {
+        auto *page = qobject_cast<QAtCanvasPage *>(docList.at(i)->widget());
         if (!page || !page->canvasItem())
             continue;
 
@@ -1440,14 +1473,15 @@ QList<CanvasSaveBundle> MainWindow::_collectCanvasBundles() const
 
 void MainWindow::saveSession()
 {
-    if (_canvasCount() == 0)
+    auto docList = dockPanelManager()->documentPanelList();
+    if (docList.isEmpty())
         return;
 
     // Sync legacy fields to ProjectDocument
     if (m_document) {
         m_document->setFilePath(m_projectPath);
-        for (int i = 0; i < _canvasCount(); ++i) {
-            auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+        for (int i = 0; i < docList.size(); ++i) {
+            auto *page = qobject_cast<QAtCanvasPage *>(docList.at(i)->widget());
             if (page) {
                 if (!m_document->canvases().contains(page))
                     m_document->registerCanvas(page);
@@ -1459,7 +1493,7 @@ void MainWindow::saveSession()
     SessionInfo info;
     info.version = 2;
     info.projectPath = m_projectPath;
-    info.activeTabIndex = qMax(0, _currentCanvasIndex());
+    info.activeTabIndex = qMax(0, docList.indexOf(m_activeDocumentPanel));
 
     info.currentTool = m_currentTool;
     info.ripEnabled = m_ripEnabled;
@@ -1468,8 +1502,8 @@ void MainWindow::saveSession()
     info.alignHSpacing = AlignWidget::hSpacing();
     info.alignVSpacing = AlignWidget::vSpacing();
 
-    for (int i = 0; i < _canvasCount(); ++i) {
-        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+    for (int i = 0; i < docList.size(); ++i) {
+        auto *page = qobject_cast<QAtCanvasPage *>(docList.at(i)->widget());
         if (!page)
             continue;
 
@@ -1540,12 +1574,18 @@ void MainWindow::loadSession()
                                [view, zoom = tab.zoomLevel]() { view->setZoomLevel(zoom); });
         }
 
-        _addCanvasDockInternal(canvasPage, canvasPage->title());
+        auto *docPanel = dockPanelManager()->addDocumentPanel(canvasPage->title());
+        docPanel->setWidget(canvasPage);
+        docPanel->setProperty("pageId", canvasPage->pageId());
     }
 
     // --- Set active tab ---
     int activeIdx = AtMath::clamp(info.activeTabIndex, 0, _canvasCount() - 1);
-    _setCurrentCanvasIndex(activeIdx);
+    {
+        auto docList = dockPanelManager()->documentPanelList();
+        if (activeIdx >= 0 && activeIdx < docList.size() && m_activeDocumentPanel != docList[activeIdx])
+            _onDocumentPanelActivated(qobject_cast<DockDocumentPanel *>(docList[activeIdx]));
+    }
 
     // --- Restore global tool ---
     m_currentTool = info.currentTool;
@@ -1564,10 +1604,13 @@ void MainWindow::loadSession()
     // --- Async load project file (single file for all canvases) ---
     if (m_projectPath.isEmpty()) {
         // Update tab titles
-        for (int i = 0; i < _canvasCount(); ++i) {
-            auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
-            if (page)
-                _updateCanvasDockTitle(page);
+        {
+            auto docList = dockPanelManager()->documentPanelList();
+            for (int i = 0; i < docList.size(); ++i) {
+                auto *page = qobject_cast<QAtCanvasPage *>(docList.at(i)->widget());
+                if (page)
+                    _updateDocumentPanelTitle(page);
+            }
         }
         SessionFile::remove();
         return;
@@ -1595,9 +1638,10 @@ void MainWindow::loadSession()
     }
 
     // Match loaded canvases to existing tabs (reuse tabs, update sizes)
-    for (int ci = 0; ci < canvasBundles.size() && ci < _canvasCount(); ++ci) {
+    auto docList = dockPanelManager()->documentPanelList();
+    for (int ci = 0; ci < canvasBundles.size() && ci < docList.size(); ++ci) {
         auto &bundle = canvasBundles[ci];
-        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(ci));
+        auto *page = qobject_cast<QAtCanvasPage *>(docList.at(ci)->widget());
         if (!page)
             continue;
 
@@ -1611,7 +1655,7 @@ void MainWindow::loadSession()
 
         if (bundle.tasks.isEmpty()) {
             m_tabStates[page].modified = isAutoSave;
-            _updateCanvasDockTitle(page);
+            _updateDocumentPanelTitle(page);
             continue;
         }
 
@@ -1646,7 +1690,7 @@ void MainWindow::loadSession()
                     pagePtr->view()->setEnabled(true);
                     // Clear autosave path
                     m_tabStates[pagePtr].modified = isAutoSave;
-                    _updateCanvasDockTitle(pagePtr);
+                    _updateDocumentPanelTitle(pagePtr);
 
                     if (_currentCanvasPage() == pagePtr) {
                         pagePtr->setRulerPpi(ppi);
@@ -1674,7 +1718,7 @@ void MainWindow::loadSession()
 
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
-    QMainWindow::resizeEvent(event);
+    DockMainWindow::resizeEvent(event);
     // 更新刻度尺 (rulers are per-page)
     auto *page = qobject_cast<QAtCanvasPage *>(_currentCanvasPage());
     if (page)
@@ -1712,10 +1756,13 @@ bool MainWindow::_maybeSaveProject()
 
     // 检查是否有任何画布被修改
     bool anyModified = false;
-    for (int i = 0; i < _canvasCount() && !anyModified; ++i) {
-        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
-        if (page && m_tabStates[page].modified)
-            anyModified = true;
+    {
+        auto docList = dockPanelManager()->documentPanelList();
+        for (int i = 0; i < docList.size() && !anyModified; ++i) {
+            auto *page = qobject_cast<QAtCanvasPage *>(docList.at(i)->widget());
+            if (page && m_tabStates[page].modified)
+                anyModified = true;
+        }
     }
     if (!anyModified)
         return true;
@@ -1733,11 +1780,12 @@ bool MainWindow::_maybeSaveProject()
         return false;
     if (btn == QMessageBox::No) {
         // Discard all changes
-        for (int i = 0; i < _canvasCount(); ++i) {
-            auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+        auto docList = dockPanelManager()->documentPanelList();
+        for (int i = 0; i < docList.size(); ++i) {
+            auto *page = qobject_cast<QAtCanvasPage *>(docList.at(i)->widget());
             if (page) {
                 m_tabStates[page].modified = false;
-                _updateCanvasDockTitle(page);
+                _updateDocumentPanelTitle(page);
             }
         }
         m_projectModified = false;
@@ -1815,11 +1863,14 @@ bool MainWindow::_syncSaveAllCanvases()
     }
 
     m_projectModified = false;
-    for (int i = 0; i < _canvasCount(); ++i) {
-        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
-        if (page) {
-            m_tabStates[page].modified = false;
-            _updateCanvasDockTitle(page);
+    {
+        auto docList = dockPanelManager()->documentPanelList();
+        for (int i = 0; i < docList.size(); ++i) {
+            auto *page = qobject_cast<QAtCanvasPage *>(docList.at(i)->widget());
+            if (page) {
+                m_tabStates[page].modified = false;
+                _updateDocumentPanelTitle(page);
+            }
         }
     }
     setWindowTitle(tr("AT Drawing Tools - %1").arg(projInfo.name));
@@ -1829,7 +1880,7 @@ bool MainWindow::_syncSaveAllCanvases()
 void MainWindow::onNew()
 {
     // Toolbar: 在当前工程中新建画布（不提示保存）
-    _addCanvasDock(tr("Canvas %1").arg(_canvasCount() + 1),
+    _addCanvasPage(tr("Canvas %1").arg(_canvasCount() + 1),
                    QStringLiteral("canvas-%1").arg(_canvasCount() + 1));
 }
 
@@ -1848,8 +1899,10 @@ void MainWindow::onNewProject()
 
     // 关闭所有现有画布标签
     if (_canvasCount() > 0) {
-        while (_canvasCount() > 0) {
-            auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(0));
+        auto docList = dockPanelManager()->documentPanelList();
+        while (!docList.isEmpty()) {
+            auto *dp = docList.first();
+            auto *page = qobject_cast<QAtCanvasPage *>(dp->widget());
             if (page) {
                 page->disconnect(this);
                 if (m_statusBarDirector)
@@ -1857,7 +1910,8 @@ void MainWindow::onNewProject()
                 AppContext::get().unregisterPage(page->pageId());
                 m_tabStates.remove(page);
             }
-            _removeCanvasDockInternal(0);
+            _removeCanvasPage(qobject_cast<DockDocumentPanel *>(dp));
+            docList = dockPanelManager()->documentPanelList();
         }
         m_pView = nullptr;
         m_undoStack = nullptr;
@@ -1870,39 +1924,7 @@ void MainWindow::onNewProject()
     setWindowTitle(tr("AT Drawing Tools - %1").arg(fi.completeBaseName()));
 
     // 创建第一个画布
-    _addCanvasDock(fi.completeBaseName(), QStringLiteral("canvas-1"));
-}
-
-// 内部方法：创建画布标签页（共享逻辑）
-void MainWindow::_addCanvasDock(const QString &title, const QString &pageId)
-{
-    static constexpr qreal kDefaultPpi = 150.0;
-    qreal mmToPx = AtMath::Units::DPIContext(kDefaultPpi).mmToPx(1.0);
-
-    NewFileDialog dlg(this);
-    if (dlg.exec() != QDialog::Accepted)
-        return;
-
-    QSizeF sizeMM = dlg.selectedSizeMM();
-    QSizeF canvasSize(std::ceil(sizeMM.width() * mmToPx), std::ceil(sizeMM.height() * mmToPx));
-
-    auto *canvasPage = new QAtCanvasPage(pageId, canvasSize, kDefaultPpi, this);
-    AppContext::get().registerPage(canvasPage);
-    _addCanvasDockInternal(canvasPage, title);
-    _setCurrentCanvasPage(canvasPage);
-
-    _activeTabState().modified = false;
-    _updateCanvasDockTitle(canvasPage);
-
-    m_pPropertyPanel->setItem(nullptr);
-    m_resizeCanvasBtn->setVisible(true);
-    m_pPropertyPanel->setDisplayPpi(kDefaultPpi);
-
-    m_pProgressMgr->resetAll();
-
-    canvasPage->updateRulers();
-    _updateCanvasLabel();
-    _updatePosLabel(m_lastScenePos);
+    _addCanvasPage(fi.completeBaseName(), QStringLiteral("canvas-1"));
 }
 
 void MainWindow::onOpenProject()
@@ -1933,8 +1955,10 @@ void MainWindow::onOpenProject()
 
     // 关闭所有现有画布标签
     if (_canvasCount() > 0) {
-        while (_canvasCount() > 0) {
-            auto *oldPage = qobject_cast<QAtCanvasPage *>(_canvasPageAt(0));
+        auto docList = dockPanelManager()->documentPanelList();
+        while (!docList.isEmpty()) {
+            auto *dp = docList.first();
+            auto *oldPage = qobject_cast<QAtCanvasPage *>(dp->widget());
             if (oldPage) {
                 oldPage->disconnect(this);
                 if (m_statusBarDirector)
@@ -1942,7 +1966,8 @@ void MainWindow::onOpenProject()
                 AppContext::get().unregisterPage(oldPage->pageId());
                 m_tabStates.remove(oldPage);
             }
-            _removeCanvasDockInternal(0);
+            _removeCanvasPage(qobject_cast<DockDocumentPanel *>(dp));
+            docList = dockPanelManager()->documentPanelList();
         }
         m_pView = nullptr;
         m_undoStack = nullptr;
@@ -1970,10 +1995,12 @@ void MainWindow::onOpenProject()
         QString tabTitle = canvasBundles.size() == 1
                                ? projInfo.name
                                : tr("%1 — Canvas %2").arg(projInfo.name).arg(ci + 1);
-        _addCanvasDockInternal(canvasPage, tabTitle);
+        auto *docPanel = dockPanelManager()->addDocumentPanel(tabTitle);
+        docPanel->setWidget(canvasPage);
+        docPanel->setProperty("pageId", canvasPage->pageId());
 
         if (ci == 0)
-            _setCurrentCanvasPage(canvasPage);
+            m_activeDocumentPanel = qobject_cast<DockDocumentPanel *>(docPanel);
 
         if (bundle.tasks.isEmpty()) {
             // Empty canvas — already initialized
@@ -1982,7 +2009,7 @@ void MainWindow::onOpenProject()
             canvasPage->updateRulers();
             if (bundle.info.zoom > 0)
                 canvasPage->view()->setZoomLevel(bundle.info.zoom);
-            _updateCanvasDockTitle(canvasPage);
+            _updateDocumentPanelTitle(canvasPage);
             continue;
         }
 
@@ -2020,7 +2047,7 @@ void MainWindow::onOpenProject()
                     pagePtr->view()->setEnabled(true);
                     pagePtr->view()->setZoomLevel(zoom);
                     m_tabStates[pagePtr].modified = false;
-                    _updateCanvasDockTitle(pagePtr);
+                    _updateDocumentPanelTitle(pagePtr);
 
                     if (_currentCanvasPage() == pagePtr) {
                         pagePtr->setRulerPpi(ppi);
@@ -2074,8 +2101,10 @@ void MainWindow::onSaveProject()
     QList<CanvasSnapshot> snapshots;
 
     int totalItems = 0;
-    for (int i = 0; i < _canvasCount(); ++i) {
-        auto *page = qobject_cast<QAtCanvasPage *>(_canvasPageAt(i));
+    {
+        auto docList = dockPanelManager()->documentPanelList();
+        for (int i = 0; i < docList.size(); ++i) {
+            auto *page = qobject_cast<QAtCanvasPage *>(docList.at(i)->widget());
         if (!page)
             continue;
         auto *canvas = page->canvasItem();
@@ -2121,6 +2150,7 @@ void MainWindow::onSaveProject()
         }
         totalItems += snap.inputs.size();
         snapshots.append(snap);
+        }
     }
 
     if (totalItems == 0 && m_projectPath.isEmpty()) {
@@ -2179,7 +2209,7 @@ void MainWindow::onSaveProject()
                 for (auto &snap : snapshots) {
                     if (snap.page) {
                         m_tabStates[snap.page].modified = false;
-                        _updateCanvasDockTitle(snap.page);
+                        _updateDocumentPanelTitle(snap.page);
                         snap.page->view()->setEnabled(true);
                     }
                 }
@@ -3219,7 +3249,7 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
             return;
         }
     }
-    QMainWindow::keyPressEvent(event);
+    DockMainWindow::keyPressEvent(event);
 }
 
 // ============================================================
@@ -3228,40 +3258,30 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 void MainWindow::loadWindowState()
 {
     QSettings settings;
-
-    // 恢复窗口几何信息
-    if (settings.contains("window/geometry")) {
+    if (settings.contains("window/geometry"))
         restoreGeometry(settings.value("window/geometry").toByteArray());
-    }
 
-    // 恢复窗口状态（工具栏、dockwidget等）
-    if (settings.contains("window/state")) {
-        restoreState(settings.value("window/state").toByteArray());
-    }
+    QString barStatePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockBars.state";
+    if (QFile::exists(barStatePath))
+        dockBarManager()->loadStateFromFile(barStatePath);
 
-    // 恢复工具栏可见性
-    QToolBar *fileEditBar = findChild<QToolBar *>("FileEditToolBar");
-    QToolBar *drawBar = findChild<QToolBar *>("DrawingToolBar");
-    QToolBar *alignToolBar = findChild<QToolBar *>("AlignToolBar");
+    QString panelStatePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockPanels.state";
+    if (QFile::exists(panelStatePath))
+        dockPanelManager()->loadStateFromFile(panelStatePath);
 
-    if (fileEditBar && settings.contains("toolbar/FileEditToolBar_visible")) {
+    auto *fileEditBar = findChild<DockToolBar *>("FileEditToolBar");
+    auto *drawBar = findChild<DockToolBar *>("DrawingToolBar");
+    auto *alignToolBar = findChild<DockToolBar *>("AlignToolBar");
+    if (fileEditBar && settings.contains("toolbar/FileEditToolBar_visible"))
         fileEditBar->setVisible(settings.value("toolbar/FileEditToolBar_visible").toBool());
-    }
-    if (drawBar && settings.contains("toolbar/DrawingToolBar_visible")) {
+    if (drawBar && settings.contains("toolbar/DrawingToolBar_visible"))
         drawBar->setVisible(settings.value("toolbar/DrawingToolBar_visible").toBool());
-    }
-    if (alignToolBar && settings.contains("toolbar/AlignToolBar_visible")) {
+    if (alignToolBar && settings.contains("toolbar/AlignToolBar_visible"))
         alignToolBar->setVisible(settings.value("toolbar/AlignToolBar_visible").toBool());
-    }
 
-    // 恢复其他设置
-    // If session was loaded, per-tab grid state is already set; only apply
-    // QSettings grid if no session tabs were restored.
     if (_canvasCount() == 0 && settings.contains("view/gridVisible")) {
-        bool gridVisible = settings.value("view/gridVisible").toBool();
-        if (m_pView) {
-            m_pView->setGridVisible(gridVisible);
-        }
+        if (m_pView)
+            m_pView->setGridVisible(settings.value("view/gridVisible").toBool());
         AppContext::get().refreshAllActions();
     }
 }
@@ -3269,29 +3289,21 @@ void MainWindow::loadWindowState()
 void MainWindow::saveWindowState()
 {
     QSettings settings;
-
-    // 保存窗口几何信息
     settings.setValue("window/geometry", saveGeometry());
 
-    // 保存窗口状态（工具栏、dockwidget等）
-    settings.setValue("window/state", saveState());
+    QString barStatePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockBars.state";
+    QDir().mkpath(QFileInfo(barStatePath).absolutePath());
+    dockBarManager()->saveStateToFile(barStatePath);
 
-    // 保存工具栏可见性
-    QToolBar *fileEditBar = findChild<QToolBar *>("FileEditToolBar");
-    QToolBar *drawBar = findChild<QToolBar *>("DrawingToolBar");
-    QToolBar *alignToolBar = findChild<QToolBar *>("AlignToolBar");
+    QString panelStatePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockPanels.state";
+    dockPanelManager()->saveStateToFile(panelStatePath);
 
-    if (fileEditBar) {
-        settings.setValue("toolbar/FileEditToolBar_visible", fileEditBar->isVisible());
-    }
-    if (drawBar) {
-        settings.setValue("toolbar/DrawingToolBar_visible", drawBar->isVisible());
-    }
-    if (alignToolBar) {
-        settings.setValue("toolbar/AlignToolBar_visible", alignToolBar->isVisible());
-    }
-
-    // QSettings 析构时自动 flush，无需显式 sync()
+    auto *fileEditBar = findChild<DockToolBar *>("FileEditToolBar");
+    auto *drawBar = findChild<DockToolBar *>("DrawingToolBar");
+    auto *alignToolBar = findChild<DockToolBar *>("AlignToolBar");
+    if (fileEditBar) settings.setValue("toolbar/FileEditToolBar_visible", fileEditBar->isVisible());
+    if (drawBar) settings.setValue("toolbar/DrawingToolBar_visible", drawBar->isVisible());
+    if (alignToolBar) settings.setValue("toolbar/AlignToolBar_visible", alignToolBar->isVisible());
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -3303,7 +3315,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     SessionInfo si;
     si.version = 2;
     si.projectPath = m_projectPath;
-    si.activeTabIndex = qMax(0, _currentCanvasIndex());
+    si.activeTabIndex = qMax(0, dockPanelManager()->documentPanelList().indexOf(m_activeDocumentPanel));
     si.currentTool = m_currentTool;
     si.ripEnabled = m_ripEnabled;
     si.ripXRes = m_ripXRes;
@@ -3338,7 +3350,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     if (m_pProcessGuard)
         m_pProcessGuard->stopAll();
 
-    QMainWindow::closeEvent(event);
+    DockMainWindow::closeEvent(event);
 }
 
 void MainWindow::_toggleHistoryPopup()

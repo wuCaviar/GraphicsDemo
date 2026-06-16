@@ -6,7 +6,7 @@
 #include <QSet>
 #include <QString>
 
-class QToolBar;
+#include "QtitanDocking.h"
 
 // Manages toolbar visibility based on active Page type
 // Toolbars are created externally and registered here for visibility rules
@@ -18,7 +18,7 @@ public:
 
     // Register an externally-created toolbar with page-type visibility rules.
     // Empty pageTypes = always visible.
-    void addToolBar(QToolBar *bar, const QSet<QString> &pageTypes = {});
+    void addToolBar(DockToolBar *bar, const QSet<QString> &pageTypes = {});
 
     // Apply visibility rules immediately (call after registering all toolbars)
     void applyVisibility(const QString &pageType);
@@ -27,7 +27,7 @@ public slots:
     void onPageSwitched(const QString &pageId, const QString &pageType);
 
 private:
-    QMap<QToolBar*, QSet<QString>> m_visibilityRules;
+    QMap<DockToolBar*, QSet<QString>> m_visibilityRules;
 };
 
 #endif // TOOLBARDIRECTOR_H
