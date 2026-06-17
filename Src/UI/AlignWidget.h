@@ -1,7 +1,7 @@
 #ifndef ALIGNWIDGET_H
 #define ALIGNWIDGET_H
 
-#include <QDockWidget>
+#include <QWidget>
 #include <QPointer>
 #include <QGraphicsItem>
 
@@ -13,7 +13,7 @@ class QDoubleSpinBox;
 class QPushButton;
 class QLabel;
 
-class AlignWidget : public QDockWidget
+class AlignWidget : public QWidget
 {
     Q_OBJECT
 
@@ -37,7 +37,7 @@ private slots:
     void onSelectionChanged();
 
 private:
-    void setupUI(QWidget *container);
+    void setupUI();
     QList<QGraphicsItem *> filterSelectableItems() const;
 
     bool applyAlign(AlignmentUtils::AlignDirection direction);

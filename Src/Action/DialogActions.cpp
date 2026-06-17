@@ -6,6 +6,7 @@
 #include "ProcessService.h"
 #include "SettingsDialog.h"
 #include "PreferencesDialog.h"
+#include "atDefine.h"
 
 #include <QMessageBox>
 #include <QApplication>
@@ -45,8 +46,13 @@ void PreferencesAction::_execute()
 
 void AboutAction::_execute()
 {
-    QMessageBox::about(qApp->activeWindow(), QObject::tr("About"),
-                       QObject::tr("ATGraphics — Vector Graphics Editor"));
+    QString strText = QString(QObject::tr("<h3>AT Drawing Tools</h3>"
+                                          "<p>Current Version: %1</p>"
+                                          "<p>    Rip Version: %2</p>"))
+                          .arg(qApp->applicationVersion())
+                          .arg(RipVersion);
+
+    QMessageBox::about(nullptr, QObject::tr("About AT Drawing Tools"), strText);
 }
 
 void AlignWidgetAction::_execute()

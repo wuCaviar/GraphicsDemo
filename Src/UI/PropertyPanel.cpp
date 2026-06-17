@@ -26,7 +26,7 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-PropertyPanel::PropertyPanel(QWidget *parent) : QDockWidget(tr("Properties"), parent)
+PropertyPanel::PropertyPanel(QWidget *parent) : QScrollArea(parent)
 {
     setupUI();
 }
@@ -40,8 +40,7 @@ void PropertyPanel::setDisplayPpi(qreal ppi)
 
 void PropertyPanel::setupUI()
 {
-    auto *scrollArea = new QScrollArea(this);
-    scrollArea->setWidgetResizable(true);
+    setWidgetResizable(true);
     auto *mainWidget = new QWidget;
     auto *mainLayout = new QVBoxLayout(mainWidget);
 
@@ -186,8 +185,7 @@ void PropertyPanel::setupUI()
     mainLayout->addWidget(m_imageInfoGroup);
 
     mainLayout->addStretch();
-    scrollArea->setWidget(mainWidget);
-    setWidget(scrollArea);
+    setWidget(mainWidget);
 
     // ---- 初始状态：隐藏所有分组，显示占位标签 ----
     m_geomGroup->setVisible(false);

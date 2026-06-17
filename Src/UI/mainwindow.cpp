@@ -138,6 +138,23 @@ QFrame *createStatusSeparator(QWidget *parent)
     line->setFixedHeight(16);
     return line;
 }
+
+// 焦点/双击时全选文本的事件过滤器
+class SelectAllFilter : public QObject
+{
+public:
+    using QObject::QObject;
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override
+    {
+        if (event->type() == QEvent::FocusIn || event->type() == QEvent::MouseButtonDblClick) {
+            if (auto *le = qobject_cast<QLineEdit *>(obj))
+                QTimer::singleShot(0, le, &QLineEdit::selectAll);
+        }
+        return false;
+    }
+};
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent)
@@ -154,15 +171,15 @@ MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent)
     _initPages();
 
     // Wire Qtitan dock panel manager signals
-    connect(dockPanelManager(), &DockPanelManager::dockPanelActivated,
-            this, [this](DockWidgetPanel *panel) {
+    connect(dockPanelManager(), &DockPanelManager::dockPanelActivated, this,
+            [this](DockWidgetPanel *panel) {
                 auto *docPanel = qobject_cast<DockDocumentPanel *>(panel);
                 if (docPanel)
                     _onDocumentPanelActivated(docPanel);
             });
 
-    connect(dockPanelManager(), &DockPanelManager::aboutToClose,
-            this, [this](DockPanelBase *panel, bool &handled) {
+    connect(dockPanelManager(), &DockPanelManager::aboutToClose, this,
+            [this](DockPanelBase *panel, bool &handled) {
                 auto *docPanel = qobject_cast<DockDocumentPanel *>(panel);
                 if (!docPanel)
                     return;
@@ -209,8 +226,9 @@ MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent)
     m_statusBarDirector = new StatusBarDirector(this);
     m_statusBarDirector->setPositionLabel(m_posLabel);
     m_statusBarDirector->setZoomControls(m_zoomEdit, m_zoomPctLabel, m_zoomPresetBtn,
-                                         m_zoomPresetMenu, m_zoomOutBtn, m_zoomInBtn,
-                                         m_zoomSlider);
+                                         m_zoomPresetMenu, m_zoomOutBtn, m_zoomInBtn, m_zoomSlider);
+    connect(m_zoomEdit, &QLineEdit::returnPressed, m_statusBarDirector,
+            &StatusBarDirector::applyZoomFromEdit);
     m_statusBarDirector->setCanvasLabel(m_canvasLabel);
     m_statusBarDirector->setToolLabel(m_toolLabel);
     connect(&AppContext::get(), &AppContext::pageSwitched, m_statusBarDirector,
@@ -260,7 +278,8 @@ MainWindow::MainWindow(QWidget *parent) : DockMainWindow(parent)
                     // 如果快照画布多于现有 Tab，动态创建新页
                     QAtCanvasPage *page = nullptr;
                     if (ci < _canvasCount()) {
-                        page = qobject_cast<QAtCanvasPage *>(dockPanelManager()->documentPanelList().at(ci)->widget());
+                        page = qobject_cast<QAtCanvasPage *>(
+                            dockPanelManager()->documentPanelList().at(ci)->widget());
                     } else {
                         QSizeF sz(bundle.info.width > 0 ? bundle.info.width : 1920,
                                   bundle.info.height > 0 ? bundle.info.height : 1080);
@@ -625,6 +644,7 @@ void MainWindow::_initToolBar()
     fileEditBar->setObjectName("FileEditToolBar");
     fileEditBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     fileEditBar->setIconSize(QSize(20, 20));
+    fileEditBar->setStyleSheet(QStringLiteral("QToolButton { margin: 0 2px; }"));
 
     // New 按钮
     QAction *newAct = new QAction(QIcon(":/icons/icons/file-new.svg"), tr("New"), this);
@@ -662,6 +682,7 @@ void MainWindow::_initToolBar()
     drawBar->setObjectName("DrawingToolBar");
     drawBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     drawBar->setIconSize(QSize(20, 20));
+    drawBar->setStyleSheet(QStringLiteral("QToolButton { margin: 2px 0; }"));
 
     auto *actionGroup = new QActionGroup(this);
     actionGroup->setExclusive(true);
@@ -686,14 +707,7 @@ void MainWindow::_initToolBar()
     alignToolBar->setObjectName("AlignToolBar");
     alignToolBar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     alignToolBar->setIconSize(QSize(20, 20));
-
-    {
-        QAction *act = AppContext::get().getQAction(QStringLiteral("AlignLayoutDialog"));
-        if (act)
-            alignToolBar->addAction(act);
-    }
-
-    alignToolBar->addSeparator();
+    alignToolBar->setStyleSheet(QStringLiteral("QToolButton { margin: 0 2px; }"));
 
     // 成组/解组
     QAction *groupAct = AppContext::get().getQAction(QStringLiteral("Group"));
@@ -739,26 +753,24 @@ void MainWindow::_initPropertyPanel()
     m_pPropertyPanel = new PropertyPanel(this);
     m_pPropertyPanel->setObjectName("PropertyPanel");
 
-    m_propsDockPanel = dockPanelManager()->addDockPanel(
-        tr("Properties"), QSize(300, -1), RightDockPanelArea);
+    m_propsDockPanel =
+        dockPanelManager()->addDockPanel(tr("Properties"), QSize(300, -1), RightDockPanelArea);
     m_propsDockPanel->setObjectName("PropertiesPanel");
     m_propsDockPanel->setWidget(m_pPropertyPanel);
     m_propsDockPanel->setFeatures(DockWidgetPanel::DockPanelClosable
-                                  | DockWidgetPanel::DockPanelHideable
-                                  | DockWidgetPanel::DockPanelFloatable);
-    m_propsDockPanel->setAllowedAreas(LeftDockPanelArea | RightDockPanelArea);
+                                  | DockWidgetPanel::DockPanelHideable);
+    m_propsDockPanel->setAllowedAreas(RightDockPanelArea);
 
     m_alignLayoutDlg = new AlignWidget(nullptr, nullptr, this);
     m_alignLayoutDlg->setObjectName("AlignLayoutDock");
 
-    m_alignDockPanel = dockPanelManager()->addDockPanel(
-        tr("Align"), QSize(300, -1), RightDockPanelArea, m_propsDockPanel);
+    m_alignDockPanel = dockPanelManager()->addDockPanel(tr("Align"), QSize(300, -1),
+                                                        RightDockPanelArea, m_propsDockPanel);
     m_alignDockPanel->setObjectName("AlignPanel");
     m_alignDockPanel->setWidget(m_alignLayoutDlg);
     m_alignDockPanel->setFeatures(DockWidgetPanel::DockPanelClosable
-                                  | DockWidgetPanel::DockPanelHideable
-                                  | DockWidgetPanel::DockPanelFloatable);
-    m_alignDockPanel->setAllowedAreas(LeftDockPanelArea | RightDockPanelArea);
+                                  | DockWidgetPanel::DockPanelHideable);
+    m_alignDockPanel->setAllowedAreas(RightDockPanelArea);
     m_alignDockPanel->closePanel();
 
     AppContext::get().setAlignWidget(m_alignLayoutDlg);
@@ -865,17 +877,17 @@ void MainWindow::_initStatusBar()
     m_zoomOutBtn->setAutoRaise(true);
     m_zoomOutBtn->setToolTip(tr("Zoom out"));
     connect(m_zoomOutBtn, &QToolButton::clicked, this, [this]() {
-        if (m_pView) m_pView->setZoomLevel(m_pView->zoomLevel() * 0.8);
+        if (m_pView)
+            m_pView->setZoomLevel(m_pView->zoomLevel() * 0.8);
     });
 
     // Zoom percentage input
     m_zoomEdit = new QLineEdit(QStringLiteral("100"));
     m_zoomEdit->setFixedWidth(44);
     m_zoomEdit->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    m_zoomEdit->setValidator(new QIntValidator(1, 3200, this));
+    m_zoomEdit->setValidator(new QIntValidator(1, 3200, m_zoomEdit));
     m_zoomEdit->setToolTip(tr("Enter zoom percentage, press Enter to apply"));
-    connect(m_zoomEdit, &QLineEdit::returnPressed,
-            m_statusBarDirector, &StatusBarDirector::applyZoomFromEdit);
+    m_zoomEdit->installEventFilter(new SelectAllFilter(m_zoomEdit));
 
     // % label
     m_zoomPctLabel = new QLabel(QStringLiteral("%"));
@@ -884,9 +896,8 @@ void MainWindow::_initStatusBar()
     m_zoomPresetMenu = new QMenu(this);
     auto addPreset = [this](const QString &text, int pct) {
         auto *act = m_zoomPresetMenu->addAction(text);
-        connect(act, &QAction::triggered, this, [this, pct]() {
-            m_statusBarDirector->applyZoomPreset(pct);
-        });
+        connect(act, &QAction::triggered, this,
+                [this, pct]() { m_statusBarDirector->applyZoomPreset(pct); });
     };
     addPreset(QStringLiteral("100%"), 100);
     addPreset(QStringLiteral("200%"), 200);
@@ -910,7 +921,8 @@ void MainWindow::_initStatusBar()
     m_zoomInBtn->setAutoRaise(true);
     m_zoomInBtn->setToolTip(tr("Zoom in"));
     connect(m_zoomInBtn, &QToolButton::clicked, this, [this]() {
-        if (m_pView) m_pView->setZoomLevel(m_pView->zoomLevel() * 1.25);
+        if (m_pView)
+            m_pView->setZoomLevel(m_pView->zoomLevel() * 1.25);
     });
 
     // Log-mapped slider
@@ -1208,7 +1220,8 @@ void MainWindow::_addCanvasPage(const QString &title, const QString &pageId)
     AppContext::get().refreshAllActions();
     m_statusBarDirector->onPageSwitched(pageId, QStringLiteral("canvas"));
 
-    if (m_propsDockPanel)
+    // Only show panel if it wasn't explicitly closed by the user
+    if (m_propsDockPanel && !m_propsDockPanel->isClosed())
         m_propsDockPanel->showPanel();
 
     m_projectModified = true;
@@ -1581,7 +1594,8 @@ void MainWindow::loadSession()
     int activeIdx = AtMath::clamp(info.activeTabIndex, 0, _canvasCount() - 1);
     {
         auto docList = dockPanelManager()->documentPanelList();
-        if (activeIdx >= 0 && activeIdx < docList.size() && m_activeDocumentPanel != docList[activeIdx])
+        if (activeIdx >= 0 && activeIdx < docList.size()
+            && m_activeDocumentPanel != docList[activeIdx])
             _onDocumentPanelActivated(qobject_cast<DockDocumentPanel *>(docList[activeIdx]));
     }
 
@@ -2103,51 +2117,51 @@ void MainWindow::onSaveProject()
         auto docList = dockPanelManager()->documentPanelList();
         for (int i = 0; i < docList.size(); ++i) {
             auto *page = qobject_cast<QAtCanvasPage *>(docList.at(i)->widget());
-        if (!page)
-            continue;
-        auto *canvas = page->canvasItem();
-        if (!canvas)
-            continue;
+            if (!page)
+                continue;
+            auto *canvas = page->canvasItem();
+            if (!canvas)
+                continue;
 
-        CanvasSnapshot snap;
-        snap.page = page;
-        snap.info.width = canvas->canvasSize().width();
-        snap.info.height = canvas->canvasSize().height();
-        snap.info.dpi = canvas->isDpiLocked() ? canvas->canvasDpiX() : 0.0;
-        snap.info.zoom = page->view() ? page->view()->zoomLevel() : 1.0;
+            CanvasSnapshot snap;
+            snap.page = page;
+            snap.info.width = canvas->canvasSize().width();
+            snap.info.height = canvas->canvasSize().height();
+            snap.info.dpi = canvas->isDpiLocked() ? canvas->canvasDpiX() : 0.0;
+            snap.info.zoom = page->view() ? page->view()->zoomLevel() : 1.0;
 
-        auto items = ::filterSelectableItems(page->scene()->items());
-        snap.inputs.reserve(items.size());
-        for (auto *item : items) {
-            SerializeInput input;
-            auto *igi = dynamic_cast<IGraphicsItem *>(item);
-            input.itemType = igi ? static_cast<int>(igi->itemType()) : 0;
-            input.zValue = item->zValue();
-            input.posX = item->pos().x();
-            input.posY = item->pos().y();
-            input.rotation = item->rotation();
-            if (igi) {
-                QByteArray binary;
-                QDataStream out(&binary, QIODevice::WriteOnly);
-                out << static_cast<int>(igi->itemType());
-                igi->serialize(out);
-                input.binary = binary;
-                if (igi->hasPenCmyk()) {
-                    input.cmyk.hasPen = true;
-                    igi->penCmyk(input.cmyk.penC, input.cmyk.penM, input.cmyk.penY,
-                                 input.cmyk.penK);
+            auto items = ::filterSelectableItems(page->scene()->items());
+            snap.inputs.reserve(items.size());
+            for (auto *item : items) {
+                SerializeInput input;
+                auto *igi = dynamic_cast<IGraphicsItem *>(item);
+                input.itemType = igi ? static_cast<int>(igi->itemType()) : 0;
+                input.zValue = item->zValue();
+                input.posX = item->pos().x();
+                input.posY = item->pos().y();
+                input.rotation = item->rotation();
+                if (igi) {
+                    QByteArray binary;
+                    QDataStream out(&binary, QIODevice::WriteOnly);
+                    out << static_cast<int>(igi->itemType());
+                    igi->serialize(out);
+                    input.binary = binary;
+                    if (igi->hasPenCmyk()) {
+                        input.cmyk.hasPen = true;
+                        igi->penCmyk(input.cmyk.penC, input.cmyk.penM, input.cmyk.penY,
+                                     input.cmyk.penK);
+                    }
+                    if (igi->hasBrushCmyk()) {
+                        input.cmyk.hasBrush = true;
+                        igi->brushCmyk(input.cmyk.brushC, input.cmyk.brushM, input.cmyk.brushY,
+                                       input.cmyk.brushK);
+                    }
+                    input.cmyk.gradient = igi->gradientStopCmykMap();
                 }
-                if (igi->hasBrushCmyk()) {
-                    input.cmyk.hasBrush = true;
-                    igi->brushCmyk(input.cmyk.brushC, input.cmyk.brushM, input.cmyk.brushY,
-                                   input.cmyk.brushK);
-                }
-                input.cmyk.gradient = igi->gradientStopCmykMap();
+                snap.inputs.append(input);
             }
-            snap.inputs.append(input);
-        }
-        totalItems += snap.inputs.size();
-        snapshots.append(snap);
+            totalItems += snap.inputs.size();
+            snapshots.append(snap);
         }
     }
 
@@ -3259,11 +3273,13 @@ void MainWindow::loadWindowState()
     if (settings.contains("window/geometry"))
         restoreGeometry(settings.value("window/geometry").toByteArray());
 
-    QString barStatePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockBars.state";
+    QString barStatePath =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockBars.state";
     if (QFile::exists(barStatePath))
         dockBarManager()->loadStateFromFile(barStatePath);
 
-    QString panelStatePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockPanels.state";
+    QString panelStatePath =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockPanels.state";
     if (QFile::exists(panelStatePath))
         dockPanelManager()->loadStateFromFile(panelStatePath);
 
@@ -3282,6 +3298,13 @@ void MainWindow::loadWindowState()
             m_pView->setGridVisible(settings.value("view/gridVisible").toBool());
         AppContext::get().refreshAllActions();
     }
+
+    // Reset stale panel state: if a previous session saved the property panel
+    // as floating/off-screen, forget that state so the panel shows properly docked.
+    if (m_propsDockPanel) {
+        dockPanelManager()->forgetDockPanel(m_propsDockPanel->id());
+        m_propsDockPanel->showPanel();
+    }
 }
 
 void MainWindow::saveWindowState()
@@ -3289,19 +3312,24 @@ void MainWindow::saveWindowState()
     QSettings settings;
     settings.setValue("window/geometry", saveGeometry());
 
-    QString barStatePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockBars.state";
+    QString barStatePath =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockBars.state";
     QDir().mkpath(QFileInfo(barStatePath).absolutePath());
     dockBarManager()->saveStateToFile(barStatePath);
 
-    QString panelStatePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockPanels.state";
+    QString panelStatePath =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/dockPanels.state";
     dockPanelManager()->saveStateToFile(panelStatePath);
 
     auto *fileEditBar = findChild<DockToolBar *>("FileEditToolBar");
     auto *drawBar = findChild<DockToolBar *>("DrawingToolBar");
     auto *alignToolBar = findChild<DockToolBar *>("AlignToolBar");
-    if (fileEditBar) settings.setValue("toolbar/FileEditToolBar_visible", fileEditBar->isVisible());
-    if (drawBar) settings.setValue("toolbar/DrawingToolBar_visible", drawBar->isVisible());
-    if (alignToolBar) settings.setValue("toolbar/AlignToolBar_visible", alignToolBar->isVisible());
+    if (fileEditBar)
+        settings.setValue("toolbar/FileEditToolBar_visible", fileEditBar->isVisible());
+    if (drawBar)
+        settings.setValue("toolbar/DrawingToolBar_visible", drawBar->isVisible());
+    if (alignToolBar)
+        settings.setValue("toolbar/AlignToolBar_visible", alignToolBar->isVisible());
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -3313,7 +3341,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
     SessionInfo si;
     si.version = 2;
     si.projectPath = m_projectPath;
-    si.activeTabIndex = qMax(0, dockPanelManager()->documentPanelList().indexOf(m_activeDocumentPanel));
+    si.activeTabIndex =
+        qMax(0, dockPanelManager()->documentPanelList().indexOf(m_activeDocumentPanel));
     si.currentTool = m_currentTool;
     si.ripEnabled = m_ripEnabled;
     si.ripXRes = m_ripXRes;

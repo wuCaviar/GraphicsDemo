@@ -3,7 +3,8 @@
 
 #include "GradientDialog.h"
 #include "IGraphicsItem.h"
-#include <QDockWidget>
+
+#include <QScrollArea>
 #include <QGraphicsItem>
 
 #include <QtColorWidgets/ColorSelector>
@@ -29,7 +30,7 @@ enum class FillMode
 };
 
 // 属性编辑面板，可编辑选中图元的边框/填充/文字/尺寸等属性
-class PropertyPanel : public QDockWidget
+class PropertyPanel : public QScrollArea
 {
     Q_OBJECT
 

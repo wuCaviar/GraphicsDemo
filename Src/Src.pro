@@ -22,9 +22,9 @@ LIBS += -L$$DESTDIR -lQtColorWidgets
 LIBS += -L$$DESTDIR -lQtGradientEditor
 LIBS += -L$$DESTDIR -lQSimpleUpdater
 LIBS += -L$$DESTDIR -lLayout
-# LIBS += -L$$DESTDIR -lQtitanBase
+LIBS += -L$$DESTDIR -lQtitanBase
 LIBS += -L$$DESTDIR -lQtitanDocking
-# LIBS += -L$$DESTDIR -lQtitanStyle
+LIBS += -L$$DESTDIR -lQtitanStyle
 LIBS += -L$$DESTDIR -lQRuler
 
 

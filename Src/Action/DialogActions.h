@@ -32,7 +32,7 @@ class AlignWidgetAction : public QAtDialogActionBase
 public:
     AlignWidgetAction()
     {
-        m_strActionToken = QStringLiteral("AlignLayoutDialog");
+        m_strActionToken = QStringLiteral("AlignLayout");
         m_checkable = true;
     }
     QString _text() override;
